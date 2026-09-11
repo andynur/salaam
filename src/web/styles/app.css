@@ -144,8 +144,8 @@
 @media (max-width: 760px) {
   .login-page { grid-template-columns: 1fr; }
   .login-intro { padding: 24px; }
-  .brand-tile { width: 150px; }
-  .brand-tile img { height: 84px; }
+  .brand-tile { width: 100px; }
+  .brand-tile img { height: 60px; }
   .login-copy { padding: 24px 0 0; }
   .login-copy h1 { font-size: 32px; margin: 12px 0; }
   .login-copy p, .intro-rule, .intro-caption, .intro-footer { display: none; }
