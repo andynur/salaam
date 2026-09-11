@@ -8,14 +8,42 @@ const fieldLabels: Record<string, string> = {
 };
 
 export function invalid(message: string): never { throw new HttpError(400, "INVALID_INPUT", message); }
-export async function jsonObject(request: Request): Promise<Record<string, unknown>> {
+export async function jsonObject(request: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
     throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Gunakan format JSON.");
   }
+  if (Number(request.headers.get("content-length")) > maxBytes) throw new HttpError(413, "BODY_TOO_LARGE", "Data terlalu besar.");
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength > maxBytes) throw new HttpError(413, "BODY_TOO_LARGE", "Data terlalu besar.");
   let value: unknown;
-  try { value = await request.json(); } catch { invalid("Data JSON tidak valid."); }
+  try { value = JSON.parse(new TextDecoder().decode(bytes)); } catch { invalid("Data JSON tidak valid."); }
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid("Isi data yang valid.");
   return value as Record<string, unknown>;
+}
+// Accepts text fields plus at most one file in the `file` field.
+export async function multipartInput(request: Request, maxBytes: number): Promise<{ body: Record<string, unknown>; file: File | null }> {
+  if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "multipart/form-data") {
+    throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Gunakan formulir berkas.");
+  }
+  if (Number(request.headers.get("content-length")) > maxBytes) throw new HttpError(413, "BODY_TOO_LARGE", "Berkas terlalu besar.");
+  let form: FormData;
+  try { form = await request.formData(); } catch { invalid("Data formulir tidak valid."); }
+  const body: Record<string, unknown> = {};
+  let file: File | null = null;
+  let fileField = false;
+  for (const [key, value] of form) {
+    if (key === "file") {
+      if (fileField) invalid("Lampirkan satu berkas saja.");
+      fileField = true;
+      // An empty browser file input submits a nameless, empty file.
+      if (typeof value !== "string" && (value.name || value.size)) file = value;
+      else if (typeof value === "string" && value) invalid("Data berkas tidak valid.");
+    } else {
+      if (typeof value !== "string" || key in body) invalid("Data formulir tidak valid.");
+      body[key] = value;
+    }
+  }
+  return { body, file };
 }
 export function textField(body: Record<string, unknown>, key: string, max = 100): string {
   const value = body[key];

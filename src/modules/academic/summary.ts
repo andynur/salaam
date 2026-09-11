@@ -8,7 +8,7 @@ export async function academicSummary(db: SQL, actor: Actor, timezone: string) {
       ORDER BY starts_on DESC, id LIMIT 1) AS academic,
     (SELECT count(*)::int FROM courses c WHERE ${all}
       OR EXISTS (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id})
-      OR EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id})) AS courses,
+      OR (c.published AND EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id}))) AS courses,
     (SELECT count(*)::int FROM classes cl WHERE ${all}
       OR EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = cl.id AND m.student_id = ${actor.id})
       OR EXISTS (SELECT 1 FROM courses c JOIN teaching_assignments a ON a.course_id = c.id WHERE c.class_id = cl.id AND a.teacher_id = ${actor.id})) AS classes`;

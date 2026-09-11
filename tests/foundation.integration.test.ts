@@ -98,6 +98,8 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect(audit[0].actor_id).toBe(adminId);
     expect(audit[0].request_id).toBeTruthy();
     expect(audit[0].metadata).toEqual({});
+    // Student dashboards count published courses only; teachers also count assigned drafts.
+    await db`UPDATE courses SET published = true WHERE id = ${courseId}`;
     for (const email of ["student@example.test", "teacher@example.test"]) {
       const cookie = await login(email);
       for (const resource of resources) {

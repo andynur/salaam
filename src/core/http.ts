@@ -6,6 +6,8 @@ import { requirePermission } from "./permissions";
 import { log } from "./logger";
 import type { FoundationHandler } from "./foundation-http";
 import type { Actor } from "./permissions";
+import type { LearningHandler } from "./learning-http";
+import { jsonObject } from "./validation";
 
 export function securityHeaders(production: boolean): Record<string, string> {
   return {
@@ -28,8 +30,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
     throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Gunakan format JSON.");
   }
   let body: unknown;
-  try { body = await request.json(); }
-  catch { throw new HttpError(400, "INVALID_INPUT", "Data masuk tidak valid."); }
+  body = await jsonObject(request);
   if (!body || typeof body !== "object" || !("email" in body) || !("password" in body) ||
     typeof body.email !== "string" || typeof body.password !== "string" ||
     body.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()) ||
@@ -39,7 +40,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
   return { email: body.email.trim().toLowerCase(), password: body.password };
 }
 
-export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown> }) {
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler }) {
   const limiter = new LoginLimiter();
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
@@ -76,6 +77,9 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
           requirePermission(actor, "dashboard:view");
           response = Response.json(services ? await services.dashboard(actor) : { academic: null, courses: 0, classes: 0, tasks: [], events: [] });
         }
+      } else if (path.startsWith("/api/learning/") && services?.learning) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.learning(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/admin/") && services) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.foundation(request, await auth.actor(request), requestId);

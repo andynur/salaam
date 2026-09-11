@@ -24,6 +24,13 @@ Rotate logs, monitor disk and database connections, back up PostgreSQL and priva
 storage to another location, and verify restores regularly. Apply migrations as a
 release step and keep applied migration files immutable.
 
+Uploaded learning files live only under `STORAGE_ROOT/learning-files/`, while their
+metadata and access rules live in PostgreSQL. Back up both in the same window and
+restore them together; a database restore without matching files returns "file not
+found" downloads. Replaced material files are retained, so include storage growth in
+disk monitoring. Configure the reverse proxy to accept request bodies of at least
+10.25 MB (a 10 MB file plus form fields) on `/api/learning/`.
+
 ## Rollout checklist
 
 Freeze the deployment window, run the test suite and build, apply migrations, verify

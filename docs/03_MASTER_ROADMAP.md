@@ -18,7 +18,8 @@ responsive administration UI. This phase is implemented and locally validated.
 ## Phase 2 — Learning core
 
 Add course modules, lessons, materials, publishing, activities, submissions, grading,
-and student progress using the shared Activity Engine.
+and student progress using the shared Activity Engine. This phase is implemented and
+locally validated; see `13_PHASE2_VALIDATION.md`.
 
 ## Phase 3 — Assessment engine
 
