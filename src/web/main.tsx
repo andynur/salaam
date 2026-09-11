@@ -38,7 +38,7 @@ function App() {
   const adminPage = path.startsWith("/admin/");
   const permission = path === "/admin/users" ? "admin.users.manage" : path === "/admin/audit" ? "audit.view" : "academic.manage";
   const content = path.startsWith("/learning") ? <Learning timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
-  return <Shell actor={session.actor} onLogout={() => void logout()} pending={loggingOut}>{error && <ErrorState message={error} />}{content}</Shell>;
+  return <Shell actor={session.actor} onLogout={() => void logout()} onExpired={expired} pending={loggingOut}>{error && <ErrorState message={error} />}{content}</Shell>;
 }
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

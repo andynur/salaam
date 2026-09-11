@@ -1,19 +1,100 @@
-import { useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import type { Actor } from "../../core/permissions";
-import { Button } from "../components/ui";
+import { Icon } from "../components/icons";
 import logo from "../../../assets/logo-color.png";
+import { GlobalSearch } from "./GlobalSearch";
+import { navigationFor, roleLabel } from "./navigation";
 
-const navigation = ["Kehadiran", "Projects", "Kalender", "Laporan"];
-export function Shell({ actor, onLogout, pending, children }: PropsWithChildren<{ actor: Actor; onLogout: () => void; pending: boolean }>) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const isStudent = actor.roles.includes("student") && !actor.roles.some(role => role === "admin" || role === "teacher");
-  const adminNavigation = [["/admin/users", "Akun & profil", "admin.users.manage"], ["/admin/academic", "Akademik", "academic.manage"], ["/admin/audit", "Audit log", "audit.view"]] as const;
-  return <div className="app-shell">
+const collapsedKey = "learning-os:sidebar-collapsed";
+const mobileQuery = "(max-width: 760px)";
+function readCollapsed() {
+  try { return localStorage.getItem(collapsedKey) === "1"; } catch { return false; }
+}
+
+export function Shell({ actor, onLogout, onExpired, pending, children }: PropsWithChildren<{ actor: Actor; onLogout: () => void; onExpired: () => void; pending: boolean }>) {
+  const { isStudent, groups, future, pages } = navigationFor(actor);
+  const [mobile, setMobile] = useState(() => matchMedia(mobileQuery).matches);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [futureOpen, setFutureOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const path = location.pathname;
+
+  useEffect(() => {
+    const media = matchMedia(mobileQuery);
+    const change = () => { setMobile(media.matches); setDrawerOpen(false); };
+    media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    document.querySelector<HTMLElement>("#sidebar a")?.focus();
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setDrawerOpen(false); toggle.current?.focus(); } };
+    addEventListener("keydown", escape);
+    return () => removeEventListener("keydown", escape);
+  }, [drawerOpen]);
+
+  function toggleSidebar() {
+    if (mobile) { setDrawerOpen(!drawerOpen); return; }
+    setCollapsed(!collapsed);
+    try { localStorage.setItem(collapsedKey, collapsed ? "0" : "1"); } catch { /* storage unavailable */ }
+  }
+  const sidebarVisible = mobile ? drawerOpen : !collapsed;
+
+  return <div className={`app-shell${collapsed ? " sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main">Langsung ke konten</a>
-    <header className="topbar"><div className="brand"><img src={logo} alt="HSI Boarding School" /><span className="brand-divider" /><span>Learning <strong>OS</strong></span></div><div className="topbar-right"><span className="workspace-label">Ruang akademik</span><span className="avatar" aria-hidden="true">{actor.displayName.charAt(0).toUpperCase()}</span><span className="user-name">{actor.displayName}</span><Button className="button-secondary button-small" onClick={onLogout} disabled={pending}>{pending ? "Keluar…" : "Keluar"}</Button></div></header>
-    <aside className="sidebar"><div className="workspace"><span className="workspace-icon" aria-hidden="true">H</span><div><strong>HSI Boarding School</strong><span>{isStudent ? "Ruang santri" : "Ruang guru & admin"}</span></div></div><button className="menu-toggle" aria-expanded={menuOpen} aria-controls="navigation" onClick={() => setMenuOpen(!menuOpen)}>Menu navigasi <span aria-hidden="true">☰</span></button>
-      <nav id="navigation" aria-label="Navigasi utama" className={menuOpen ? "navigation is-open" : "navigation"}><span className="nav-label">WORKSPACE</span><a className={location.pathname === "/dashboard" ? "nav-active" : ""} href="/dashboard" aria-current={location.pathname === "/dashboard" ? "page" : undefined}><span aria-hidden="true">▦</span>Dashboard</a>{adminNavigation.filter(([, , permission]) => actor.permissions.includes(permission)).map(([href, label]) => <a key={href} href={href} className={location.pathname === href ? "nav-active" : ""} aria-current={location.pathname === href ? "page" : undefined}><span aria-hidden="true">◇</span>{label}</a>)}{actor.permissions.includes("learning.view") && <a href="/learning" className={location.pathname.startsWith("/learning") ? "nav-active" : ""} aria-current={location.pathname.startsWith("/learning") ? "page" : undefined}><span aria-hidden="true">◇</span>Pembelajaran</a>}{(isStudent ? ["Projects", "Kalender"] : navigation).map(label => <span className="nav-future" key={label}><span aria-hidden="true">◇</span>{label}<span className="future-label">Segera</span></span>)}</nav>
-      <div className="sidebar-note"><span className="gold-dot" /><strong>Ruang untuk bertumbuh</strong><p>Ilmu yang bermanfaat.<br />Karya yang berdampak.</p></div>
-    </aside><main id="main" className="main-content" tabIndex={-1}>{children}</main>
+    <header className="topbar">
+      <div className="topbar-start">
+        <button ref={toggle} type="button" className="icon-button" aria-controls="sidebar" aria-expanded={sidebarVisible} aria-label={sidebarVisible ? "Tutup navigasi" : "Buka navigasi"} onClick={toggleSidebar}><Icon name="sidebar" size={20} /></button>
+        <a className="brand" href="/dashboard"><img src={logo} alt="HSI Boarding School" /><span>Learning <strong>OS</strong></span></a>
+      </div>
+      <GlobalSearch pages={pages} canSearchCourses={actor.permissions.includes("learning.view")} onExpired={onExpired} />
+      <div className="topbar-end"><AccountMenu actor={actor} onLogout={onLogout} pending={pending} /></div>
+    </header>
+    <aside id="sidebar" className={`sidebar${drawerOpen ? " is-open" : ""}`} aria-label="Sidebar">
+      <div className="space-header"><span className="space-avatar" aria-hidden="true">H</span><div><strong>HSI Boarding School</strong><span>{isStudent ? "Ruang santri" : "Ruang guru & admin"}</span></div></div>
+      <nav aria-label="Navigasi utama" className="navigation">
+        {groups.map((group, index) => <div className="nav-group" key={group.label ?? index}>
+          {group.label && <div className="nav-heading" id={`nav-${index}`}>{group.label}</div>}
+          <ul aria-labelledby={group.label ? `nav-${index}` : undefined}>{group.items.map(item => {
+            const active = item.active(path);
+            return <li key={item.href}><a href={item.href} className={`nav-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={20} /><span>{item.label}</span></a></li>;
+          })}</ul>
+        </div>)}
+        <div className="nav-group">
+          <button type="button" className="nav-heading nav-disclosure" aria-expanded={futureOpen} aria-controls="nav-future" onClick={() => setFutureOpen(!futureOpen)}><span>Segera hadir</span><Icon name={futureOpen ? "chevronDown" : "chevronRight"} /></button>
+          <ul id="nav-future" hidden={!futureOpen}>{future.map(item => <li key={item.label}><span className="nav-item nav-item-disabled" aria-disabled="true"><Icon name={item.icon} size={20} /><span>{item.label}</span><span className="nav-soon">Segera</span></span></li>)}</ul>
+        </div>
+      </nav>
+      <p className="sidebar-footer"><span className="gold-dot" aria-hidden="true" />Ilmu yang bermanfaat. Karya yang berdampak.</p>
+    </aside>
+    {drawerOpen && <div className="sidebar-backdrop" aria-hidden="true" onClick={() => setDrawerOpen(false)} />}
+    <main id="main" className="main-content" tabIndex={-1}>{children}</main>
+  </div>;
+}
+
+function AccountMenu({ actor, onLogout, pending }: { actor: Actor; onLogout: () => void; pending: boolean }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    root.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener("pointerdown", outside);
+    addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside); removeEventListener("keydown", escape); };
+  }, [open]);
+  const initial = actor.displayName.trim().charAt(0).toUpperCase() || "?";
+  return <div className="account-menu" ref={root}>
+    <button ref={trigger} type="button" className="account-trigger" aria-haspopup="menu" aria-expanded={open} aria-controls="account-menu" onClick={() => setOpen(!open)}>
+      <span className="avatar" aria-hidden="true">{initial}</span><span className="account-name">{actor.displayName}</span><Icon name="chevronDown" />
+    </button>
+    {open && <div className="menu-popover" id="account-menu" role="menu" aria-label="Akun">
+      <div className="menu-profile" role="presentation"><span className="avatar avatar-large" aria-hidden="true">{initial}</span><div><strong>{actor.displayName}</strong><span>{roleLabel(actor)}</span></div></div>
+      <div className="menu-separator" role="separator" />
+      <button type="button" role="menuitem" className="menu-item" disabled={pending} onClick={onLogout}><Icon name="logout" size={20} />{pending ? "Keluar…" : "Keluar"}</button>
+    </div>}
   </div>;
 }
