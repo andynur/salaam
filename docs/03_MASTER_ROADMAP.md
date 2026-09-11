@@ -24,7 +24,9 @@ locally validated; see `13_PHASE2_VALIDATION.md`.
 ## Phase 3 — Assessment engine
 
 Add question banks, attempts, answers, grading workflows, rubrics, timers,
-randomization, autosave, reconnect recovery, and idempotent final submission.
+randomization, autosave, reconnect recovery, and idempotent final submission. This phase
+is implemented and locally validated for choice-based questions; essays and rubrics are
+deferred (see `14_PHASE3_VALIDATION.md`).
 
 ## Phase 4 — Project learning
 

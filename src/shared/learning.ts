@@ -1,3 +1,5 @@
+import type { Assessment } from "./assessment";
+
 export interface Page<T> { items: T[]; nextOffset: number | null }
 export interface StoredFile { id: string; name: string; mediaType: string; sizeBytes: number }
 export interface LearningCourse { id: string; name: string; className: string; term: string; year: string; published: boolean; canManage: boolean }
@@ -8,8 +10,8 @@ export interface Grade { id: string; score: number; feedback: string; createdAt:
 export interface Submission { id: string; activityId: string; studentId: string; studentName: string; content: string; file: StoredFile | null; submittedAt: string; grade: Grade | null }
 export interface Activity { id: string; lessonId: string; kind: "assignment"; title: string; instructions: string; dueAt: string | null; published: boolean; archived: boolean; submission: Submission | null }
 export interface Progress { studentId: string; studentName: string; lessons: number; completed: number; activities: number; submitted: number; graded: number }
-export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; progress: Progress | null }
-export interface LearningTask { type: "assignment" | "lesson" | "grading"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number }
+export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; progress: Progress | null }
+export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number }
 
 // Extension allowlist for uploads. The server also checks each file's leading bytes.
 export const uploadTypes = {

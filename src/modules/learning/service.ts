@@ -1,6 +1,7 @@
 import type { SQL } from "bun";
 import type { Actor } from "../../core/permissions";
 import { requirePermission } from "../../core/permissions";
+import { HttpError } from "../../core/errors";
 import { idField, invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
 import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
@@ -8,6 +9,7 @@ import type { CourseDetail, CourseModule, Lesson, Material, LearningCourse, Prog
 import { courseAccess, lessonAccess, notFound } from "./access";
 import { archivedInput, materialInput, positionInput, publishedInput } from "./input";
 import { listActivities } from "../activities/service";
+import { listAssessments } from "../assessments/service";
 
 export async function listCourses(db: SQL, actor: Actor, pattern: string, offset: number) {
   requirePermission(actor, "learning.view");
@@ -22,6 +24,8 @@ export async function listCourses(db: SQL, actor: Actor, pattern: string, offset
     ORDER BY y.starts_on DESC, c.name, c.id LIMIT 51 OFFSET ${offset}`;
 }
 
+// Activities of every kind count. An assignment is done when submitted and graded when a
+// grade exists; a quiz or exam is both once any attempt is submitted (scores are automatic).
 export async function progressRows(db: SQL, courseId: string, studentId: string | null, pattern = "%", offset = 0) {
   return db<Progress[]>`WITH visible_lessons AS (
       SELECT l.id FROM lessons l JOIN course_modules m ON m.id = l.module_id JOIN courses c ON c.id = l.course_id
@@ -32,9 +36,11 @@ export async function progressRows(db: SQL, courseId: string, studentId: string 
       (SELECT count(*)::int FROM visible_lessons) AS lessons,
       (SELECT count(*)::int FROM lesson_completions lc JOIN visible_lessons l ON l.id = lc.lesson_id WHERE lc.student_id = u.id) AS completed,
       (SELECT count(*)::int FROM visible_activities) AS activities,
-      (SELECT count(*)::int FROM submissions s JOIN visible_activities a ON a.id = s.activity_id WHERE s.student_id = u.id) AS submitted,
-      (SELECT count(*)::int FROM submissions s JOIN visible_activities a ON a.id = s.activity_id
-        WHERE s.student_id = u.id AND EXISTS (SELECT 1 FROM submission_grades g WHERE g.submission_id = s.id)) AS graded
+      (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id)
+        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)) AS submitted,
+      (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id
+          AND EXISTS (SELECT 1 FROM submission_grades g WHERE g.submission_id = s.id))
+        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)) AS graded
     FROM class_members cm JOIN users u ON u.id = cm.student_id JOIN courses c ON c.class_id = cm.class_id
     WHERE c.id = ${courseId} AND (${studentId}::uuid IS NULL OR u.id = ${studentId}::uuid) AND u.display_name ILIKE ${pattern}
     ORDER BY u.display_name, u.id LIMIT 51 OFFSET ${offset}`;
@@ -60,8 +66,9 @@ export async function courseDetail(db: SQL, actor: Actor, courseId: string): Pro
         AND (${drafts} OR (lm.archived_at IS NULL AND l.published AND m.published AND l.archived_at IS NULL AND m.archived_at IS NULL))
       ORDER BY lm.created_at, lm.id`;
     const activities = await listActivities(tx, actor, courseId, drafts);
+    const assessments = await listAssessments(tx, actor, courseId, drafts);
     const progress = access.canParticipate ? (await progressRows(tx, courseId, actor.id))[0] ?? null : null;
-    return { ...access, modules, lessons, materials, activities, progress };
+    return { ...access, modules, lessons, materials, activities, assessments, progress };
   });
 }
 
@@ -132,7 +139,12 @@ export async function publishContent(db: SQL, actor: Actor, courseId: string, re
       case "courses": rows = await tx`UPDATE courses SET published = ${published} WHERE id = ${courseId} RETURNING id`; break;
       case "modules": rows = await tx`UPDATE course_modules SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
       case "lessons": rows = await tx`UPDATE lessons SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
-      case "activities": rows = await tx`UPDATE activities SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} AND kind = 'assignment' RETURNING id`; break;
+      case "activities":
+        if (published && (await tx`SELECT 1 FROM activities a WHERE a.id = ${id} AND a.course_id = ${courseId} AND a.kind IN ('quiz', 'exam')
+            AND NOT EXISTS (SELECT 1 FROM assessment_questions aq WHERE aq.activity_id = a.id)`).length) {
+          throw new HttpError(409, "NO_QUESTIONS", "Tambahkan soal sebelum mempublikasikan penilaian.");
+        }
+        rows = await tx`UPDATE activities SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
     }
     if (!rows.length) notFound();
     await recordAudit(tx, actor.id, `learning.${resource}.${published ? "published" : "unpublished"}`, resource, rows[0]!.id, requestId);
@@ -153,7 +165,7 @@ export async function archiveContent(db: SQL, actor: Actor, courseId: string, re
       case "materials": rows = await tx`UPDATE lesson_materials SET archived_at = CASE WHEN ${archived} THEN COALESCE(archived_at, clock_timestamp()) END
         WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
       case "activities": rows = await tx`UPDATE activities SET archived_at = CASE WHEN ${archived} THEN COALESCE(archived_at, clock_timestamp()) END
-        WHERE id = ${id} AND course_id = ${courseId} AND kind = 'assignment' RETURNING id`; break;
+        WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
     }
     if (!rows.length) notFound();
     await recordAudit(tx, actor.id, `learning.${resource}.${archived ? "archived" : "restored"}`, resource, rows[0]!.id, requestId);

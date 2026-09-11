@@ -1,7 +1,8 @@
 import type { SQL } from "bun";
 import type { RecordRow } from "../../shared/foundation";
 
-export async function recordAudit(db: SQL, actorId: string, event: string, resourceType: string, resourceId: string, requestId: string) {
+// A null actor marks system-driven events, such as attempts finalized at their deadline.
+export async function recordAudit(db: SQL, actorId: string | null, event: string, resourceType: string, resourceId: string, requestId: string) {
   await db`INSERT INTO audit_logs (actor_id, event, resource_type, resource_id, request_id)
     VALUES (${actorId}, ${event}, ${resourceType}, ${resourceId}, ${requestId})`;
 }

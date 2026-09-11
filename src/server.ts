@@ -32,7 +32,7 @@ const server = Bun.serve({
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index },
+  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index },
   fetch(request, server) { return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {
     const requestId = crypto.randomUUID();

@@ -8,9 +8,12 @@ export function notFound(): never { throw new HttpError(404, "NOT_FOUND", "Konte
 
 // Lock the course first on every mutation, including publishing, submitting and grading.
 // Descendant checks and writes then observe one consistent visibility state.
-export async function courseAccess(db: SQL, actor: Actor, courseId: string, mode: "view" | "manage" | "participate", lock = false) {
+// Attempt traffic takes a shared lock instead: publishing still waits for in-flight
+// attempt writes, but students answering the same exam do not serialize on each other.
+export async function courseAccess(db: SQL, actor: Actor, courseId: string, mode: "view" | "manage" | "participate", lock: boolean | "share" = false) {
   requirePermission(actor, mode === "manage" ? "learning.manage" : mode === "participate" ? "learning.participate" : "learning.view");
-  if (lock) await db`SELECT id FROM courses WHERE id = ${courseId} FOR UPDATE`;
+  if (lock === "share") await db`SELECT id FROM courses WHERE id = ${courseId} FOR SHARE`;
+  else if (lock) await db`SELECT id FROM courses WHERE id = ${courseId} FOR UPDATE`;
   const rows = await db<(LearningCourse & { enrolled: boolean })[]>`SELECT c.id, c.name, cl.name AS "className", t.name AS term, y.name AS year, c.published,
     (${actor.permissions.includes("learning.manage")} AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS
       (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id}))) AS "canManage",

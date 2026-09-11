@@ -1,0 +1,56 @@
+import type { SQL } from "bun";
+import type { Actor } from "../../core/permissions";
+import { HttpError } from "../../core/errors";
+import { idField, invalid } from "../../core/validation";
+import { recordAudit } from "../../core/audit/repository";
+import { courseAccess, notFound } from "../learning/access";
+import { adjustmentInput } from "./input";
+import { finalizeExpired } from "./attempts";
+import type { AttemptRow, ScoreAdjustment } from "../../shared/assessment";
+
+export async function listAttempts(db: SQL, actor: Actor, courseId: string, activityId: string, pattern: string, offset: number, requestId: string) {
+  await finalizeExpired(db, { activityId }, requestId);
+  return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
+    await courseAccess(tx, actor, courseId, "manage");
+    if (!(await tx`SELECT 1 FROM activities WHERE id = ${activityId} AND course_id = ${courseId} AND kind IN ('quiz', 'exam')`).length) notFound();
+    return tx<AttemptRow[]>`SELECT t.id, t.student_id AS "studentId", u.display_name AS "studentName", t.number, t.started_at AS "startedAt",
+        t.deadline_at AS "deadlineAt", t.submitted_at AS "submittedAt", t.submission_reason AS "submissionReason", t.max_score::float8 AS "maxScore",
+        COALESCE((SELECT adj.score FROM attempt_score_adjustments adj WHERE adj.attempt_id = t.id ORDER BY adj.created_at DESC, adj.id DESC LIMIT 1), t.score)::float8 AS score,
+        EXISTS (SELECT 1 FROM attempt_score_adjustments adj WHERE adj.attempt_id = t.id) AS adjusted
+      FROM attempts t JOIN users u ON u.id = t.student_id
+      WHERE t.activity_id = ${activityId} AND u.display_name ILIKE ${pattern}
+      ORDER BY u.display_name, u.id, t.number LIMIT 51 OFFSET ${offset}`;
+  });
+}
+
+export async function adjustScore(db: SQL, actor: Actor, courseId: string, attemptId: string, body: Record<string, unknown>, requestId: string) {
+  const { score, reason } = adjustmentInput(body);
+  // The editor supplies the adjustment it read, like assignment grade corrections.
+  const previousAdjustmentId = body.previousAdjustmentId === null ? null : idField(body, "previousAdjustmentId");
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const attempt = (await tx<{ submitted: boolean; maxScore: number }[]>`SELECT t.submitted_at IS NOT NULL AS submitted, t.max_score::float8 AS "maxScore"
+      FROM attempts t JOIN activities a ON a.id = t.activity_id WHERE t.id = ${attemptId} AND a.course_id = ${courseId} FOR UPDATE OF t`)[0];
+    if (!attempt) notFound();
+    if (!attempt.submitted) throw new HttpError(409, "ATTEMPT_OPEN", "Nilai hanya dapat dikoreksi setelah attempt selesai.");
+    if (score > attempt.maxScore) invalid(`Nilai maksimal ${attempt.maxScore}.`);
+    const latest = (await tx<{ id: string; score: number; reason: string }[]>`SELECT id, score::float8 AS score, reason FROM attempt_score_adjustments
+      WHERE attempt_id = ${attemptId} ORDER BY created_at DESC, id DESC LIMIT 1`)[0];
+    if (latest && latest.score === score && latest.reason === reason) return { id: latest.id };
+    if ((latest?.id ?? null) !== previousAdjustmentId) throw new HttpError(409, "SCORE_CHANGED", "Nilai sudah dikoreksi. Muat ulang sebelum mengoreksi kembali.");
+    const rows = await tx<{ id: string }[]>`INSERT INTO attempt_score_adjustments (attempt_id, grader_id, score, reason)
+      VALUES (${attemptId}, ${actor.id}, ${score}, ${reason}) RETURNING id`;
+    await recordAudit(tx, actor.id, "assessment.attempt.adjusted", "attempts", attemptId, requestId);
+    return rows[0]!;
+  });
+}
+
+export async function adjustmentHistory(db: SQL, actor: Actor, courseId: string, attemptId: string, offset: number) {
+  return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
+    await courseAccess(tx, actor, courseId, "manage");
+    if (!(await tx`SELECT 1 FROM attempts t JOIN activities a ON a.id = t.activity_id WHERE t.id = ${attemptId} AND a.course_id = ${courseId}`).length) notFound();
+    return tx<ScoreAdjustment[]>`SELECT adj.id, adj.score::float8 AS score, adj.reason, u.display_name AS "graderName", adj.created_at AS "createdAt"
+      FROM attempt_score_adjustments adj JOIN users u ON u.id = adj.grader_id
+      WHERE adj.attempt_id = ${attemptId} ORDER BY adj.created_at DESC, adj.id DESC LIMIT 51 OFFSET ${offset}`;
+  });
+}

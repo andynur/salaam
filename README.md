@@ -4,21 +4,29 @@ Learning OS is an open-source learning and academic operations platform for HSI
 Boarding School. It is designed as a modular monolith for courses, assessments,
 projects, portfolios, attendance, gamification, and classroom operations.
 
-The repository currently delivers **Phase 2 — Learning Core** on top of the Phase 1
-identity and academic foundation. Phase 1 covers secure authentication, role-linked
-profiles, academic years, terms, classes, student enrollment, subjects, courses, teacher
-assignments, permission checks, audit logs, and a responsive administration interface.
-Phase 2 adds course modules, lessons, text/link/file materials, layered publishing,
-archiving, assignments with optional file attachments, final submissions, grade
-corrections, student progress, and dashboard task shortcuts. Assessments (quizzes,
-exams, attempts) and the remaining roadmap phases are tracked separately.
+The repository currently delivers **Phase 3 — Assessment Engine** on top of the
+Phase 1 identity and academic foundation and the Phase 2 learning core.
+
+- **Phase 1:** secure authentication, role-linked profiles, academic years, terms,
+  classes, enrollment, subjects, courses, teacher assignments, permission checks, audit
+  logs, and a responsive administration interface.
+- **Phase 2:** course modules, lessons, text/link/file materials, layered publishing,
+  archiving, assignments with file attachments, submissions, grade corrections, student
+  progress, and dashboard task shortcuts.
+- **Phase 3:** a course question bank (single choice, multiple choice, true/false),
+  quizzes and exams on the shared Activity Engine, server-timed attempts with
+  per-student randomization, forward-only autosave with reconnect recovery, idempotent
+  final submission, automatic scoring, result visibility rules, and audited score
+  adjustments.
+
+Project learning and the remaining roadmap phases are tracked separately.
 
 ## Status
 
-This is an active early-stage project. Phases 0, 1, and 2 are implemented and
-validated locally. The project is not presented as a production deployment for a
-school environment yet; HTTPS proxy configuration, backup/restore drills, capacity
-testing, and operational rollout still require environment-specific validation.
+This is an active early-stage project. Phases 0 through 3 are implemented and validated
+locally. The project is not presented as a production deployment for a school
+environment yet; HTTPS proxy configuration, backup/restore drills, capacity testing, and
+operational rollout still require environment-specific validation.
 
 ## Architecture
 
@@ -41,6 +49,7 @@ Important directories:
 | `src/modules/academic/` | Academic structure, enrollment, teacher assignments, and dashboard summaries |
 | `src/modules/learning/` | Course access, modules, lessons, materials, publishing, archiving, progress, and dashboard tasks |
 | `src/modules/activities/` | Shared Activity Engine: assignments, submissions, and grading |
+| `src/modules/assessments/` | Question bank, quiz/exam settings, attempts, automatic scoring, and score adjustments |
 | `src/shared/` | Shared data contracts used by server and web layers |
 | `src/web/` | Application shell, pages, UI primitives, and design tokens |
 | `database/migrations/` | Ordered, immutable-after-apply SQL migrations |
@@ -119,16 +128,13 @@ authorized administrator through the administration UI.
 4. Assign active teachers to courses.
 5. Review the read-only audit log.
 
-The current administration API exposes `GET` and `POST` routes under
-`/api/admin/{resource}` for `users`, `years`, `terms`, `classes`, `enrollments`,
-`subjects`, `courses`, and `teaching-assignments`. Audit records are available through
-`GET /api/admin/audit`. Lists accept `q` and `offset`, return at most 50 rows, and use
-the `{ items, nextOffset }` response shape. Server-side permissions and same-origin
-checks apply to every mutation.
-
-Phase 1 intentionally provides create/list operations only. Profile editing, role
-reassignment, account recovery, class transfers, and academic archive states are not
-included.
+The administration API exposes `GET` and `POST` routes under `/api/admin/{resource}` for
+`users`, `years`, `terms`, `classes`, `enrollments`, `subjects`, `courses`, and
+`teaching-assignments`. Audit records are available through `GET /api/admin/audit`.
+Lists accept `q` and `offset`, return at most 50 rows, and use the
+`{ items, nextOffset }` response shape. Server-side permissions and same-origin checks
+apply to every mutation. Profile editing, role reassignment, account recovery, class
+transfers, and academic archive states are not included.
 
 ## Phase 2 workflow
 
@@ -140,38 +146,42 @@ included.
 4. Enrolled students complete lessons and submit one final answer before the
    server-side deadline: text, a file, or both.
 5. The teacher grades submissions from 0 to 100 with feedback and reviews class
-   progress. Corrections append a new grade and keep the earlier ones in the history.
-6. Content that is no longer needed is archived instead of deleted. Archived items stay
-   restorable, and their completions, submissions, and grades are kept.
-
-The dashboard lists open assignments and each course's next lesson for students, and
-assignments with ungraded submissions for teachers.
+   progress. Corrections append a new grade and keep the earlier ones.
+6. Content that is no longer needed is archived instead of deleted and stays restorable.
 
 Uploads accept PDF, PNG, JPG, WebP, TXT, DOCX, XLSX, PPTX, and ZIP files up to 10 MB.
-The server checks the extension against the file's leading bytes and ignores the
-browser-supplied media type. Files are stored under `STORAGE_ROOT/learning-files/` by
-generated ID; the original name is display metadata only. Downloads require the same
-access as the material or submission, and are always served as attachments with a
-sandboxing Content-Security-Policy.
+The server checks the extension against the file's leading bytes, stores files under
+`STORAGE_ROOT/learning-files/` by generated ID, and serves downloads only as sandboxed
+attachments after access checks. See
+[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md) for the API and limits.
 
-The learning API is under `/api/learning/courses`. `GET /api/learning/courses` and
-`GET /api/learning/courses/{courseId}` return the course list and workspace. Authoring
-uses `POST` (create) and `PATCH` (update) on `modules`, `lessons`, `materials`, and
-`activities` within a course. `POST .../publish` sets visibility for the course or for a
-module, lesson, or activity, and `POST .../{resource}/{id}/archive` archives or restores
-a module, lesson, material, or activity. Students use `POST .../lessons/{id}/complete`
-and `POST .../activities/{id}/submit`. Teachers use `GET .../activities/{id}/submissions`,
-`POST .../submissions/{id}/grade`, `GET .../submissions/{id}/grades`, and
-`GET .../progress`. Files download from `GET .../materials/{id}/file` and
-`GET .../submissions/{id}/file`. Material authoring and submissions accept
-`multipart/form-data` with one `file` field; other learning requests are JSON limited to
-64 KiB, and login and administration bodies stay at 4 KiB. Access follows teacher
-assignment, class enrollment, publishing, and archive state, and anything outside that
-scope returns 404.
+## Phase 3 workflow
 
-Phase 2 does not provide quizzes, exams, resubmissions, deadline extensions, rich text,
-XP, or calendar deadlines. See
-[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md) for the full list.
+1. In a course, the teacher opens **Bank soal** and adds single-choice,
+   multiple-choice, or true/false questions with an answer key and optional explanation.
+2. In a lesson, the teacher adds a quiz or an exam, chooses questions and points, and
+   sets the window, time limit, attempts, shuffling, and result visibility. An exam
+   always has one attempt, a time limit, and a closing time.
+3. After publishing, students start the assessment from the lesson or dashboard. Each
+   attempt snapshots its questions, shuffles them per student when configured, and
+   fixes its deadline from server time.
+4. Answers autosave as they are chosen. Answers made while offline stay on the device
+   and are resent after the connection or page returns. Retried or late autosaves never
+   overwrite a newer answer.
+5. Students submit once; submission is idempotent. Attempts that reach their deadline
+   are finalized automatically with the last saved answers. Multiple-choice questions
+   score only when every choice is exact.
+6. Students see scores and explanations according to the visibility setting. Teachers
+   review attempts and append audited score adjustments with a reason.
+
+Questions used by an attempted assessment, and the assessment's settings and question
+list, are locked. The Phase 3 API extends `/api/learning/courses/{courseId}` with
+`questions`, `assessments`, `assessments/{id}/items`, `assessments/{id}/attempts`,
+`attempts/{id}`, `attempts/{id}/answers`, `attempts/{id}/submit`,
+`attempts/{id}/adjust`, and `attempts/{id}/adjustments`; publishing and archiving reuse
+`activities/{id}/publish` and `activities/{id}/archive`. See
+[`docs/14_PHASE3_VALIDATION.md`](docs/14_PHASE3_VALIDATION.md) for details and the
+out-of-scope list (essays, rubrics, surveys, time extensions, and proctoring).
 
 ## Database migrations
 
@@ -180,9 +190,10 @@ bun run db:migrate
 ```
 
 The migration runner uses a PostgreSQL advisory lock, validates migration checksums,
-and applies pending files atomically. Add a new file such as
-`0004_assessment_engine.sql`; do not edit a migration that has already been applied.
-Runtime values use parameterized SQL. Raw SQL is limited to trusted migration files.
+and applies pending files atomically. Add a new file such as `0005_project_learning.sql`;
+do not edit a migration that has already been applied. Runtime values use parameterized
+SQL. Raw SQL is limited to trusted migration files. Bind JSON documents as
+`${JSON.stringify(value)}::text::jsonb`; a direct `::jsonb` cast stores a JSON string.
 
 ## Development and validation
 
@@ -201,18 +212,20 @@ TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test
 ```
 
 Integration tests create and remove random schemas and do not modify the public schema.
-They cover migration replay and rollback, constraints, login/session behavior,
-permission revocation, provisioning, academic relationships, duplicate and concurrent
-enrollment, audit rollback, pagination, and database connectivity. For the learning
-core they also cover layered publishing, archiving, course boundaries, file validation
-and private downloads, idempotent submissions, server-side deadlines, concurrent
-grading, dashboard tasks, progress, and 125 concurrent submissions to one course.
+They cover migrations, constraints, sessions, permissions, provisioning, academic
+relationships, audit rollback, and pagination. For the learning core they also cover
+publishing, archiving, course boundaries, private files, idempotent submissions,
+deadlines, grading, dashboard tasks, and 125 concurrent submissions. For the assessment
+engine they cover the question bank, attempt snapshots, forward-only autosave,
+idempotent submission, automatic scoring, exam windows and expiry, result visibility,
+score adjustments, course boundaries, and 125 students completing one exam concurrently.
 Uploaded test files are written under the ignored `.test-artifacts/` directory and
 removed afterwards.
 
 Validated results are documented in
-[`docs/12_PHASE1_VALIDATION.md`](docs/12_PHASE1_VALIDATION.md) and
-[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md).
+[`docs/12_PHASE1_VALIDATION.md`](docs/12_PHASE1_VALIDATION.md),
+[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md), and
+[`docs/14_PHASE3_VALIDATION.md`](docs/14_PHASE3_VALIDATION.md).
 
 ## Production notes
 
@@ -243,11 +256,10 @@ rules for coding agents and maintainers.
 
 ## Roadmap
 
-The next planned milestone is **Phase 3 — Assessment Engine**: question banks,
-attempts, answers, grading workflows, rubrics, timers, randomization, autosave,
-reconnect recovery, and idempotent final submission, built on the shared Activity
-Engine. Follow the [master roadmap](docs/03_MASTER_ROADMAP.md) and keep each phase
-independently reviewable and testable.
+The next planned milestone is **Phase 4 — Project Learning**: challenges, projects,
+teams, Kanban workflows, reviews, showcases, and portfolio entries. Follow the
+[master roadmap](docs/03_MASTER_ROADMAP.md) and keep each phase independently
+reviewable and testable.
 
 ## Contributing
 
