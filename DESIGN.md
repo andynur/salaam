@@ -1,10 +1,11 @@
-## DESIGN.md — UI Kit Reference
+# DESIGN.md — UI kit reference
 
 Read this before building or changing any screen. It documents the UI kit as it actually
 exists in `src/web/`, not an aspirational spec — every token and class below is real and
-in use. The product-level direction (Jira-inspired productivity UI for teachers/admins,
-simpler task UI for students) lives in `docs/06_UI_UX_DESIGN_SYSTEM.md`; this file is the
-concrete "how to build it consistently" companion.
+in use.
+
+Product direction: teacher and administrator screens are dense, Jira-inspired productivity
+views; student screens stay simple, task- and progress-focused, and comfortable on a phone.
 
 The visual language follows the Atlassian/Jira pattern — white topbar with global search,
 a grouped left sidebar with line icons, breadcrumb + page header, bordered cards, lozenges,
@@ -15,7 +16,7 @@ class or component that already does what you need before writing new CSS or a n
 component. Most screens should only need new page-level layout classes, not new
 primitives.
 
-### Stack and rendering model
+## Stack and rendering model
 
 - Plain React function components, no CSS-in-JS, no component library, no icon package.
 - Tailwind CSS v4 is used only for its CSS-first token engine (`@theme` in
@@ -32,7 +33,7 @@ primitives.
   `.option-row`, `.option-row.option-correct`). State classes use `is-*`
   (`.nav-item.is-active`, `.sidebar.is-open`). Match this style for new classes.
 
-### Design tokens (`@theme` in `app.css`)
+## Design tokens (`@theme` in `app.css`)
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -71,7 +72,7 @@ Radius: 3px lozenges, 4px controls/nav items, 6px search/option rows, 8px cards/
 50% avatars. Elevation: cards are flat with a 1px border; only overlays get
 `--shadow-overlay`.
 
-### Icons (`src/web/components/icons.tsx`)
+## Icons (`src/web/components/icons.tsx`)
 
 ```tsx
 <Icon name="book" />            // 16px, inherits currentColor, aria-hidden
@@ -83,7 +84,7 @@ text or an `aria-label` on the parent control; the icon itself is decorative. Ad
 icon by adding a path entry to the `paths` map in the same style — don't import an icon
 library, and don't use Unicode glyphs (`◇`, `▦`, `☰`) as icons.
 
-### Layout shells
+## Layout shells
 
 Two top-level page shells exist; every screen is one of these two, never a bespoke
 layout:
@@ -92,11 +93,11 @@ layout:
   dark `.login-intro` brand panel + light `.login-form-area` form panel. Collapses to a
   single column under 760px. Login keeps 44px inputs/buttons. The form `.badge` holds
   the Arabic salam greeting — the only Arabic-script copy allowed in the UI, because HSI
-  Boarding School is an Islamic school; see `docs/BRAND_GUIDELINES.md`. The product name in
+  Boarding School is an Islamic school; see `docs/brand.md`. The product name in
   `.intro-footer` and `.login-footer`, and every `document.title`, come from `BRAND` and
   `brandTitle()` in `src/web/lib/brand.ts` — never hard-code the product name. Favicon,
   app icons, manifest, and social preview live in `assets/brand/`; see
-  `docs/BRAND_GUIDELINES.md`.
+  `docs/brand.md`.
 - **`.app-shell`** — authenticated app (`src/web/layouts/Shell.tsx`):
   - `.topbar` (sticky, `--topbar-height`): `.topbar-start` (sidebar toggle
     `.icon-button` + `.brand` link: 28px SALAAM mark and the product name at 16px/650),
@@ -121,7 +122,7 @@ layout:
   (debounced, top 5). `/` focuses it; ↑/↓/Enter/Escape work. At ≤760px it collapses to a
   `.search-trigger` icon that expands over the topbar.
 
-Responsive rules (enforced by the phase validation docs, keep honoring them):
+Responsive rules (checked in every phase's browser smoke run; keep honoring them):
 
 - No document-level horizontal scroll at 390px (phone) or 820px (tablet) viewports.
 - Wide tabular content scrolls internally via `.table-scroll { overflow: auto; }`
@@ -132,7 +133,7 @@ Responsive rules (enforced by the phase validation docs, keep honoring them):
   `@media (pointer: coarse)` raises touch targets. Don't add another width breakpoint
   without a real reason.
 
-### Base primitives (`src/web/components/ui.tsx`)
+## Base primitives (`src/web/components/ui.tsx`)
 
 ```tsx
 <Button>Simpan</Button>                                   // primary
@@ -153,9 +154,9 @@ Don't reintroduce "← Kembali" links — a breadcrumb is the back navigation.
 
 Every data view must render one of `LoadingState` / `EmptyState` / `ErrorState` /
 success content — no bare blank screens while fetching or on empty results. This is a
-hard rule from `docs/06_UI_UX_DESIGN_SYSTEM.md`, not optional polish.
+hard rule, not optional polish; see the interaction-state contract below.
 
-### List/detail/form kit (`src/web/components/learning.tsx`)
+## List/detail/form kit (`src/web/components/learning.tsx`)
 
 This is the reusable "Jira-like admin view" kit. Every new admin or data-management
 screen (the Phase 4 project screens included) should be built from these, not
@@ -179,7 +180,7 @@ Create flows on list pages follow the Jira pattern in `Foundation.tsx`: a primar
 `+ Action` button in `PageHeader` actions toggles an `.admin-form-card` panel above the
 list (focus moves to the first field), and the empty state offers the same action.
 
-### Component class catalogue
+## Component class catalogue
 
 Grouped by what they're for. This is the full inventory in `app.css` — check here before
 adding a near-duplicate.
@@ -230,8 +231,8 @@ adding a near-duplicate.
   `.board-hint`, `.task-editor`.
 - **Projects**: `.project-meta` (icon + text strip under the header), `.project-layout`
   (`.project-main` + 360px `.project-side`, one column ≤1100px), `.member-list`,
-  `.member-picker`, `.board-progress` (inline done/total bar in tables), `.showcase-tile`
-  (on `.course-tile`) with `.showcase-summary`/`.showcase-team`/`.showcase-links`,
+  `.member-picker`, `.board-progress` (inline done/total bar in tables), showcase tiles
+  (`.course-tile` with `.showcase-summary`/`.showcase-team`/`.showcase-links`),
   `.portfolio-entry` with `.portfolio-reflection` (gold rule).
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
@@ -240,7 +241,7 @@ adding a near-duplicate.
   `.visually-hidden`. Dashboard task tiles add `.task-challenge` (navy) and `.task-review`
   (gold).
 
-### Interaction-state contract
+## Interaction-state contract
 
 Every data view/form must implement:
 
@@ -260,7 +261,7 @@ Every data view/form must implement:
    use uncontrolled inputs with `defaultValue` for this reason. Don't switch a `Field` to
    controlled state unless you also preserve the value on error.
 
-### Accessibility checklist
+## Accessibility checklist
 
 - `:focus-visible` gets a `2px solid var(--color-blue)` outline (offset 2px; inputs,
   tabs, and menu items draw it inset) — don't suppress it with `outline: none`.
@@ -277,14 +278,14 @@ Every data view/form must implement:
   `@media (pointer: coarse)` raises `.button`, `.input`, `.nav-item`, `.icon-button` to
   44px. `.option-row` is always ≥44px (students answer on phones).
 
-### Language
+## Language
 
 UI copy (labels, buttons, error messages, empty states) is Indonesian. Code, comments,
 class names, and docs (this file included) are English. Don't mix — a new component
 should read like `Sedang masuk…`, `Coba lagi`, `Belum ada data`, matching the tone
 already in `ui.tsx`/`learning.tsx` (plain, short, no exclamation marks).
 
-### Adding something new
+## Adding something new
 
 1. Search `app.css` and `components/` first (see catalogue above).
 2. If nothing fits, add the smallest new class that covers the case, in the
@@ -297,7 +298,7 @@ already in `ui.tsx`/`learning.tsx` (plain, short, no exclamation marks).
    or rule, treat that as a design decision, not a one-off — extend the token set or the
    relevant primitive instead of hardcoding.
 
-### Projects and the Kanban board (Phase 4)
+## Projects and the Kanban board (Phase 4)
 
 Project screens live in `src/web/pages/Projects.tsx` (hub: project list, showcase,
 portfolio), `src/web/pages/ProjectBoard.tsx` (one project: board + overview), and
