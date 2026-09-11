@@ -11,6 +11,8 @@ import { archiveQuestion, listQuestions, saveQuestion } from "../modules/assessm
 import { saveAssessment, setAssessmentItems } from "../modules/assessments/service";
 import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modules/assessments/attempts";
 import { adjustmentHistory, adjustScore, listAttempts } from "../modules/assessments/grading";
+import { saveChallenge } from "../modules/projects/challenges";
+import { createProject } from "../modules/projects/service";
 
 // Room for multipart boundaries and text fields around one maximum-size file.
 export const maxLearningUploadRequestBytes = maxUploadBytes + 256 * 1024;
@@ -79,12 +81,16 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await submitAttempt(db, actor, courseId, id, requestId);
         } else if (itemAction && resource === "attempts" && action === "adjust") {
           result = await adjustScore(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "challenges" && action === "projects") {
+          const project = await createProject(db, actor, courseId, id, body, requestId);
+          return Response.json(project, { status: project.resumed ? 200 : 201 });
         } else if (contentSave) {
           created = method === "POST";
           if (resource === "modules" || resource === "lessons" || resource === "materials") result = await saveContent(db, storageRoot, actor, courseId, resource, body, file, requestId, id);
           else if (resource === "activities") result = await saveActivity(db, actor, courseId, body, requestId, id);
           else if (resource === "questions") result = await saveQuestion(db, actor, courseId, body, requestId, id);
           else if (resource === "assessments") result = await saveAssessment(db, actor, courseId, body, requestId, id);
+          else if (resource === "challenges") result = await saveChallenge(db, actor, courseId, body, requestId, id);
           else throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
         } else throw new HttpError(404, "NOT_FOUND", "Operasi tidak ditemukan.");
         return Response.json(result, { status: created ? 201 : 200 });

@@ -10,6 +10,7 @@ import { courseAccess, lessonAccess, notFound } from "./access";
 import { archivedInput, materialInput, positionInput, publishedInput } from "./input";
 import { listActivities } from "../activities/service";
 import { listAssessments } from "../assessments/service";
+import { listChallenges } from "../projects/challenges";
 
 export async function listCourses(db: SQL, actor: Actor, pattern: string, offset: number) {
   requirePermission(actor, "learning.view");
@@ -25,7 +26,8 @@ export async function listCourses(db: SQL, actor: Actor, pattern: string, offset
 }
 
 // Activities of every kind count. An assignment is done when submitted and graded when a
-// grade exists; a quiz or exam is both once any attempt is submitted (scores are automatic).
+// grade exists; a quiz or exam is both once any attempt is submitted (scores are automatic);
+// a challenge is done once the student's project was submitted and graded once approved.
 export async function progressRows(db: SQL, courseId: string, studentId: string | null, pattern = "%", offset = 0) {
   return db<Progress[]>`WITH visible_lessons AS (
       SELECT l.id FROM lessons l JOIN course_modules m ON m.id = l.module_id JOIN courses c ON c.id = l.course_id
@@ -37,10 +39,14 @@ export async function progressRows(db: SQL, courseId: string, studentId: string 
       (SELECT count(*)::int FROM lesson_completions lc JOIN visible_lessons l ON l.id = lc.lesson_id WHERE lc.student_id = u.id) AS completed,
       (SELECT count(*)::int FROM visible_activities) AS activities,
       (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id)
-        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)) AS submitted,
+        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id
+          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.first_submitted_at IS NOT NULL)) AS submitted,
       (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id
           AND EXISTS (SELECT 1 FROM submission_grades g WHERE g.submission_id = s.id))
-        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)) AS graded
+        OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id
+          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.status = 'approved')) AS graded
     FROM class_members cm JOIN users u ON u.id = cm.student_id JOIN courses c ON c.class_id = cm.class_id
     WHERE c.id = ${courseId} AND (${studentId}::uuid IS NULL OR u.id = ${studentId}::uuid) AND u.display_name ILIKE ${pattern}
     ORDER BY u.display_name, u.id LIMIT 51 OFFSET ${offset}`;
@@ -67,8 +73,9 @@ export async function courseDetail(db: SQL, actor: Actor, courseId: string): Pro
       ORDER BY lm.created_at, lm.id`;
     const activities = await listActivities(tx, actor, courseId, drafts);
     const assessments = await listAssessments(tx, actor, courseId, drafts);
+    const challenges = await listChallenges(tx, actor, courseId, drafts);
     const progress = access.canParticipate ? (await progressRows(tx, courseId, actor.id))[0] ?? null : null;
-    return { ...access, modules, lessons, materials, activities, assessments, progress };
+    return { ...access, modules, lessons, materials, activities, assessments, challenges, progress };
   });
 }
 

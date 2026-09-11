@@ -150,7 +150,7 @@ hard rule from `docs/06_UI_UX_DESIGN_SYSTEM.md`, not optional polish.
 ### List/detail/form kit (`src/web/components/learning.tsx`)
 
 This is the reusable "Jira-like admin view" kit. Every new admin or data-management
-screen (including Phase 4 Kanban/project views) should be built from these, not
+screen (the Phase 4 project screens included) should be built from these, not
 reimplemented per page:
 
 - `useData<T>(path, onExpired, revision?)` — fetch + loading/error state, redirects to
@@ -214,6 +214,23 @@ adding a near-duplicate.
   topbar), `.attempt-timer`/`.attempt-timer-low`, `.question-picker`/`.picker-row`. Only
   reuse these for actual assessment UI, not as a generic "selectable row" — use
   `.option-row`'s shape as a reference for a new selectable-row pattern instead.
+- **Kanban board**: `.board` (the only horizontally scrolling region) > `.board-column`
+  (`--color-background` lane, `.is-drop-target`) > `.board-column-header` (`h2` +
+  `.board-count`) + `ul.board-cards` > `li.board-card` (`.board-card-title` button,
+  `.board-card-desc`, `.board-card-footer` with `.board-assignee`/`.board-card-unassigned`
+  and `.board-card-moves`), plus `.board-empty`, `.board-add`, `.board-quick-add`,
+  `.board-hint`, `.task-editor`.
+- **Projects**: `.project-meta` (icon + text strip under the header), `.project-layout`
+  (`.project-main` + 360px `.project-side`, one column ≤1100px), `.member-list`,
+  `.member-picker`, `.board-progress` (inline done/total bar in tables), `.showcase-tile`
+  (on `.course-tile`) with `.showcase-summary`/`.showcase-team`/`.showcase-links`,
+  `.portfolio-entry` with `.portfolio-reflection` (gold rule).
+- **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
+  `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
+  `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title
+  and meta inside a table cell), `.icon-button-small` (28px, 36px on coarse pointers),
+  `.visually-hidden`. Dashboard task tiles add `.task-challenge` (navy) and `.task-review`
+  (gold).
 
 ### Interaction-state contract
 
@@ -272,22 +289,32 @@ already in `ui.tsx`/`learning.tsx` (plain, short, no exclamation marks).
    or rule, treat that as a design decision, not a one-off — extend the token set or the
    relevant primitive instead of hardcoding.
 
-### Looking ahead: Phase 4 (Kanban/project boards)
+### Projects and the Kanban board (Phase 4)
 
-Nothing board-shaped exists in the codebase yet — don't treat the names below as real
-classes. When Phase 4 is built, keep it inside this same kit instead of starting a
-parallel design language:
+Project screens live in `src/web/pages/Projects.tsx` (hub: project list, showcase,
+portfolio), `src/web/pages/ProjectBoard.tsx` (one project: board + overview), and
+`src/web/pages/ChallengePanel.tsx` (the per-lesson challenge card). Shared pieces are in
+`src/web/components/projects.tsx`:
 
-- Register Projects in `navigationFor` (replacing its "Segera" entry) and start the
-  screen with `PageHeader` + `.tabs` (e.g. Board / List).
-- A board column is a `--color-background` lane; a board card reuses `.card` sizing and
-  the `.task-item` anatomy (type icon tile, title, meta, lozenge). Cards stay flat with a
-  1px border — `--shadow-overlay` is reserved for overlays (a card being dragged counts
-  as an overlay).
-- Status/priority pills reuse the lozenge variants (`.badge`, `.badge-success`,
-  `.badge-draft`, `.badge-gold`, `.badge-danger`, `.badge-discovery`) rather than a new
-  color-coded label system; item types follow the `.task-*` icon tile colors.
-- Drag affordances, column headers, and the board scroll container should follow the
-  `.table-scroll` precedent: the page never scrolls horizontally, only the board's own
-  container does, and it must not break the 390px/820px no-horizontal-scroll rule.
-- Add the real classes to the catalogue above in the same PR that introduces them.
+```tsx
+<ProjectStatusBadge status="submitted" />      // Dikerjakan / Menunggu review / Perlu revisi / Disetujui
+<AvatarStack members={members} />               // overlapping initials, names as screen-reader text
+<AvatarStack members={members} names />         // …with visible names
+<MemberPicker courseId max selected onChange onExpired />  // enrolled-student checklist
+```
+
+- Project status maps onto the existing lozenges: in progress `.badge`, submitted
+  `.badge-discovery`, changes requested `.badge-danger`, approved `.badge-success`;
+  showcase is `.badge-gold`. Don't add a separate color system.
+- The board keeps its data on screen while it reloads (`useProject` in
+  `ProjectBoard.tsx`) — a card move must never flash `LoadingState`. Use `useData` for
+  ordinary lists.
+- Every drag action has a button equivalent: each card has ←/↑/↓/→ `.icon-button-small`
+  controls with `aria-label`s, a visually hidden `role="status"` announces the move, and
+  focus returns to the moved card's title. Drag-and-drop is a pointer shortcut, not the
+  only path.
+- Only `.board` scrolls horizontally (four `minmax(260px, 1fr)` columns, scroll-snap
+  under 760px); the page keeps the 390px/820px no-horizontal-scroll rule. A dragged card
+  (`.board-card.is-dragging`) is the one card that gets `--shadow-overlay`.
+- Project stages follow the Jira flow in copy too: "Kirim untuk review" → guru "Setujui
+  proyek" (0–100) or "Minta revisi". Locked states explain themselves with `.info-state`.

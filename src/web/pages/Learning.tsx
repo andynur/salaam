@@ -7,6 +7,7 @@ import { Icon } from "../components/icons";
 import { Field, MutationForm, Pager, Search, Status, chosenFile, deviceTimezone, errorMessage as message, formatDateTime as date, learningApi as base, toLocalInput, useData } from "../components/learning";
 import { LessonAssessments, QuestionBank } from "./AssessmentPanel";
 import { AttemptRunner } from "./AttemptRunner";
+import { LessonChallenges } from "./ChallengePanel";
 
 type Common = { timezone: string; onExpired: () => void };
 const accept = Object.keys(uploadTypes).map(extension => `.${extension}`).join(",");
@@ -71,6 +72,7 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
     ...data.materials.filter(item => item.archived).map(item => ({ path: `materials/${item.id}`, label: "Materi", title: item.title })),
     ...data.activities.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: "Tugas", title: item.title })),
     ...data.assessments.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: item.kind === "exam" ? "Ujian" : "Quiz", title: item.title })),
+    ...data.challenges.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: "Challenge", title: item.title })),
   ];
   const lesson = lessons.find(item => item.id === selectedLesson) ?? lessons[0];
   const publishButton = (path: string, published: boolean, label: string) => <Button className="button-secondary button-small" disabled={pending} onClick={() => void mutate(path ? `${path}/publish` : "publish", { published: !published }, published ? "Konten dikembalikan ke draft." : "Konten dipublikasikan. Santri dapat membukanya jika course, modul, dan lesson juga terbit.")} aria-label={`${published ? "Jadikan draft" : "Publikasikan"} ${label}`}>{published ? "Jadikan draft" : "Publikasikan"}</Button>;
@@ -108,9 +110,10 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
             </article>)}{!activities.some(item => item.lessonId === lesson.id) && <p className="learning-muted">Belum ada tugas untuk lesson ini.</p>}
           </Card>
           <LessonAssessments courseId={courseId} lessonId={lesson.id} assessments={data.assessments} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
+          <LessonChallenges courseId={courseId} lessonId={lesson.id} challenges={data.challenges} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
         </>}</div>
       </div>}
-      {course.canManage && archived.length > 0 && <Card className="lesson-card archive-card"><h2>Konten diarsipkan</h2><p className="learning-muted">Santri tidak melihat konten ini. Lesson, materi, tugas, dan quiz di dalam modul yang diarsipkan ikut tersembunyi sampai modulnya dipulihkan.</p>
+      {course.canManage && archived.length > 0 && <Card className="lesson-card archive-card"><h2>Konten diarsipkan</h2><p className="learning-muted">Santri tidak melihat konten ini. Lesson, materi, tugas, quiz, dan challenge di dalam modul yang diarsipkan ikut tersembunyi sampai modulnya dipulihkan.</p>
         {archived.map(item => <div className="archive-item" key={item.path}><div><span className="eyebrow text-muted">{item.label}</span><strong>{item.title}</strong></div><Button className="button-secondary button-small" disabled={pending} aria-label={`Pulihkan ${item.title}`} onClick={() => void mutate(`${item.path}/archive`, { archived: false }, "Konten dipulihkan.")}>Pulihkan</Button></div>)}
       </Card>}
     </>}
@@ -176,11 +179,11 @@ function HistoryRows({ courseId, submissionId, timezone, onExpired }: Common & {
   return error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : <>{!data.items.length ? <p className="learning-muted">Belum ada nilai.</p> : data.items.map(grade => <div className="grade-entry" key={grade.id}><strong>{grade.score} / 100</strong><small>{date(grade.createdAt, timezone)}</small><p className="learning-prose">{grade.feedback}</p></div>)}<Pager offset={offset} next={data.nextOffset} change={setOffset} /></>;
 }
 function ProgressSummary({ value }: { value: Progress }) {
-  return <div className="learning-progress"><div><strong>{value.completed} / {value.lessons} lesson selesai</strong><progress aria-label="Progres lesson" max={value.lessons || 1} value={value.completed} /></div><span>{value.submitted} / {value.activities} tugas & quiz selesai</span><span>{value.graded} sudah dinilai</span></div>;
+  return <div className="learning-progress"><div><strong>{value.completed} / {value.lessons} lesson selesai</strong><progress aria-label="Progres lesson" max={value.lessons || 1} value={value.completed} /></div><span>{value.submitted} / {value.activities} aktivitas selesai</span><span>{value.graded} sudah dinilai</span></div>;
 }
 function ProgressTable({ courseId, onExpired }: { courseId: string; onExpired: () => void }) {
   const [offset, setOffset] = useState(0);
   const [q, setQ] = useState("");
   const { data, error, retry } = useData<Page<Progress>>(`${base}/${courseId}/progress?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired);
-  return <Card><div className="card-heading"><h2>Progres konten terbit</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>{error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada santri" description="Santri yang terdaftar di kelas akan muncul di sini." /> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Progres santri"><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Lesson selesai</th><th scope="col">Tugas & quiz selesai</th><th scope="col">Sudah dinilai</th></tr></thead><tbody>{data.items.map(row => <tr key={row.studentId}><td>{row.studentName}</td><td>{row.completed} / {row.lessons}</td><td>{row.submitted} / {row.activities}</td><td>{row.graded}</td></tr>)}</tbody></table></div>}{data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}</Card>;
+  return <Card><div className="card-heading"><h2>Progres konten terbit</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>{error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada santri" description="Santri yang terdaftar di kelas akan muncul di sini." /> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Progres santri"><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Lesson selesai</th><th scope="col">Aktivitas selesai</th><th scope="col">Sudah dinilai</th></tr></thead><tbody>{data.items.map(row => <tr key={row.studentId}><td>{row.studentName}</td><td>{row.completed} / {row.lessons}</td><td>{row.submitted} / {row.activities}</td><td>{row.graded}</td></tr>)}</tbody></table></div>}{data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}</Card>;
 }

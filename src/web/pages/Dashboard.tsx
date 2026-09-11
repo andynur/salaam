@@ -12,8 +12,12 @@ const taskTypes: Record<LearningTask["type"], { label: string; icon: IconName; b
   exam: { label: "Kerjakan ujian", icon: "timer", badge: "badge-danger" },
   lesson: { label: "Lanjutkan belajar", icon: "book", badge: "badge-success" },
   grading: { label: "Perlu dinilai", icon: "pen", badge: "badge-gold" },
+  challenge: { label: "Kerjakan proyek", icon: "board", badge: "badge-discovery" },
+  review: { label: "Perlu direview", icon: "check", badge: "badge-gold" },
 };
-const taskHref = (task: LearningTask) => `/learning/courses/${task.courseId}?${new URLSearchParams(task.type === "grading" ? { lesson: task.lessonId, review: task.id } : { lesson: task.lessonId })}`;
+const taskHref = (task: LearningTask) => task.type === "review" ? `/projects?${new URLSearchParams({ status: "submitted", challenge: task.id })}`
+  : task.type === "challenge" && task.projectId ? `/projects/${task.projectId}`
+  : `/learning/courses/${task.courseId}?${new URLSearchParams(task.type === "grading" ? { lesson: task.lessonId, review: task.id } : { lesson: task.lessonId })}`;
 function greeting(timezone: string) {
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: timezone }).format(new Date()));
   return hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
@@ -34,8 +38,9 @@ export function Dashboard({ actor, timezone, onExpired }: { actor: Actor; timezo
   }, [attempt, onExpired]);
   const date = new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeZone: timezone }).format(new Date());
   const deadline = (value: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
-  const taskMeta = (task: LearningTask) => task.type === "grading" ? `${task.pending} jawaban menunggu` : task.type === "lesson" ? "Lesson berikutnya"
-    : task.dueAt ? `${task.type === "assignment" ? "Tenggat" : "Ditutup"} ${deadline(task.dueAt)}` : "Tanpa tenggat";
+  const taskMeta = (task: LearningTask) => task.type === "grading" ? `${task.pending} jawaban menunggu` : task.type === "review" ? `${task.pending} proyek menunggu review`
+    : task.type === "lesson" ? "Lesson berikutnya"
+    : task.dueAt ? `${task.type === "assignment" || task.type === "challenge" ? "Tenggat" : "Ditutup"} ${deadline(task.dueAt)}` : "Tanpa tenggat";
   const stats: { icon: IconName; tone: string; label: string; value: string | number; hint: string }[] = data ? [
     { icon: "calendar", tone: "stat-blue", label: "Tahun akademik", value: data.academic ?? "Belum diatur", hint: "Tahun ajaran sesuai tanggal sekolah saat ini." },
     { icon: "book", tone: "stat-purple", label: "Course", value: data.courses, hint: "Course dasar dalam akses Anda." },
@@ -47,7 +52,7 @@ export function Dashboard({ actor, timezone, onExpired }: { actor: Actor; timezo
       <div className="summary-grid">{stats.map(stat => <Card className="stat-card" key={stat.label}><span className={`stat-icon ${stat.tone}`} aria-hidden="true"><Icon name={stat.icon} size={20} /></span><div><span className="summary-label">{stat.label}</span><strong className="summary-value">{stat.value}</strong><p>{stat.hint}</p></div></Card>)}</div>
       <div className="dashboard-grid">
         <Card><div className="card-heading"><h2>Tugas hari ini</h2>{data.tasks.length > 0 && <span className="badge badge-draft">{data.tasks.length} tugas</span>}</div>
-          {!data.tasks.length ? <EmptyState icon="success" title="Tidak ada yang menunggu" description={actor.permissions.includes("learning.manage") ? "Jawaban santri yang perlu dinilai akan tampil di sini." : "Tugas, quiz, ujian terbuka, dan lesson berikutnya akan tampil di sini."} />
+          {!data.tasks.length ? <EmptyState icon="success" title="Tidak ada yang menunggu" description={actor.permissions.includes("learning.manage") ? "Jawaban dan proyek santri yang perlu dinilai akan tampil di sini." : "Tugas, quiz, ujian terbuka, proyek, dan lesson berikutnya akan tampil di sini."} />
             : <ul className="task-list">{data.tasks.map(task => <li key={`${task.type}-${task.id}`}><a className="task-item" href={taskHref(task)}>
               <span className={`task-icon task-${task.type}`} aria-hidden="true"><Icon name={taskTypes[task.type].icon} /></span>
               <span className="task-body"><strong>{task.title}</strong><span className="task-meta">{task.courseName} · {taskMeta(task)}</span></span>

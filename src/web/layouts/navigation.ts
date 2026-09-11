@@ -13,7 +13,10 @@ export function navigationFor(actor: Actor) {
   const isStudent = actor.roles.includes("student") && !actor.roles.some(role => role === "admin" || role === "teacher");
   const main: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard", active: exact("/dashboard") },
-    ...(can("learning.view") ? [{ href: "/learning", label: "Pembelajaran", icon: "book", active: (path: string) => path.startsWith("/learning") } satisfies NavItem] : []),
+    ...(can("learning.view") ? [
+      { href: "/learning", label: "Pembelajaran", icon: "book", active: (path: string) => path.startsWith("/learning") } satisfies NavItem,
+      { href: "/projects", label: "Projects", icon: "board", active: (path: string) => path.startsWith("/projects") } satisfies NavItem,
+    ] : []),
   ];
   const admin: NavItem[] = ([
     ["/admin/users", "Akun & profil", "users", "admin.users.manage"],
@@ -21,8 +24,8 @@ export function navigationFor(actor: Actor) {
     ["/admin/audit", "Audit log", "history", "audit.view"],
   ] as const).filter(([, , , permission]) => can(permission)).map(([href, label, icon]) => ({ href, label, icon, active: exact(href) }));
   const future: FutureItem[] = isStudent
-    ? [{ label: "Projects", icon: "board" }, { label: "Kalender", icon: "calendar" }]
-    : [{ label: "Projects", icon: "board" }, { label: "Kehadiran", icon: "attendance" }, { label: "Kalender", icon: "calendar" }, { label: "Laporan", icon: "chart" }];
+    ? [{ label: "Kalender", icon: "calendar" }]
+    : [{ label: "Kehadiran", icon: "attendance" }, { label: "Kalender", icon: "calendar" }, { label: "Laporan", icon: "chart" }];
   const groups: NavGroup[] = [{ items: main },...(admin.length ? [{ label: "Administrasi", items: admin }] : [])];
   return { isStudent, groups, future, pages: groups.flatMap(group => group.items) };
 }

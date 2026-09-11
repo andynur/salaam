@@ -4,8 +4,9 @@ Learning OS is an open-source learning and academic operations platform for HSI
 Boarding School. It is designed as a modular monolith for courses, assessments,
 projects, portfolios, attendance, gamification, and classroom operations.
 
-The repository currently delivers **Phase 3 — Assessment Engine** on top of the
-Phase 1 identity and academic foundation and the Phase 2 learning core.
+The repository currently delivers **Phase 4 — Project Learning** on top of the
+Phase 1 identity and academic foundation, the Phase 2 learning core, and the Phase 3
+assessment engine.
 
 - **Phase 1:** secure authentication, role-linked profiles, academic years, terms,
   classes, enrollment, subjects, courses, teacher assignments, permission checks, audit
@@ -18,12 +19,16 @@ Phase 1 identity and academic foundation and the Phase 2 learning core.
   per-student randomization, forward-only autosave with reconnect recovery, idempotent
   final submission, automatic scoring, result visibility rules, and audited score
   adjustments.
+- **Phase 4:** project challenges on the shared Activity Engine, teacher-formed teams
+  and individual projects, Kanban boards with conflict-checked card moves, submission
+  and review with revision requests and scores, a school showcase, and student
+  portfolio entries with reflections.
 
-Project learning and the remaining roadmap phases are tracked separately.
+Gamification and the remaining roadmap phases are tracked separately.
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 3 are implemented and validated
+This is an active early-stage project. Phases 0 through 4 are implemented and validated
 locally. The project is not presented as a production deployment for a school
 environment yet; HTTPS proxy configuration, backup/restore drills, capacity testing, and
 operational rollout still require environment-specific validation.
@@ -50,6 +55,7 @@ Important directories:
 | `src/modules/learning/` | Course access, modules, lessons, materials, publishing, archiving, progress, and dashboard tasks |
 | `src/modules/activities/` | Shared Activity Engine: assignments, submissions, and grading |
 | `src/modules/assessments/` | Question bank, quiz/exam settings, attempts, automatic scoring, and score adjustments |
+| `src/modules/projects/` | Challenges, teams, project boards, reviews, showcase, and portfolio entries |
 | `src/shared/` | Shared data contracts used by server and web layers |
 | `src/web/` | Application shell, pages, UI primitives, and design tokens |
 | `database/migrations/` | Ordered, immutable-after-apply SQL migrations |
@@ -187,6 +193,36 @@ list, are locked. The Phase 3 API extends `/api/learning/courses/{courseId}` wit
 [`docs/14_PHASE3_VALIDATION.md`](docs/14_PHASE3_VALIDATION.md) for details and the
 out-of-scope list (essays, rubrics, surveys, time extensions, and proctoring).
 
+## Phase 4 workflow
+
+1. In a lesson, the teacher adds a **challenge**: instructions, an optional submission
+   deadline, and either individual work or teams of 2–10 students. Challenges publish and
+   archive like other activities.
+2. For a team challenge, the teacher forms teams from the enrolled class roster. For an
+   individual challenge, each student starts their own project from the lesson; repeated
+   starts reopen the same project. A student belongs to at most one project per challenge.
+3. The team works on a **Kanban board** (Akan dikerjakan, Sedang dikerjakan, Ditinjau,
+   Selesai): cards with a description and an assignee from the team, moved by drag and
+   drop or by keyboard-accessible arrow buttons. Every card carries a version, so a stale
+   edit or move is refused instead of silently overwriting a teammate.
+4. The team writes a result summary, adds an optional HTTP/HTTPS link to the work, and
+   submits the project for review before the deadline. The board locks while it is
+   being reviewed.
+5. The teacher either requests changes, which reopens the board (resubmission is allowed
+   after the deadline), or approves the project with a score from 0 to 100. Reviews are
+   appended and audited; approval is final.
+6. The teacher can place approved projects in the **showcase**, which every signed-in
+   user can browse without scores or reviews. Team members add approved projects to
+   their **portfolio** with a personal reflection; entries remain theirs after the class
+   year ends.
+
+Challenge progress counts in course progress and the dashboard (open challenges for
+students, submitted projects awaiting review for teachers). The Phase 4 API adds
+`challenges` and `challenges/{id}/projects` under `/api/learning/courses/{courseId}` and
+a project API under `/api/projects`. See
+[`docs/15_PHASE4_VALIDATION.md`](docs/15_PHASE4_VALIDATION.md) for the routes, rules, and
+the out-of-scope list.
+
 ## Database migrations
 
 ```sh
@@ -196,7 +232,7 @@ bun run db:migrate:reset      # undo every migration, then reapply all of them (
 ```
 
 The migration runner uses a PostgreSQL advisory lock, validates migration checksums,
-and applies pending files atomically. Add a new file such as `0005_project_learning.sql`;
+and applies pending files atomically. Add a new file such as `0006_gamification.sql`;
 do not edit a migration that has already been applied. Runtime values use parameterized
 SQL. Raw SQL is limited to trusted migration files. Bind JSON documents as
 `${JSON.stringify(value)}::text::jsonb`; a direct `::jsonb` cast stores a JSON string.
@@ -231,13 +267,17 @@ deadlines, grading, dashboard tasks, and 125 concurrent submissions. For the ass
 engine they cover the question bank, attempt snapshots, forward-only autosave,
 idempotent submission, automatic scoring, exam windows and expiry, result visibility,
 score adjustments, course boundaries, and 125 students completing one exam concurrently.
-Uploaded test files are written under the ignored `.test-artifacts/` directory and
+For project learning they cover challenge authoring and locks, team formation,
+idempotent individual starts, board versions and positions, the submission and review
+workflow, showcase and portfolio visibility, and 125 students on 25 teams moving cards
+concurrently. Uploaded test files are written under the ignored `.test-artifacts/` directory and
 removed afterwards.
 
 Validated results are documented in
 [`docs/12_PHASE1_VALIDATION.md`](docs/12_PHASE1_VALIDATION.md),
-[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md), and
-[`docs/14_PHASE3_VALIDATION.md`](docs/14_PHASE3_VALIDATION.md).
+[`docs/13_PHASE2_VALIDATION.md`](docs/13_PHASE2_VALIDATION.md),
+[`docs/14_PHASE3_VALIDATION.md`](docs/14_PHASE3_VALIDATION.md), and
+[`docs/15_PHASE4_VALIDATION.md`](docs/15_PHASE4_VALIDATION.md).
 
 ## Production notes
 
@@ -270,8 +310,8 @@ any screen.
 
 ## Roadmap
 
-The next planned milestone is **Phase 4 — Project Learning**: challenges, projects,
-teams, Kanban workflows, reviews, showcases, and portfolio entries. Follow the
+The next planned milestone is **Phase 5 — Gamification**: XP, levels, badges,
+achievements, reward rules, and an auditable XP ledger. Follow the
 [master roadmap](docs/03_MASTER_ROADMAP.md) and keep each phase independently
 reviewable and testable.
 

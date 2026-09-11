@@ -32,6 +32,20 @@ export async function learningTasks(db: SQL, actor: Actor): Promise<LearningTask
           AND NOT EXISTS (SELECT 1 FROM lesson_completions lc WHERE lc.lesson_id = l.id AND lc.student_id = ${actor.id})
         ORDER BY c.id, m.position, m.created_at, m.id, l.position, l.created_at, l.id
       ) next_lessons ORDER BY recent DESC NULLS LAST, "courseName", "courseId" LIMIT 3`);
+    // Open challenges the student can act on: an individual challenge not started yet, or
+    // their own project before its first submission or after a revision request.
+    tasks.push(...await db<LearningTask[]>`SELECT 'challenge' AS type, a.id, c.id AS "courseId", c.name AS "courseName", a.lesson_id AS "lessonId", a.title,
+        a.due_at::text AS "dueAt", 0 AS pending, own.id AS "projectId"
+      FROM activities a JOIN challenge_settings s ON s.activity_id = a.id JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
+      JOIN courses c ON c.id = a.course_id JOIN class_members cm ON cm.class_id = c.class_id AND cm.student_id = ${actor.id}
+      LEFT JOIN LATERAL (SELECT p.id, p.status FROM projects p JOIN project_members pm ON pm.project_id = p.id
+        WHERE p.activity_id = a.id AND pm.student_id = ${actor.id}) own ON true
+      WHERE c.published AND m.published AND l.published AND a.published
+        AND a.archived_at IS NULL AND l.archived_at IS NULL AND m.archived_at IS NULL
+        AND (own.id IS NOT NULL OR s.team_mode = 'individual')
+        AND (own.status IS NULL OR own.status IN ('in_progress', 'changes_requested'))
+        AND (own.status = 'changes_requested' OR a.due_at IS NULL OR a.due_at > clock_timestamp())
+      ORDER BY a.due_at NULLS LAST, a.created_at, a.id LIMIT 5`);
   }
   if (actor.permissions.includes("learning.manage")) {
     // Quizzes and exams score automatically, so only assignments create grading work.
@@ -43,6 +57,14 @@ export async function learningTasks(db: SQL, actor: Actor): Promise<LearningTask
         AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS
           (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id}))
       GROUP BY a.id, c.id ORDER BY min(s.submitted_at), a.id LIMIT 5`);
+    // Submitted projects waiting for a review, grouped by challenge.
+    tasks.push(...await db<LearningTask[]>`SELECT 'review' AS type, a.id, c.id AS "courseId", c.name AS "courseName", a.lesson_id AS "lessonId",
+        a.title, a.due_at::text AS "dueAt", count(*)::int AS pending, NULL::text AS "projectId"
+      FROM projects p JOIN activities a ON a.id = p.activity_id JOIN courses c ON c.id = p.course_id
+      WHERE p.status = 'submitted' AND a.archived_at IS NULL
+        AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS
+          (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id}))
+      GROUP BY a.id, c.id ORDER BY min(p.submitted_at), a.id LIMIT 5`);
   }
   return tasks;
 }

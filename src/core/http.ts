@@ -7,6 +7,7 @@ import { log } from "./logger";
 import type { FoundationHandler } from "./foundation-http";
 import type { Actor } from "./permissions";
 import type { LearningHandler } from "./learning-http";
+import type { ProjectHandler } from "./project-http";
 import { jsonObject } from "./validation";
 
 export function securityHeaders(production: boolean): Record<string, string> {
@@ -40,7 +41,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
   return { email: body.email.trim().toLowerCase(), password: body.password };
 }
 
-export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler }) {
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler }) {
   const limiter = new LoginLimiter();
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
@@ -80,6 +81,9 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if (path.startsWith("/api/learning/") && services?.learning) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.learning(request, await auth.actor(request), requestId);
+      } else if ((path === "/api/projects" || path.startsWith("/api/projects/")) && services?.projects) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.projects(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/admin/") && services) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.foundation(request, await auth.actor(request), requestId);

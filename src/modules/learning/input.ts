@@ -25,26 +25,30 @@ export function materialInput(body: Record<string, unknown>, hasFile = false) {
     return { title, kind, content: content.trim() };
   }
   const content = textField(body, "content", kind === "link" ? 2000 : 20000);
-  if (kind === "link") {
-    try {
-      const url = new URL(content);
-      if (!/^https?:\/\//.test(content) || !["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error();
-    } catch { invalid("Tautan harus berupa URL HTTP/HTTPS tanpa kredensial."); }
-  }
+  if (kind === "link") httpUrlInput(content);
   return { title, kind, content };
+}
+export function httpUrlInput(content: string) {
+  try {
+    const url = new URL(content);
+    if (!/^https?:\/\//.test(content) || !["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error();
+  } catch { invalid("Tautan harus berupa URL HTTP/HTTPS tanpa kredensial."); }
+  return content;
+}
+// Optional UTC timestamp in canonical ISO form, e.g. an activity deadline.
+export function timestampInput(body: Record<string, unknown>, key: string, label: string): string | null {
+  const value = body[key];
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)) invalid(`${label} tidak valid.`);
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().replace(".000Z", "Z") !== value.replace(".000Z", "Z") || date.getUTCFullYear() < 1900 || date.getUTCFullYear() > 2200) invalid(`${label} tidak valid (1900–2200).`);
+  return date.toISOString();
 }
 export function activityInput(body: Record<string, unknown>) {
   if (body.kind !== "assignment") invalid("Phase 2 mendukung tugas. Jenis assessment belum tersedia.");
   const title = textField(body, "title", 150);
   const instructions = textField(body, "instructions", 20000);
-  let dueAt: string | null = null;
-  if (body.dueAt !== null && body.dueAt !== undefined && body.dueAt !== "") {
-    if (typeof body.dueAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(body.dueAt)) invalid("Tenggat tidak valid.");
-    const date = new Date(body.dueAt);
-    if (!Number.isFinite(date.getTime()) || date.toISOString().replace(".000Z", "Z") !== body.dueAt.replace(".000Z", "Z") || date.getUTCFullYear() < 1900 || date.getUTCFullYear() > 2200) invalid("Tenggat tidak valid (1900–2200).");
-    dueAt = date.toISOString();
-  }
-  return { title, instructions, dueAt };
+  return { title, instructions, dueAt: timestampInput(body, "dueAt", "Tenggat") };
 }
 // Text is optional when a file is attached; the service requires at least one of them.
 export function submissionContentInput(body: Record<string, unknown>) {

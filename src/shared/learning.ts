@@ -1,4 +1,5 @@
 import type { Assessment } from "./assessment";
+import type { Challenge } from "./project";
 
 export interface Page<T> { items: T[]; nextOffset: number | null }
 export interface StoredFile { id: string; name: string; mediaType: string; sizeBytes: number }
@@ -10,8 +11,9 @@ export interface Grade { id: string; score: number; feedback: string; createdAt:
 export interface Submission { id: string; activityId: string; studentId: string; studentName: string; content: string; file: StoredFile | null; submittedAt: string; grade: Grade | null }
 export interface Activity { id: string; lessonId: string; kind: "assignment"; title: string; instructions: string; dueAt: string | null; published: boolean; archived: boolean; submission: Submission | null }
 export interface Progress { studentId: string; studentName: string; lessons: number; completed: number; activities: number; submitted: number; graded: number }
-export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; progress: Progress | null }
-export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number }
+export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; challenges: Challenge[]; progress: Progress | null }
+// `projectId` is set for a student's challenge task when their project already exists.
+export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading" | "challenge" | "review"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number; projectId?: string | null }
 
 // Extension allowlist for uploads. The server also checks each file's leading bytes.
 export const uploadTypes = {

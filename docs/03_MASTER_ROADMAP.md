@@ -31,7 +31,8 @@ deferred (see `14_PHASE3_VALIDATION.md`).
 ## Phase 4 — Project learning
 
 Add challenges, projects, teams, Kanban workflows, reviews, showcases, and portfolio
-entries.
+entries. This phase is implemented and locally validated; see
+`15_PHASE4_VALIDATION.md` for the scope decisions and out-of-scope items.
 
 ## Phase 5 — Gamification
 

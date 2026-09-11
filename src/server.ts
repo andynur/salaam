@@ -9,12 +9,13 @@ import { academicSummary } from "./modules/academic/summary";
 import { learningTasks } from "./modules/learning/dashboard";
 import { createFoundationHandler } from "./core/foundation-http";
 import { createLearningHandler, maxLearningUploadRequestBytes } from "./core/learning-http";
+import { createProjectHandler } from "./core/project-http";
 import { log } from "./core/logger";
 
 const config = loadConfig();
 await mkdir(config.storageRoot, { recursive: true, mode: 0o700 });
 const db = connectDatabase(config.databaseUrl);
-const handle = createHttpHandler(config, createAuthService(db, config), () => checkDatabase(db), { foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor) }) });
+const handle = createHttpHandler(config, createAuthService(db, config), () => checkDatabase(db), { foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor) }) });
 // Bun 1.4.2 resolves prebuilt HTML assets from cwd. Resolve config/storage first,
 // then use the bundle directory; development HTML imports do not need this.
 if (index.files) process.chdir(import.meta.dir);
@@ -32,7 +33,7 @@ const server = Bun.serve({
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index },
+  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index },
   fetch(request, server) { return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {
     const requestId = crypto.randomUUID();
