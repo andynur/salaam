@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { connectDatabase } from "../src/core/database/connection";
-import { migrate, readMigrations } from "../src/core/database/migrations";
+import { migrate, readMigrations, reset, rollback } from "../src/core/database/migrations";
 import { hashPassword } from "../src/core/auth/password";
 import { createAuthService } from "../src/core/auth/service";
 import { createHttpHandler } from "../src/core/http";
@@ -90,5 +90,24 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
     const pool = connectDatabase(url!);
     try { expect((await pool`SELECT 1 AS ok`)[0].ok).toBe(1); }
     finally { await pool.close(); }
+  });
+  // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
+  test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
+    expect(await rollback(db)).toBe("0004_assessment_engine.sql");
+    expect((await db`SELECT to_regclass('questions') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT name FROM schema_migrations ORDER BY name`).map((row: { name: string }) => row.name))
+      .toEqual(["0001_identity.sql", "0002_academic_foundation.sql", "0003_learning_core.sql"]);
+
+    const allNames = (await readMigrations("database/migrations")).map(migration => migration.name);
+    const result = await reset(db);
+    expect(result.rolledBack).toEqual(["0003_learning_core.sql", "0002_academic_foundation.sql", "0001_identity.sql"]);
+    expect(result.applied).toEqual(allNames);
+    expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).not.toBeNull();
+    expect((await db`SELECT * FROM users`).length).toBe(0);
+
+    for (let i = 0; i < allNames.length; i++) expect(await rollback(db)).not.toBeNull();
+    expect(await rollback(db)).toBeNull();
+    expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).toBeNull();
+    await migrate(db);
   });
 });

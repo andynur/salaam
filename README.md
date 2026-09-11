@@ -105,6 +105,10 @@ bun run db:seed
 
 The development seed is transactional, writes an audit event, refuses an existing
 email, and only runs with `NODE_ENV=development`. Remove the variables after seeding.
+It never updates an existing account — if you change `SEED_ADMIN_PASSWORD` after the
+first successful seed, re-running `db:seed` fails silently on the duplicate email and
+the old password keeps working. Run `bun run db:migrate:reset && bun run db:seed` to
+start over with the current `.env` values.
 
 For the first administrator in any environment, set the following private variables:
 `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_IDENTIFIER`, and
@@ -186,7 +190,9 @@ out-of-scope list (essays, rubrics, surveys, time extensions, and proctoring).
 ## Database migrations
 
 ```sh
-bun run db:migrate
+bun run db:migrate            # apply every pending migration
+bun run db:migrate:rollback   # undo the single most recently applied migration
+bun run db:migrate:reset      # undo every migration, then reapply all of them (drops all data)
 ```
 
 The migration runner uses a PostgreSQL advisory lock, validates migration checksums,
@@ -194,6 +200,12 @@ and applies pending files atomically. Add a new file such as `0005_project_learn
 do not edit a migration that has already been applied. Runtime values use parameterized
 SQL. Raw SQL is limited to trusted migration files. Bind JSON documents as
 `${JSON.stringify(value)}::text::jsonb`; a direct `::jsonb` cast stores a JSON string.
+
+Every file in `database/migrations/*.sql` needs a matching down script in
+`database/migrations/down/` with the same filename; `rollback`/`reset` reverse-apply
+those. Both commands refuse to run when `NODE_ENV=production` because they destroy
+data — use a forward migration in production instead. `db:migrate:reset` is the fast
+way to get a known-clean local database (equivalent to dropping and recreating it).
 
 ## Development and validation
 
@@ -252,7 +264,9 @@ for security and recovery requirements.
 Start with [`docs/00_README.md`](docs/00_README.md), then read the product vision,
 architecture, roadmap, security, UI, operations, engineering rules, and validation
 documents as needed. [`AGENTS.md`](AGENTS.md) contains repository-level contribution
-rules for coding agents and maintainers.
+rules for coding agents and maintainers. [`DESIGN.md`](DESIGN.md) is the concrete UI kit
+reference (tokens, components, class catalogue) — read it before building or changing
+any screen.
 
 ## Roadmap
 

@@ -42,3 +42,37 @@ export async function migrate(db: SQL, directory = "database/migrations"): Promi
     return pending.map(migration => migration.name);
   });
 }
+
+// Rolls back exactly the most recently applied migration, using its hand-written
+// down script. Names are sequential and application order is enforced by
+// pendingMigrations, so the lexicographically latest applied name is the last one in.
+export async function rollback(db: SQL, downDirectory = "database/migrations/down"): Promise<string | null> {
+  return db.begin(async tx => {
+    await tx`SELECT pg_advisory_xact_lock(741926301)`;
+    await tx`CREATE TABLE IF NOT EXISTS schema_migrations (
+      name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now()
+    )`;
+    const [latest] = await tx<{ name: string }[]>`SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1`;
+    if (!latest) return null;
+    const path = join(downDirectory, latest.name);
+    if (!(await Bun.file(path).exists())) throw new Error(`Missing down migration: ${path}`);
+    const sql = await Bun.file(path).text();
+    // Same raw SQL boundary as migrate(): only version-controlled down files enter here.
+    await tx.unsafe(sql).simple();
+    await tx`DELETE FROM schema_migrations WHERE name = ${latest.name}`;
+    return latest.name;
+  });
+}
+
+// Rolls every applied migration back to an empty schema, then replays all migrations
+// from scratch. Equivalent to Laravel's migrate:reset followed by migrate.
+export async function reset(db: SQL, directory = "database/migrations", downDirectory = "database/migrations/down"): Promise<{ rolledBack: string[]; applied: string[] }> {
+  const rolledBack: string[] = [];
+  for (;;) {
+    const name = await rollback(db, downDirectory);
+    if (!name) break;
+    rolledBack.push(name);
+  }
+  const applied = await migrate(db, directory);
+  return { rolledBack, applied };
+}
