@@ -1,0 +1,55 @@
+import index from "./web/index.html";
+import { mkdir } from "node:fs/promises";
+import { loadConfig } from "./core/config";
+import { connectDatabase, checkDatabase } from "./core/database/connection";
+import { createAuthService } from "./core/auth/service";
+import { createHttpHandler, securityHeaders } from "./core/http";
+import { errorResponse } from "./core/errors";
+import { academicSummary } from "./modules/academic/summary";
+import { createFoundationHandler } from "./core/foundation-http";
+import { log } from "./core/logger";
+
+const config = loadConfig();
+await mkdir(config.storageRoot, { recursive: true, mode: 0o700 });
+const db = connectDatabase(config.databaseUrl);
+const handle = createHttpHandler(config, createAuthService(db, config), () => checkDatabase(db), { foundation: createFoundationHandler(db), dashboard: actor => academicSummary(db, actor, config.timezone) });
+// Bun 1.4.2 resolves prebuilt HTML assets from cwd. Resolve config/storage first,
+// then use the bundle directory; development HTML imports do not need this.
+if (index.files) process.chdir(import.meta.dir);
+// Bun's ahead-of-time HTML manifest accepts headers on each generated asset.
+for (const file of index.files ?? []) {
+  Object.assign(file.headers, securityHeaders(config.environment === "production"));
+  if (file.loader === "html") {
+    file.headers["cache-control"] = "no-cache";
+    file.headers["content-security-policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+  }
+}
+const server = Bun.serve({
+  hostname: config.host,
+  port: config.port,
+  development: config.environment === "development" ? { hmr: true, console: false } : false,
+  maxRequestBodySize: 4096,
+  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index },
+  fetch(request, server) { return handle(request, server.requestIP(request)?.address ?? "unknown"); },
+  error(error) {
+    const requestId = crypto.randomUUID();
+    log({ level: "error", event: "http.unhandled", requestId });
+    const response = errorResponse(error, requestId);
+    response.headers.set("X-Request-ID", requestId);
+    return response;
+  },
+});
+log({ level: "info", event: "server.started" });
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const timeout = setTimeout(() => process.exit(1), 10000);
+  timeout.unref();
+  await server.stop();
+  await db.close({ timeout: 5 });
+  clearTimeout(timeout);
+  process.exit(0);
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

@@ -1,0 +1,95 @@
+import type { Config } from "./config";
+import type { AuthService } from "./auth/service";
+import { LoginLimiter } from "./auth/rate-limit";
+import { errorResponse, HttpError } from "./errors";
+import { requirePermission } from "./permissions";
+import { log } from "./logger";
+import type { FoundationHandler } from "./foundation-http";
+import type { Actor } from "./permissions";
+
+export function securityHeaders(production: boolean): Record<string, string> {
+  return {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    ...(production ? { "Strict-Transport-Security": "max-age=31536000" } : {}),
+  };
+}
+
+export function requireSameOrigin(request: Request, config: Config): void {
+  if (request.headers.get("origin") !== config.baseUrl || request.headers.get("sec-fetch-site") === "cross-site") {
+    throw new HttpError(403, "INVALID_ORIGIN", "Permintaan tidak diizinkan. Muat ulang halaman.");
+  }
+}
+
+export async function loginInput(request: Request): Promise<{ email: string; password: string }> {
+  if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
+    throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Gunakan format JSON.");
+  }
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { throw new HttpError(400, "INVALID_INPUT", "Data masuk tidak valid."); }
+  if (!body || typeof body !== "object" || !("email" in body) || !("password" in body) ||
+    typeof body.email !== "string" || typeof body.password !== "string" ||
+    body.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()) ||
+    body.password.length < 1 || body.password.length > 128) {
+    throw new HttpError(400, "INVALID_INPUT", "Isi email dan kata sandi yang valid.");
+  }
+  return { email: body.email.trim().toLowerCase(), password: body.password };
+}
+
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown> }) {
+  const limiter = new LoginLimiter();
+  let activeLogins = 0;
+  return async (request: Request, ip = "unknown"): Promise<Response> => {
+    const requestId = crypto.randomUUID();
+    const started = performance.now();
+    let response: Response;
+    try {
+      const path = new URL(request.url).pathname;
+      const method = request.method;
+      if (path === "/health/live" && method === "GET") {
+        response = Response.json({ status: "ok" });
+      } else if (path === "/health/ready" && method === "GET") {
+        try { await ready(); }
+        catch { throw new HttpError(503, "NOT_READY", "Layanan belum siap."); }
+        response = Response.json({ status: "ready" });
+      } else if (path === "/api/auth/login" && method === "POST") {
+        requireSameOrigin(request, config);
+        limiter.consume(ip);
+        if (activeLogins >= 2) throw new HttpError(429, "BUSY", "Layanan sedang sibuk. Silakan coba kembali.");
+        activeLogins++;
+        try {
+          const input = await loginInput(request);
+          response = await auth.login(input.email, input.password, request, requestId);
+        } finally { activeLogins--; }
+      } else if (path === "/api/auth/logout" && method === "POST") {
+        requireSameOrigin(request, config);
+        response = await auth.logout(request, requestId);
+      } else if ((path === "/api/auth/me" || path === "/api/dashboard") && method === "GET") {
+        const actor = await auth.actor(request);
+        if (path === "/api/auth/me") {
+          if (!actor) throw new HttpError(401, "UNAUTHENTICATED", "Silakan masuk untuk melanjutkan.");
+          response = Response.json({ actor, timezone: config.timezone });
+        } else {
+          requirePermission(actor, "dashboard:view");
+          response = Response.json(services ? await services.dashboard(actor) : { academic: null, courses: 0, classes: 0, tasks: [], events: [] });
+        }
+      } else if (path.startsWith("/api/admin/") && services) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.foundation(request, await auth.actor(request), requestId);
+      } else {
+        throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
+      }
+    } catch (error) {
+      response = errorResponse(error, requestId);
+    }
+    for (const [key, value] of Object.entries(securityHeaders(config.environment === "production"))) response.headers.set(key, value);
+    response.headers.set("X-Request-ID", requestId);
+    response.headers.set("Cache-Control", "no-store");
+    log({ level: response.status >= 500 ? "error" : response.status >= 400 ? "warn" : "info",
+      event: "http.request", requestId, status: response.status, durationMs: Math.round(performance.now() - started) });
+    return response;
+  };
+}
