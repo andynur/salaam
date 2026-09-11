@@ -4,6 +4,7 @@ import { loadConfig } from "./core/config";
 import { connectDatabase, checkDatabase } from "./core/database/connection";
 import { createAuthService } from "./core/auth/service";
 import { createHttpHandler, securityHeaders } from "./core/http";
+import { brandAssetRoutes } from "./core/brand-assets";
 import { errorResponse } from "./core/errors";
 import { academicSummary } from "./modules/academic/summary";
 import { learningTasks } from "./modules/learning/dashboard";
@@ -27,13 +28,14 @@ for (const file of index.files ?? []) {
     file.headers["content-security-policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
   }
 }
+const brandRoutes = await brandAssetRoutes(config.environment === "production");
 const server = Bun.serve({
   hostname: config.host,
   port: config.port,
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index },
+  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index },
   fetch(request, server) { return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {
     const requestId = crypto.randomUUID();
