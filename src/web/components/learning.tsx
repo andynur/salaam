@@ -35,7 +35,7 @@ export function Pager({ offset, next, change }: { offset: number; next: number |
 export function Search({ change }: { change: (q: string) => void }) {
   return <form className="table-search" onSubmit={event => { event.preventDefault(); change(String(new FormData(event.currentTarget).get("q") ?? "")); }}><input name="q" className="input" type="search" aria-label="Cari data" placeholder="Cari…" maxLength={100} /><Button type="submit" className="button-secondary button-small">Cari</Button></form>;
 }
-export function Status({ published }: { published: boolean }) { return <span className={`badge ${published ? "" : "badge-draft"}`}>{published ? "Terbit" : "Draft"}</span>; }
+export function Status({ published }: { published: boolean }) { return <span className={`badge ${published ? "badge-success" : "badge-draft"}`}>{published ? "Terbit" : "Draft"}</span>; }
 
 export function MutationForm({ path, label, body, saved, onExpired, children, method = "POST", disabled = false }: { path: string; label: string; body: (form: FormData) => unknown; saved: () => void; onExpired: () => void; children?: ReactNode; method?: string; disabled?: boolean }) {
   const [pending, setPending] = useState(false);

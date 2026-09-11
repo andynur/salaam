@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { uploadTypes } from "../../shared/learning";
 import type { Activity, CourseDetail, CourseModule, Grade, LearningCourse, Lesson, Material, Page, Progress, StoredFile, Submission } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Icon } from "../components/icons";
 import { Field, MutationForm, Pager, Search, Status, chosenFile, deviceTimezone, errorMessage as message, formatDateTime as date, learningApi as base, toLocalInput, useData } from "../components/learning";
 import { LessonAssessments, QuestionBank } from "./AssessmentPanel";
 import { AttemptRunner } from "./AttemptRunner";
@@ -10,6 +11,7 @@ import { AttemptRunner } from "./AttemptRunner";
 type Common = { timezone: string; onExpired: () => void };
 const accept = Object.keys(uploadTypes).map(extension => `.${extension}`).join(",");
 const fileSize = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word.charAt(0)).join("").toUpperCase();
 function FileLink({ href, file }: { href: string; file: StoredFile }) { return <a className="material-link" href={href}>Unduh {file.name} ({fileSize(file.sizeBytes)}) ↓</a>; }
 
 export function Learning({ timezone, onExpired }: Common) {
@@ -24,9 +26,9 @@ function CourseList({ onExpired }: Pick<Common, "onExpired">) {
   const [offset, setOffset] = useState(0);
   const [q, setQ] = useState("");
   const { data, error, retry } = useData<Page<LearningCourse>>(`${base}?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired);
-  return <><div className="page-heading"><div><span className="eyebrow text-muted">RUANG BELAJAR</span><h1>Pembelajaran</h1><p>Materi, tugas, quiz, dan progres belajar dalam course Anda.</p></div></div>
-    <Card><div className="card-heading"><h2>Courses Anda</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>
-      {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada course" description={q ? "Tidak ada hasil yang sesuai dengan pencarian." : "Course akan tampil setelah Anda terdaftar dan course dipublikasikan. Guru dapat membuka course yang ditugaskan."} /> : <div className="course-grid">{data.items.map(course => <a className="course-tile" href={`/learning/courses/${course.id}`} key={course.id}><div className="learning-row"><span className="eyebrow text-muted">{course.className}</span><Status published={course.published} /></div><h3>{course.name}</h3><p>{course.term} · {course.year}</p><span className="course-open">{course.canManage ? "Kelola pembelajaran" : "Mulai belajar"} →</span></a>)}</div>}
+  return <><PageHeader title="Pembelajaran" description="Materi, tugas, quiz, dan progres belajar dalam course Anda." />
+    <Card><div className="card-heading"><h2>Course Anda</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>
+      {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState icon="book" title="Belum ada course" description={q ? "Tidak ada hasil yang sesuai dengan pencarian." : "Course akan tampil setelah Anda terdaftar dan course dipublikasikan. Guru dapat membuka course yang ditugaskan."} /> : <div className="course-grid">{data.items.map(course => <a className="course-tile" href={`/learning/courses/${course.id}`} key={course.id}><div className="learning-row"><span className="course-avatar" aria-hidden="true">{initials(course.name)}</span><Status published={course.published} /></div><h3>{course.name}</h3><p>{course.className} · {course.term} · {course.year}</p><span className="course-open">{course.canManage ? "Kelola pembelajaran" : "Mulai belajar"}<Icon name="arrowRight" /></span></a>)}</div>}
       {data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}
     </Card></>;
 }
@@ -53,7 +55,8 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
     } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setSaveError(message(cause)); }
     finally { saving.current = false; setPending(false); }
   }
-  if (error) return <><a href="/learning" className="learning-back">← Semua course</a><ErrorState message={error} retry={retry} /></>;
+  const crumbs = [{ label: "Pembelajaran", href: "/learning" }];
+  if (error) return <><PageHeader breadcrumbs={crumbs} title="Course" /><ErrorState message={error} retry={retry} /></>;
   if (!data) return <LoadingState />;
   const { course } = data;
   // Managers also receive archived items; the outline shows active content only.
@@ -74,11 +77,10 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
   const archiveButton = (path: string, label: string) => <Button className="button-secondary button-small" disabled={pending} aria-label={`Arsipkan ${label}`} onClick={() => { if (confirm(`Arsipkan "${label}"? Santri tidak akan melihatnya lagi. Jawaban, nilai, dan progres tetap tersimpan, dan konten dapat dipulihkan.`)) void mutate(`${path}/archive`, { archived: true }, "Konten diarsipkan. Pulihkan dari bagian Konten diarsipkan bila diperlukan."); }}>Arsipkan</Button>;
   const tabButton = (key: string, label: string) => <button className={tab === key ? "tab-active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>;
   return <>
-    <a href="/learning" className="learning-back">← Semua course</a>
-    <div className="page-heading"><div><span className="eyebrow text-muted">{course.className} · {course.term} · {course.year}</span><h1>{course.name}</h1><p>{course.canManage ? "Susun pembelajaran, publikasikan materi, dan dampingi progres santri." : "Pelajari materi, selesaikan lesson, lalu kerjakan tugas dan quiz Anda."}</p></div><div className="learning-actions"><Status published={course.published} />{course.canManage && publishButton("", course.published, "course")}</div></div>
+    <PageHeader breadcrumbs={crumbs} title={course.name} description={`${course.className} · ${course.term} · ${course.year}`} actions={<><Status published={course.published} />{course.canManage && publishButton("", course.published, "course")}</>} />
     {success && <p className="success-state" role="status">{success}</p>}{saveError && <ErrorState message={saveError} />}
     {data.progress && <ProgressSummary value={data.progress} />}
-    <nav className="academic-tabs" aria-label="Halaman course">{tabButton("content", "Materi & tugas")}{course.canManage && tabButton("questions", "Bank soal")}{course.canManage && tabButton("progress", "Progres santri")}</nav>
+    <nav className="tabs" aria-label="Halaman course">{tabButton("content", "Materi & tugas")}{course.canManage && tabButton("questions", "Bank soal")}{course.canManage && tabButton("progress", "Progres santri")}</nav>
     {tab === "progress" && course.canManage ? <ProgressTable courseId={courseId} onExpired={onExpired} /> : tab === "questions" && course.canManage ? <QuestionBank courseId={courseId} onExpired={onExpired} /> : <>
       {course.canManage && <div className="learning-toolbar"><Button onClick={() => setEditor({ resource: "modules" })}>Tambah modul</Button><p>Publikasikan setiap tingkat agar konten terlihat oleh santri.</p></div>}
       {editor && <ContentEditor key={`${editor.resource}-${editor.value?.id ?? ("parentId" in editor ? editor.parentId : "new")}`} editor={editor} modules={modules} courseId={courseId} onExpired={onExpired} close={() => setEditor(null)} saved={() => { setEditor(null); setSuccess("Konten berhasil disimpan."); changed(); }} />}
@@ -151,7 +153,7 @@ function ContentEditor({ editor, modules, courseId, onExpired, close, saved }: {
 }
 function StudentSubmission({ activity, courseId, timezone, onExpired, saved }: Common & { activity: Activity; courseId: string; saved: () => void }) {
   const submission = activity.submission;
-  if (submission) return <div className="submitted-answer"><p className="badge">✓ Dikumpulkan {date(submission.submittedAt, timezone)}</p>{submission.content && <p className="learning-prose">{submission.content}</p>}{submission.file && <FileLink href={`${base}/${courseId}/submissions/${submission.id}/file`} file={submission.file} />}{submission.grade ? <><h4>Nilai: {submission.grade.score} / 100</h4><p className="learning-prose">{submission.grade.feedback}</p><History courseId={courseId} submissionId={submission.id} timezone={timezone} onExpired={onExpired} /></> : <p className="learning-muted">Menunggu penilaian guru.</p>}</div>;
+  if (submission) return <div className="submitted-answer"><p className="badge badge-success">✓ Dikumpulkan {date(submission.submittedAt, timezone)}</p>{submission.content && <p className="learning-prose">{submission.content}</p>}{submission.file && <FileLink href={`${base}/${courseId}/submissions/${submission.id}/file`} file={submission.file} />}{submission.grade ? <><h4>Nilai: {submission.grade.score} / 100</h4><p className="learning-prose">{submission.grade.feedback}</p><History courseId={courseId} submissionId={submission.id} timezone={timezone} onExpired={onExpired} /></> : <p className="learning-muted">Menunggu penilaian guru.</p>}</div>;
   return <MutationForm path={`${base}/${courseId}/activities/${activity.id}/submit`} label="Kumpulkan jawaban" onExpired={onExpired} saved={saved} body={form => chosenFile(form) ? form : { content: form.get("content") }}>
     <Field name="content" label="Jawaban Anda (teks atau tautan karya)" area required={false} max={20000} />
     <label className="learning-field field-wide"><span>Lampiran berkas (opsional, maks. 10 MB)</span><input className="input" type="file" name="file" accept={accept} /></label>

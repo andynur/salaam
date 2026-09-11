@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { FoundationResource, RecordPage, RecordRow } from "../../shared/foundation";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Icon } from "../components/icons";
 
 type Field = { key: string; label: string; type?: string; max?: number; source?: FoundationResource; role?: string };
 type Definition = { title: string; action: string; description: string; columns: [string, string][]; fields: Field[] };
@@ -57,8 +58,11 @@ function Choice({ field, onExpired }: { field: Field; onExpired: () => void }) {
     {(offset > 0 || page?.nextOffset !== null && page?.nextOffset !== undefined) && <div className="choice-pager"><button type="button" disabled={!page || offset === 0} onClick={() => setOffset(offset - 50)}>Sebelumnya</button><button type="button" disabled={!page || page.nextOffset === null} onClick={() => setOffset(page!.nextOffset!)}>Berikutnya</button></div>}
   </div>;
 }
-export function Foundation({ resource, timezone, onExpired }: { resource: FoundationResource; timezone: string; onExpired: () => void }) {
+export function Foundation({ resource, timezone, onExpired, title, tabs }: { resource: FoundationResource; timezone: string; onExpired: () => void; title?: string; tabs?: ReactNode }) {
   const definition = definitions[resource];
+  const [creating, setCreating] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (creating) panel.current?.querySelector<HTMLElement>("input, select")?.focus(); }, [creating]);
   const [page, setPage] = useState<RecordPage | null>(null);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
@@ -97,24 +101,29 @@ export function Foundation({ resource, timezone, onExpired }: { resource: Founda
   function display(row: RecordRow, key: string) {
     const value = row[key];
     if (key === "createdAt" && typeof value === "string") return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
-    return typeof value === "boolean" ? value ? "Ya" : "Tidak" : value ?? "—";
+    return typeof value === "boolean" ? <span className={`badge ${value ? "badge-success" : "badge-draft"}`}>{value ? "Ya" : "Tidak"}</span> : value ?? "—";
   }
+  const canCreate = definition.fields.length > 0;
+  function toggleCreate(open: boolean) { setCreating(open); setSuccess(""); setSaveError(""); }
   return <>
-    <div className="page-heading"><div><span className="eyebrow text-muted">ADMINISTRASI SEKOLAH</span><h1>{definition.title}</h1><p>{definition.description}</p></div><span className="badge">Fondasi akademik</span></div>
-    {definition.fields.length > 0 && <Card className="admin-form-card"><h2>{definition.action}</h2>
+    <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title={title ?? definition.title} description={definition.description}
+      actions={canCreate && <Button aria-expanded={creating} aria-controls="create-panel" className={creating ? "button-secondary" : ""} onClick={() => toggleCreate(!creating)}><Icon name={creating ? "close" : "plus"} />{creating ? "Tutup formulir" : definition.action}</Button>} />
+    {tabs}
+    {canCreate && creating && <div id="create-panel" ref={panel}><Card className="admin-form-card"><h2>{definition.action}</h2>
       <form key={formRevision} onSubmit={event => void submit(event)}><fieldset disabled={pending} className="admin-fields">
         {definition.fields.map(field => <div className="admin-field" key={field.key}><label htmlFor={field.key}>{field.label}</label>{field.source ? <Choice field={field} onExpired={onExpired} /> : field.type === "role" ? <select className="input" id={field.key} name={field.key} required defaultValue="student"><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select> : <input className="input" id={field.key} name={field.key} type={field.type ?? "text"} required maxLength={field.max} minLength={field.type === "password" ? 12 : undefined} autoComplete={field.type === "password" ? "new-password" : "off"} {...(field.type === "date" ? { min: "1900-01-01", max: "2200-12-31" } : {})} />}</div>)}
         <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : definition.action}</Button></div>
       </fieldset></form>
       {saveError && <ErrorState message={saveError} />}{success && <p className="success-state" role="status">{success}</p>}
-    </Card>}
+    </Card></div>}
     <Card><div className="card-heading"><h2>Daftar {definition.title.toLowerCase()}</h2><form className="table-search" onSubmit={event => { event.preventDefault(); setSearch(q); setOffset(0); }}><input className="input" type="search" aria-label="Cari data" placeholder="Cari data…" maxLength={100} value={q} onChange={event => setQ(event.target.value)} /><Button className="button-secondary button-small" type="submit">Cari</Button></form></div>
-      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}</tr>)}</tbody></table></div>}
+      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}</tr>)}</tbody></table></div>}
       <div className="table-pagination"><span>{page ? `${page.items.length ? offset + 1 : 0}–${offset + page.items.length} ditampilkan` : "Memuat…"}</span><div><Button className="button-secondary button-small" disabled={!page || offset === 0} onClick={() => setOffset(offset - 50)}>Sebelumnya</Button><Button className="button-secondary button-small" disabled={!page || page.nextOffset === null} onClick={() => setOffset(page!.nextOffset!)}>Berikutnya</Button></div></div>
     </Card>
   </>;
 }
 export function AcademicFoundation({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
   const [resource, setResource] = useState<FoundationResource>("years");
-  return <><nav className="academic-tabs" aria-label="Administrasi akademik">{Object.entries(definitions).filter(([key]) => key !== "users" && key !== "audit").map(([key, definition]) => <button key={key} className={resource === key ? "tab-active" : ""} aria-current={resource === key ? "page" : undefined} onClick={() => setResource(key as FoundationResource)}>{definition.title}</button>)}</nav><Foundation key={resource} resource={resource} timezone={timezone} onExpired={onExpired} /></>;
+  const tabs = <nav className="tabs" aria-label="Administrasi akademik">{Object.entries(definitions).filter(([key]) => key !== "users" && key !== "audit").map(([key, definition]) => <button key={key} className={resource === key ? "tab-active" : ""} aria-current={resource === key ? "page" : undefined} onClick={() => setResource(key as FoundationResource)}>{definition.title}</button>)}</nav>;
+  return <Foundation key={resource} resource={resource} title="Akademik" tabs={tabs} timezone={timezone} onExpired={onExpired} />;
 }

@@ -92,7 +92,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
   }
   const total = picked.reduce((sum, item) => sum + item.points, 0);
   return <Card className="admin-form-card"><div className="learning-row"><h2>{value ? `Pengaturan ${kindLabels[kind].toLowerCase()}` : "Tambah quiz/ujian"}</h2><Button className="button-secondary button-small" onClick={close}>Tutup</Button></div>
-    {locked && <p className="success-state">Sudah dikerjakan santri. Pengaturan dan daftar soal terkunci agar penilaian adil.</p>}
+    {locked && <p className="info-state">Sudah dikerjakan santri. Pengaturan dan daftar soal terkunci agar penilaian adil.</p>}
     <form className="learning-form" onSubmit={event => void submit(event)}><fieldset className="admin-fields" disabled={pending || locked}>
       <label className="learning-field"><span>Jenis</span><select className="input" name="kind" value={kind} disabled={Boolean(value)} onChange={event => setKind(event.target.value as AssessmentKind)}><option value="quiz">Quiz</option><option value="exam">Ujian</option></select></label>
       <Field name="title" label="Judul" value={value?.title} />

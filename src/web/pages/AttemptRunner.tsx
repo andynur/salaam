@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttemptDetail, AttemptQuestion } from "../../shared/assessment";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, ErrorState, LoadingState } from "../components/ui";
+import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { errorMessage, formatDateTime, learningApi } from "../components/learning";
 
 type Answer = { selected: string[]; revision: number };
@@ -120,8 +120,8 @@ export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { co
     void flush();
   }
 
-  const back = <a href={`/learning/courses/${courseId}`} className="learning-back">← Kembali ke course</a>;
-  if (error && !attempt) return <>{back}<ErrorState message={error} retry={() => void load()} /></>;
+  const crumbs = [{ label: "Pembelajaran", href: "/learning" }, { label: "Course", href: `/learning/courses/${courseId}` }];
+  if (error && !attempt) return <><PageHeader breadcrumbs={crumbs} title="Percobaan" /><ErrorState message={error} retry={() => void load()} /></>;
   if (!attempt) return <LoadingState />;
   const answering = attempt.canAnswer;
   const answered = attempt.questions.filter(question => (answers[question.questionId]?.selected.length ?? 0) > 0).length;
@@ -130,8 +130,7 @@ export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { co
     ? `${attempt.studentName} · dikumpulkan ${formatDateTime(attempt.submittedAt, timezone)}${attempt.submissionReason === "expired" ? " (otomatis saat waktu habis)" : ""}.`
     : answering ? "Jawaban tersimpan otomatis setiap kali Anda memilih." : "Santri masih mengerjakan. Tampilan ini hanya untuk melihat.";
   return <>
-    {back}
-    <div className="page-heading"><div><span className="eyebrow text-muted">PERCOBAAN KE-{attempt.number}</span><h1>{heading}</h1><p>{summary}</p></div></div>
+    <PageHeader breadcrumbs={crumbs} title={heading} description={`Percobaan ke-${attempt.number} · ${summary}`} />
     {error && <ErrorState message={error} />}
     {!answering && <Card className="lesson-card attempt-result">{attempt.scoreVisible && attempt.score !== null
       ? <><span className="summary-label">Nilai</span><strong className="summary-value">{attempt.score} / {attempt.maxScore}</strong>{attempt.adjusted && <p className="learning-muted">Nilai telah dikoreksi guru.</p>}</>
