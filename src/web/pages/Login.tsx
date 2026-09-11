@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../lib/api";
 import { Button, ErrorState } from "../components/ui";
-import logo from "../../../assets/logo-color.png";
+import logo from "../../../assets/logo-white.png";
 
 export function Login({ onLogin }: { onLogin: () => Promise<void> }) {
   const [pending, setPending] = useState(false);
