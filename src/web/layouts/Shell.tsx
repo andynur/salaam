@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import type { Actor } from "../../core/permissions";
 import { Icon } from "../components/icons";
+import { brandTitle, BRAND } from "../lib/brand";
 import logo from "../../../assets/logo-color.png";
+import mark from "../../../assets/brand/salaam-mark.svg";
 import { GlobalSearch } from "./GlobalSearch";
 import { navigationFor, roleLabel } from "./navigation";
 
@@ -19,7 +21,9 @@ export function Shell({ actor, onLogout, onExpired, pending, children }: PropsWi
   const [futureOpen, setFutureOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const path = location.pathname;
+  const pageLabel = pages.find(item => item.active(path))?.label;
 
+  useEffect(() => { document.title = brandTitle(pageLabel); }, [pageLabel]);
   useEffect(() => {
     const media = matchMedia(mobileQuery);
     const change = () => { setMobile(media.matches); setDrawerOpen(false); };
@@ -46,13 +50,13 @@ export function Shell({ actor, onLogout, onExpired, pending, children }: PropsWi
     <header className="topbar">
       <div className="topbar-start">
         <button ref={toggle} type="button" className="icon-button" aria-controls="sidebar" aria-expanded={sidebarVisible} aria-label={sidebarVisible ? "Tutup navigasi" : "Buka navigasi"} onClick={toggleSidebar}><Icon name="sidebar" size={20} /></button>
-        <a className="brand" href="/dashboard"><img src={logo} alt="HSI Boarding School" /><span>Learning <strong>OS</strong></span></a>
+        <a className="brand" href="/dashboard"><img src={mark} alt="" /><strong>{BRAND.name}</strong></a>
       </div>
       <GlobalSearch pages={pages} canSearchCourses={actor.permissions.includes("learning.view")} onExpired={onExpired} />
       <div className="topbar-end"><AccountMenu actor={actor} onLogout={onLogout} pending={pending} /></div>
     </header>
     <aside id="sidebar" className={`sidebar${drawerOpen ? " is-open" : ""}`} aria-label="Sidebar">
-      <div className="space-header"><span className="space-avatar" aria-hidden="true">H</span><div><strong>HSI Boarding School</strong><span>{isStudent ? "Ruang santri" : "Ruang guru & admin"}</span></div></div>
+      <div className="space-header"><span className="space-avatar" aria-hidden="true"><img src={logo} alt="" /></span><div><strong>HSI Boarding School</strong><span>{isStudent ? "Ruang santri" : "Ruang guru & admin"}</span></div></div>
       <nav aria-label="Navigasi utama" className="navigation">
         {groups.map((group, index) => <div className="nav-group" key={group.label ?? index}>
           {group.label && <div className="nav-heading" id={`nav-${index}`}>{group.label}</div>}
@@ -66,7 +70,7 @@ export function Shell({ actor, onLogout, onExpired, pending, children }: PropsWi
           <ul id="nav-future" hidden={!futureOpen}>{future.map(item => <li key={item.label}><span className="nav-item nav-item-disabled" aria-disabled="true"><Icon name={item.icon} size={20} /><span>{item.label}</span><span className="nav-soon">Segera</span></span></li>)}</ul>
         </div>
       </nav>
-      <p className="sidebar-footer"><span className="gold-dot" aria-hidden="true" />Ilmu yang bermanfaat. Karya yang berdampak.</p>
+      <p className="sidebar-footer"><span className="gold-dot" aria-hidden="true" />{BRAND.tagline}</p>
     </aside>
     {drawerOpen && <div className="sidebar-backdrop" aria-hidden="true" onClick={() => setDrawerOpen(false)} />}
     <main id="main" className="main-content" tabIndex={-1}>{children}</main>
