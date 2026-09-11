@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(bun run typecheck)",
+      "Bash(bun run build)",
+      "Bash(bun test *)",
+      "Bash(TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test *)"
+    ],
+    "deny": [
+      "Read(./.env)"
+    ]
+  }
+}
