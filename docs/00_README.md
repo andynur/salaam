@@ -1,8 +1,8 @@
-# Learning OS — Planning Pack
+# SALAAM — Planning Pack
 
-This directory is the planning baseline for Learning OS, an HSI Boarding School
-platform for learning, assessment, project-based learning, gamification, portfolios,
-attendance, and classroom operations.
+This directory is the planning baseline for SALAAM, the Learning & Growth Platform for
+HSI Boarding School: learning, assessment, project-based learning, gamification,
+portfolios, attendance, and classroom operations.
 
 The technical baseline is Bun 1.4.2, TypeScript, React, Tailwind CSS, PostgreSQL via
 `Bun.SQL`, `Bun.serve()`, native WebSocket support, private local storage, and an
@@ -10,7 +10,8 @@ initial Ubuntu Server deployment target.
 
 ## Product goals
 
-Learning OS is a school learning operating system rather than a narrow LMS. The
+SALAAM is a Learning & Growth Platform where students learn, build, and grow, rather
+than a narrow LMS. The
 planned product brings together courses, activities, submissions, grading, projects,
 portfolios, XP and badges, calendars, attendance, notifications, auditability,
 backups, and future isolated coding challenges.
@@ -44,6 +45,7 @@ The product follows these principles:
 10. [Post-V1 backlog](10_BACKLOG_AFTER_V1.md)
 11. [Agent instruction template](AGENTS_TEMPLATE.md)
 12. [Initial setup prompt](MASTER_PROMPT.md)
+13. [Brand guidelines](BRAND_GUIDELINES.md)
 
 ## Working with the planning pack
 

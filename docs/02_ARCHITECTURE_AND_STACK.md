@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Learning OS is a modular monolith. Bun serves HTTP and WebSocket traffic, application
+SALAAM is a modular monolith. Bun serves HTTP and WebSocket traffic, application
 modules enforce domain rules, repositories use PostgreSQL through native `Bun.SQL`,
 and React/Tailwind provide the web UI. V1 does not require a backend framework, ORM,
 Redis, Valkey, or microservices.

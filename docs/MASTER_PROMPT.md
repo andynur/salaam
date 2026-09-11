@@ -1,5 +1,8 @@
 # MASTER PROMPT — Learning OS Initial Setup
 
+> Historical record: this is the original setup prompt, written when the product was
+> named Learning OS. The product is now **SALAAM**; see `docs/REBRANDING.md`.
+
 Copy the prompt below into Codex from the root folder that will become the repository.
 
 ---

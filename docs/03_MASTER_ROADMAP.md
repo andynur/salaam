@@ -1,7 +1,7 @@
 # Master Roadmap
 
-The roadmap keeps Learning OS in independently testable, reviewable phases. Complete a
-phase and validate it before expanding scope.
+The roadmap keeps SALAAM in independently testable, reviewable phases. Complete a phase
+and validate it before expanding scope.
 
 ## Phase 0 — Repository and identity foundation
 

@@ -2,8 +2,8 @@
 
 ## Product statement
 
-Learning OS is an internal HSI Boarding School platform for learning and academic
-operations. It combines LMS workflows with project management, portfolios,
+SALAAM is the internal Learning & Growth Platform for HSI Boarding School, covering
+learning and academic operations. It combines LMS workflows with project management, portfolios,
 gamification, classroom attendance, and academic administration in a lightweight
 system that can run reliably on the school network.
 

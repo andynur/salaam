@@ -1,8 +1,12 @@
-# AGENTS.md — Learning OS
+# AGENTS.md — SALAAM
 
 ## Product
 
-Learning OS is an internal HSI Boarding School platform for learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
+SALAAM is the Learning & Growth Platform for HSI Boarding School. Philosophy: Learn. Build. Grow.
+
+It combines learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
+
+Brand strings live in `src/web/lib/brand.ts`; do not hard-code the product name. Brand usage and assets are described in `docs/BRAND_GUIDELINES.md`. Technical identifiers (`hsi-learning-os` package, `hsi_learning_os` databases, `learning-os:` storage keys) intentionally keep the old name.
 
 ## Stack
 
@@ -108,6 +112,7 @@ Read on demand:
 - `docs/08_CODEX_VSCODE_HARNESS.md`
 - `docs/09_ENGINEERING_RULES_AND_DOD.md`
 - `DESIGN.md` (UI kit reference — tokens, components, class catalogue)
+- `docs/BRAND_GUIDELINES.md` (name, tagline, logos, icons, social preview)
 
 Do not load all docs for every task.
 

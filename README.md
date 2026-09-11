@@ -1,8 +1,27 @@
-# Learning OS
+<img src="assets/brand/salaam-mark.svg" alt="" width="64" height="64" />
 
-Learning OS is an open-source learning and academic operations platform for HSI
-Boarding School. It is designed as a modular monolith for courses, assessments,
-projects, portfolios, attendance, gamification, and classroom operations.
+# SALAAM
+
+**Learn. Build. Grow.**
+
+SALAAM is the Learning & Growth Platform for HSI Boarding School.
+
+It combines learning, assessment, project-based learning, student portfolio,
+gamification, attendance, calendar, and classroom workflows in one lightweight internal
+platform, built as an open-source modular monolith.
+
+## Philosophy
+
+SALAAM comes from the Arabic word "Salām" (سلام), representing peace, safety,
+well-being, and positive growth.
+
+The platform is built around three principles:
+
+- **Learn** — acquire knowledge and understanding.
+- **Build** — transform learning into challenges, projects, and meaningful work.
+- **Grow** — develop skills, achievements, character, and a lasting portfolio.
+
+## Current delivery
 
 The repository currently delivers **Phase 4 — Project Learning** on top of the
 Phase 1 identity and academic foundation, the Phase 2 learning core, and the Phase 3
@@ -306,7 +325,8 @@ architecture, roadmap, security, UI, operations, engineering rules, and validati
 documents as needed. [`AGENTS.md`](AGENTS.md) contains repository-level contribution
 rules for coding agents and maintainers. [`DESIGN.md`](DESIGN.md) is the concrete UI kit
 reference (tokens, components, class catalogue) — read it before building or changing
-any screen.
+any screen. [`docs/BRAND_GUIDELINES.md`](docs/BRAND_GUIDELINES.md) covers the name,
+tagline, logos, icons, and social preview.
 
 ## Roadmap
 

@@ -90,13 +90,19 @@ layout:
 
 - **`.login-page`** — unauthenticated split screen (`grid-template-columns: 1fr 1fr`),
   dark `.login-intro` brand panel + light `.login-form-area` form panel. Collapses to a
-  single column under 760px. Login keeps 44px inputs/buttons.
+  single column under 760px. Login keeps 44px inputs/buttons. The product name in
+  `.intro-footer` and `.login-footer`, and every `document.title`, come from `BRAND` and
+  `brandTitle()` in `src/web/lib/brand.ts` — never hard-code the product name. Favicon,
+  app icons, manifest, and social preview live in `assets/brand/`; see
+  `docs/BRAND_GUIDELINES.md`.
 - **`.app-shell`** — authenticated app (`src/web/layouts/Shell.tsx`):
   - `.topbar` (sticky, `--topbar-height`): `.topbar-start` (sidebar toggle
-    `.icon-button` + `.brand` link), `GlobalSearch` in the middle, `.topbar-end` with the
+    `.icon-button` + `.brand` link: 28px SALAAM mark and the product name at 16px/650),
+    `GlobalSearch` in the middle, `.topbar-end` with the
     account menu (`.account-trigger` → `.menu-popover[role=menu]` with `.menu-profile`,
     `.menu-separator`, `.menu-item`).
-  - `.sidebar` (sticky, own scroll): `.space-header` (`.space-avatar` + name/role),
+  - `.sidebar` (sticky, own scroll): `.space-header` (`.space-avatar` — the HSI logo on
+    a white bordered tile — + school name/role),
     `nav.navigation` of `.nav-group`s — optional `.nav-heading`, `ul` of `.nav-item`
     links (`.is-active` + `aria-current="page"` draws the blue left indicator), a
     collapsible "Segera hadir" group (`.nav-disclosure`, `.nav-item-disabled`,

@@ -1,8 +1,10 @@
-# AGENTS.md — Learning OS
+# AGENTS.md — SALAAM
 
 ## Product
 
-Learning OS is an internal HSI Boarding School platform for learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
+SALAAM is the Learning & Growth Platform for HSI Boarding School. Philosophy: Learn. Build. Grow.
+
+It combines learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
 
 ## Stack
 
