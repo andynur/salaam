@@ -82,7 +82,7 @@ locking rules.
 ```sh
 bun install --frozen-lockfile
 cp .env.example .env
-createdb hsi_learning_os
+createdb salaam
 bun run db:migrate
 bun run dev
 ```
@@ -163,8 +163,8 @@ bun run build
 against a disposable test database:
 
 ```sh
-createdb hsi_learning_os_test
-TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test
+createdb salaam_test
+TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test
 ```
 
 Integration tests create and drop random schemas and never modify the public schema. They

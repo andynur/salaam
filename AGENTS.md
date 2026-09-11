@@ -1,6 +1,6 @@
 # AGENTS.md — SALAAM
 
-SALAAM (repository and package `hsi-learning-os`) is the Learning & Growth Platform for
+SALAAM (repository and package `salaam`) is the Learning & Growth Platform for
 HSI Boarding School. It is a modular monolith: one Bun process serves the API and a React
 SPA, and PostgreSQL is the source of truth. Phases 0–4 are delivered; `docs/roadmap.md`
 lists what comes next.
@@ -12,14 +12,14 @@ bun install --frozen-lockfile
 bun run typecheck                 # tsc --noEmit, strict; the only lint gate
 bun test tests/<file>.test.ts     # run the tests you touched first
 bun test                          # PostgreSQL suites skip without TEST_DATABASE_URL
-TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test   # full suite
+TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test   # full suite
 bun run build                     # production bundle in dist/
 bun run dev                       # watch mode; needs .env and a migrated database
 bun run db:migrate                # db:migrate:rollback and db:migrate:reset destroy data
 ```
 
-- Bun 1.4.2 and PostgreSQL 17. Local databases are `hsi_learning_os` and
-  `hsi_learning_os_test`; a test database name must end in `_test`.
+- Bun 1.4.2 and PostgreSQL 17. Local databases are `salaam` and
+  `salaam_test`; a test database name must end in `_test`.
 - Don't read `.env`. Variable names and defaults are in `.env.example`.
 - No formatter or linter: two-space indentation, semicolons, double quotes, and the compact
   style of the surrounding file.
@@ -79,8 +79,9 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 - Applied migrations are immutable; their checksums are verified.
 - No backend framework, ORM, Redis or queue, UI or icon library, or extra runtime service.
   State the reason for any new dependency.
-- Product strings come from `src/web/lib/brand.ts`. The names `hsi-learning-os`,
-  `hsi_learning_os`, and the `learning-os:` storage keys stay on purpose.
+- Product strings come from `src/web/lib/brand.ts`. The package name, database names,
+  and the `salaam:` storage key prefix all match the SALAAM brand; keep them consistent
+  when renaming anything else.
 
 ## Workflow
 

@@ -7,7 +7,7 @@ import { errorMessage, formatDateTime, learningApi } from "../components/learnin
 type Answer = { selected: string[]; revision: number };
 type Sync = "saved" | "saving" | "offline" | "error";
 const syncLabels: Record<Sync, string> = { saved: "Semua jawaban tersimpan", saving: "Menyimpan…", offline: "Koneksi terputus. Jawaban disimpan di perangkat dan dikirim ulang otomatis.", error: "Sebagian jawaban ditolak server. Periksa pilihan Anda." };
-const storageKey = (attemptId: string) => `learning-os:attempt:${attemptId}`;
+const storageKey = (attemptId: string) => `salaam:attempt:${attemptId}`;
 // Unsynced answers survive reloads and dropped connections on this device.
 function readPending(attemptId: string): Record<string, Answer> {
   try { return JSON.parse(localStorage.getItem(storageKey(attemptId)) ?? "{}") as Record<string, Answer>; } catch { return {}; }

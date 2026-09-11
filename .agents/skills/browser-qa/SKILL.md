@@ -13,7 +13,7 @@ browser checks.
 ## Setup
 
 1. Run `bun run build`.
-2. Create a QA database with `createdb hsi_learning_os_qa_<suffix>` and migrate it:
+2. Create a QA database with `createdb salaam_qa_<suffix>` and migrate it:
    `DATABASE_URL=postgres://localhost:5432/<db> APP_BASE_URL=http://localhost:3100 STORAGE_ROOT=<tmp>/storage bun run db:migrate`.
 3. Seed from the script by importing repository functions by absolute path: `bootstrapAdmin`
    and `createUser` from `src/modules/users/service.ts`, `createAcademic` from

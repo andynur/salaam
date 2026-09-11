@@ -43,7 +43,7 @@ Mutations require the same origin. Resources outside the actor's scope return 40
 
 ## Commands and results
 
-- `TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test`:
+- `TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test`:
   **N passed, 0 failed, N assertions** across Phases 0–N.
 - `bun test` without a test database: N passed, N skipped, 0 failed.
 - `bun run typecheck`: passed.

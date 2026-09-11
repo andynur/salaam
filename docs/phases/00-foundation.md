@@ -8,7 +8,7 @@ without modifying the global install. Use Bun 1.4.2 for subsequent work.
 
 - `bun install --frozen-lockfile`: successful, lockfile unchanged.
 - `bun run typecheck`: passed.
-- `TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test`:
+- `TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test`:
   **24 passed, 0 failed, 88 assertions**; includes real PostgreSQL integration.
 - `bun run db:migrate`: first migration applied to the new local app database;
   second invocation reported already up to date.
@@ -43,7 +43,7 @@ attributes are unit-tested; full HTTPS reverse-proxy validation remains a deploy
 step. Configure proxy per-client login throttling before real multi-user operation
 (the app's socket-IP limiter sees a shared address behind a proxy).
 
-Local databases `hsi_learning_os` and `hsi_learning_os_test` and ignored `.env` were
+Local databases `salaam` and `salaam_test` and ignored `.env` were
 created. The application database has the identity schema and baseline roles/
 permissions, with no remaining QA account. Seed your own development admin privately.
 

@@ -135,7 +135,7 @@ Downloads repeat the access checks and are served as sandboxed attachments; see
   `components/icons.tsx`.
 - `lib/api.ts` wraps `fetch` with same-origin credentials and surfaces the server's
   Indonesian error message. Exam answers made offline are queued in `localStorage` under
-  `learning-os:attempt:<id>`.
+  `salaam:attempt:<id>`.
 - Styling is one Tailwind CSS v4 stylesheet of semantic classes; see
   [`DESIGN.md`](../DESIGN.md).
 

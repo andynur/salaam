@@ -157,7 +157,7 @@ The course workspace response includes `assessments`.
 
 ## Commands and results
 
-- `TEST_DATABASE_URL=postgres://localhost/hsi_learning_os_test bun test`:
+- `TEST_DATABASE_URL=postgres://localhost/salaam_test bun test`:
   **64 passed, 0 failed, 794 assertions** across Phases 0–3.
 - `bun run typecheck`: passed.
 - `bun run build`: passed, five production output files.

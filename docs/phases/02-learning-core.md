@@ -157,7 +157,7 @@ Lists accept `q` and `offset` and return `{ items, nextOffset }` with at most 50
 
 ## Commands and results
 
-- `TEST_DATABASE_URL=postgres://localhost/hsi_learning_os_test bun test`:
+- `TEST_DATABASE_URL=postgres://localhost/salaam_test bun test`:
   **54 passed, 0 failed, 651 assertions**, including real PostgreSQL integration.
 - `bun run typecheck`: passed.
 - `bun run build`: passed, five production output files.

@@ -41,7 +41,7 @@ Run these and record the exact results:
 ```sh
 bun test tests/<new files>
 bun run typecheck
-TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test
+TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test
 bun test                      # counts without the database
 bun run build
 bun run db:migrate            # local application database

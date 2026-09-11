@@ -7,7 +7,7 @@ import mark from "../../../assets/brand/salaam-mark.svg";
 import { GlobalSearch } from "./GlobalSearch";
 import { navigationFor, roleLabel } from "./navigation";
 
-const collapsedKey = "learning-os:sidebar-collapsed";
+const collapsedKey = "salaam:sidebar-collapsed";
 const mobileQuery = "(max-width: 760px)";
 function readCollapsed() {
   try { return localStorage.getItem(collapsedKey) === "1"; } catch { return false; }

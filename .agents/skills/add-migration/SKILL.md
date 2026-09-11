@@ -35,7 +35,7 @@ description: Add a PostgreSQL schema change to SALAAM as the next numbered migra
 6. Verify:
 
    ```sh
-   TEST_DATABASE_URL=postgres://localhost:5432/hsi_learning_os_test bun test tests/database.integration.test.ts tests/migrations.test.ts
+   TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test tests/database.integration.test.ts tests/migrations.test.ts
    bun run db:migrate    # local app database; a second run prints "Database is up to date."
    ```
 

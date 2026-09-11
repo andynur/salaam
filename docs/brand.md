@@ -1,8 +1,9 @@
 # SALAAM Brand Guidelines
 
 This is the reference for how SALAAM presents itself in the product, documentation, and
-shared links. The product was renamed from Learning OS to SALAAM in September 2026; the
-technical names that keep the old name on purpose are listed near the end.
+shared links. The product was renamed from Learning OS to SALAAM in September 2026,
+including the package name, database names, and storage key prefix — see "Technical
+identifiers" near the end.
 
 ## Identity
 
@@ -145,15 +146,14 @@ Edit `salaam-mark.svg` first, then export every raster file from it at device sc
 
 Check every size visually, then run `bun test tests/brand.test.ts` and `bun run build`.
 
-## Names that stay technical
+## Technical identifiers
 
-These identifiers keep the original name on purpose. Renaming them would need data or
-deployment migrations and is not a branding change:
-
-- package name `hsi-learning-os`;
-- databases `hsi_learning_os` and `hsi_learning_os_test`;
-- browser storage keys `learning-os:sidebar-collapsed` and `learning-os:attempt:<id>`
-  (renaming would drop sidebar preferences and pending exam answers saved on the device).
+The package name (`salaam`), local database names (`salaam` and `salaam_test`), and
+browser storage key prefix (`salaam:sidebar-collapsed`, `salaam:attempt:<id>`) all match
+the SALAAM brand. Renaming any of them again means a real migration — `bun install` to
+regenerate the lockfile, `createdb`/dump-restore for the databases, and existing devices
+losing sidebar preferences and pending exam answers saved under the old storage keys —
+so treat it as a migration, not a wording change.
 
 ## Credits
 

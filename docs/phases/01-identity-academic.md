@@ -64,7 +64,7 @@ apply to every mutation.
 
 ## Commands and results
 
-- `TEST_DATABASE_URL=postgres://localhost/hsi_learning_os_test bun test`:
+- `TEST_DATABASE_URL=postgres://localhost/salaam_test bun test`:
   **33 passed, 0 failed, 250 assertions**, including real PostgreSQL integration.
 - `bun run typecheck`: passed.
 - `bun run build`: passed, five production output files.
