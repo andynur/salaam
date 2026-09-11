@@ -6,6 +6,10 @@ in use. The product-level direction (Jira-inspired productivity UI for teachers/
 simpler task UI for students) lives in `docs/06_UI_UX_DESIGN_SYSTEM.md`; this file is the
 concrete "how to build it consistently" companion.
 
+The visual language follows the Atlassian/Jira pattern — white topbar with global search,
+a grouped left sidebar with line icons, breadcrumb + page header, bordered cards, lozenges,
+underline tabs — expressed in the HSI palette (navy, blue, restrained gold).
+
 Reuse before inventing. Grep `src/web/styles/app.css` and `src/web/components/` for a
 class or component that already does what you need before writing new CSS or a new
 component. Most screens should only need new page-level layout classes, not new
@@ -13,45 +17,71 @@ primitives.
 
 ### Stack and rendering model
 
-- Plain React function components, no CSS-in-JS, no component library.
+- Plain React function components, no CSS-in-JS, no component library, no icon package.
 - Tailwind CSS v4 is used only for its CSS-first token engine (`@theme` in
-  `src/web/styles/app.css`) and `@layer` organization — **not** for utility classes in
-  JSX. Do not write `className="flex gap-4 p-3"` etc. Every class used in a component is
-  a semantic, hand-written class defined in `@layer components` in `app.css`.
-- One global stylesheet (`app.css`), organized as `@layer base` (reset), then several
-  `@layer components` blocks grouped by feature area (shell/dashboard, admin/tables,
-  learning/assessment), plus grouped `@media` blocks at the end of each section for
-  responsive overrides. Add new rules to the block matching your feature area instead of
-  appending to the end of the file.
+  `src/web/styles/app.css`), Preflight reset, and `@layer` organization — **not** for
+  utility classes in JSX. Do not write `className="flex gap-4 p-3"` etc. Every class used
+  in a component is a semantic, hand-written class defined in `@layer components` in
+  `app.css`.
+- One global stylesheet (`app.css`), organized as `@layer base` (reset + layout
+  variables), then several `@layer components` blocks grouped by feature area
+  (primitives/page chrome/shell/dashboard, admin/tables, learning/assessment), plus
+  grouped `@media` blocks after each section for responsive overrides. Add new rules to
+  the block matching your feature area instead of appending to the end of the file.
 - Class naming is kebab-case, mostly BEM-ish without strict BEM (`.card-heading`,
-  `.option-row`, `.option-row.option-correct`). Match this style for new classes.
+  `.option-row`, `.option-row.option-correct`). State classes use `is-*`
+  (`.nav-item.is-active`, `.sidebar.is-open`). Match this style for new classes.
 
 ### Design tokens (`@theme` in `app.css`)
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--color-navy` | `#0b1f3a` | Primary dark surface (topbar-adjacent dark panels, headings on dark bg) |
-| `--color-blue` | `#1d5fd1` | Primary action color, links, active/selected state |
-| `--color-blue-soft` | `#eaf2ff` | Selected/hover background paired with `--color-blue` text |
-| `--color-gold` | `#eab308` | Restrained accent only — rules, dots, small highlights. Never a primary action color |
-| `--color-gold-soft` | `#fff8d6` | Accent badge background paired with `--color-navy` text |
-| `--color-surface` | `#ffffff` | Card/input/panel background |
-| `--color-background` | `#f7f8fa` | Page background, table header background |
-| `--color-border` | `#dfe1e6` | All hairline borders |
+| `--color-navy` | `#0b1f3a` | Brand dark: avatars, space/course tiles, pressed primary button |
+| `--color-blue` | `#1d5fd1` | Primary action, links, selected/active state, focus ring |
+| `--color-blue-hover` | `#174ba6` | Primary button hover |
+| `--color-blue-soft` | `#e9f2ff` | Selected background paired with `--color-blue` text |
+| `--color-blue-soft-hover` | `#cfe1fd` | Hover on an already-selected item |
+| `--color-gold` | `#eab308` | Restrained accent only — dots, rules, grading icon. Never a primary action color |
+| `--color-gold-soft` | `#fff7d6` | Gold lozenge/stat background paired with `--color-navy` text |
+| `--color-surface` | `#ffffff` | App background, cards, inputs, popovers |
+| `--color-background` | `#f7f8f9` | Sunken/hover rows, input hover, nested answer panels |
+| `--color-neutral` | `#f1f2f4` | Secondary button, neutral lozenge, nav/menu hover |
+| `--color-neutral-hover` | `#dcdfe4` | Secondary button hover, spinner track |
+| `--color-border` | `#dfe1e6` | All hairline borders and dividers |
+| `--color-border-input` | `#8590a2` | Input and search borders (3:1 non-text contrast) |
 | `--color-text` | `#172b4d` | Body text |
-| `--color-muted` | `#5e6c84` | Secondary text, labels, meta |
-| `--color-danger` | `#b42318` | Error text/border |
-| `--color-danger-soft` | `#fff0ee` | Error background |
-| `--font-sans` | `"Aptos","Inter","Segoe UI",system-ui,sans-serif` | The only font stack |
+| `--color-subtle` | `#44546f` | Nav items, labels, breadcrumbs, secondary button text |
+| `--color-muted` | `#626f86` | Meta text, hints, placeholders, section headings |
+| `--color-danger` / `-soft` | `#b42318` / `#ffeceb` | Errors, exam task type, danger lozenge |
+| `--color-success` / `-soft` | `#216e4e` / `#dcfff1` | Success messages, published/active lozenges, lesson task type |
+| `--color-discovery` / `-soft` | `#5e4db2` / `#f3f0ff` | Quiz task type, discovery lozenge, course stat |
+| `--font-sans` | `"Inter", ui-sans-serif, -apple-system, … sans-serif` | The only font stack |
+| `--shadow-overlay` | `0 8px 12px …, 0 0 1px …` | Popovers, menus, mobile drawer, skip link — nothing else |
+
+Layout variables live in `@layer base` `:root`: `--topbar-height` (`56px`) and
+`--sidebar-width` (`240px`, `220px` ≤1100px). Use them for anything sticky under the
+topbar (see `.attempt-bar`).
 
 Never write a raw hex color in a component or a new CSS rule — use the token. If a
 screen genuinely needs a new semantic color, add it to `@theme` first, don't inline it.
 
-There is no formal spacing or type scale (no `--space-*` tokens). Observed ranges:
-font-size 9px (micro labels/eyebrows) to 28px (page `h1`), border-radius 4–8px for
-controls/cards, 999px for pill/progress shapes. When sizing something new, match the
-size used by the nearest existing element with the same role instead of picking an
-arbitrary value.
+Type scale in use: 11–12px (lozenges, section headings, meta), 13–14px (body, nav,
+tables, buttons), 15–18px (card/section headings), 20–24px (page `h1`, stat values).
+Radius: 3px lozenges, 4px controls/nav items, 6px search/option rows, 8px cards/popovers,
+50% avatars. Elevation: cards are flat with a 1px border; only overlays get
+`--shadow-overlay`.
+
+### Icons (`src/web/components/icons.tsx`)
+
+```tsx
+<Icon name="book" />            // 16px, inherits currentColor, aria-hidden
+<Icon name="users" size={20} /> // 20px for nav items and icon buttons
+```
+
+Inline SVG line icons on a 24px grid with a 2px stroke. Always pair an icon with visible
+text or an `aria-label` on the parent control; the icon itself is decorative. Add a new
+icon by adding a path entry to the `paths` map in the same style — don't import an icon
+library, and don't use Unicode glyphs (`◇`, `▦`, `☰`) as icons.
 
 ### Layout shells
 
@@ -60,31 +90,58 @@ layout:
 
 - **`.login-page`** — unauthenticated split screen (`grid-template-columns: 1fr 1fr`),
   dark `.login-intro` brand panel + light `.login-form-area` form panel. Collapses to a
-  single column under 760px.
-- **`.app-shell`** — authenticated app (`Shell.tsx` layout), a `232px` sidebar +
-  fluid main column, with a `64px` topbar spanning both. Collapses to a stacked
-  mobile nav (`.menu-toggle` + `.navigation.is-open`) under 760px. `.main-content` caps
-  at `1600px` and centers.
+  single column under 760px. Login keeps 44px inputs/buttons.
+- **`.app-shell`** — authenticated app (`src/web/layouts/Shell.tsx`):
+  - `.topbar` (sticky, `--topbar-height`): `.topbar-start` (sidebar toggle
+    `.icon-button` + `.brand` link), `GlobalSearch` in the middle, `.topbar-end` with the
+    account menu (`.account-trigger` → `.menu-popover[role=menu]` with `.menu-profile`,
+    `.menu-separator`, `.menu-item`).
+  - `.sidebar` (sticky, own scroll): `.space-header` (`.space-avatar` + name/role),
+    `nav.navigation` of `.nav-group`s — optional `.nav-heading`, `ul` of `.nav-item`
+    links (`.is-active` + `aria-current="page"` draws the blue left indicator), a
+    collapsible "Segera hadir" group (`.nav-disclosure`, `.nav-item-disabled`,
+    `.nav-soon`), and `.sidebar-footer`.
+  - `.main-content` caps at `1600px` and centers.
+  - The toggle collapses the sidebar on desktop (`.sidebar-collapsed`, remembered in
+    `localStorage`) and opens it as an off-canvas drawer (`.sidebar.is-open` +
+    `.sidebar-backdrop`, Escape closes) at ≤760px.
+- Navigation entries come from `navigationFor(actor)` in `src/web/layouts/navigation.ts`,
+  filtered by permission. Add a new page there once; the sidebar and the topbar search
+  both read it.
+- `GlobalSearch` (`src/web/layouts/GlobalSearch.tsx`) is an ARIA combobox: it filters
+  reachable pages locally and matches course names through `GET /api/learning/courses?q=`
+  (debounced, top 5). `/` focuses it; ↑/↓/Enter/Escape work. At ≤760px it collapses to a
+  `.search-trigger` icon that expands over the topbar.
 
 Responsive rules (enforced by the phase validation docs, keep honoring them):
 
 - No document-level horizontal scroll at 390px (phone) or 820px (tablet) viewports.
 - Wide tabular content scrolls internally via `.table-scroll { overflow: auto; }`
-  around `.data-table` — never let a table force the page to scroll horizontally.
-- Breakpoints in use: `1100px` (shell/grid density), `760px` (mobile stack), `420px`
-  (tightest grids). Reuse these three; don't add a fourth without a real reason.
+  around `.data-table`; long tab rows scroll inside `.tabs` — never let content force the
+  page to scroll horizontally.
+- Breakpoints in use: `1100px` (shell/grid density), `760px` (drawer/mobile stack;
+  `min-width: 761px` only for the desktop sidebar-collapse rule), `420px` (tightest rows).
+  `@media (pointer: coarse)` raises touch targets. Don't add another width breakpoint
+  without a real reason.
 
 ### Base primitives (`src/web/components/ui.tsx`)
 
 ```tsx
-<Button>Simpan</Button>                          // primary, min-height 44px
-<Button className="button-secondary">Batal</Button>
+<Button>Simpan</Button>                                   // primary
+<Button className="button-secondary">Batal</Button>       // neutral gray
 <Button className="button-secondary button-small">Cari</Button>
-<Card>...</Card>                                  // white panel, border, radius 8px
-<EmptyState title="Belum ada data" description="..." symbol="◇" />
-<LoadingState />                                  // pulsing dot + "Memuat ruang belajar…"
-<ErrorState message={error} retry={() => ...} />  // role="alert", optional retry button
+<Button><Icon name="plus" />Buat akun</Button>             // icon + label
+<Card>...</Card>                                           // white panel, 1px border, radius 8px
+<PageHeader breadcrumbs={[{ label: "Pembelajaran", href: "/learning" }]} title={course.name}
+  description="Kelas 10A · Semester Ganjil" actions={<Status published />} />
+<EmptyState icon="book" title="Belum ada course" description="..." action={<Button>…</Button>} />
+<LoadingState />                                           // spinner + "Memuat ruang belajar…"
+<ErrorState message={error} retry={() => ...} />           // role="alert", icon, optional retry
 ```
+
+Every app-shell screen starts with `PageHeader`. Breadcrumbs list ancestors only (the
+`h1` names the current page); omit them on top-level pages (Dashboard, Pembelajaran).
+Don't reintroduce "← Kembali" links — a breadcrumb is the back navigation.
 
 Every data view must render one of `LoadingState` / `EmptyState` / `ErrorState` /
 success content — no bare blank screens while fetching or on empty results. This is a
@@ -100,9 +157,9 @@ reimplemented per page:
   `onExpired()` on a `401`, exposes `retry()`. Standard way to load any view's data.
 - `<Pager offset next change />` — the only pagination UI (`.table-pagination`),
   50 rows/page convention baked into the label.
-- `<Search change />` — the only search box pattern (`.table-search`).
-- `<Status published />` — draft/published badge (`.badge` / `.badge-draft`). Model any
-  new status pill (e.g. a future Kanban card status) on this component, not a new one.
+- `<Search change />` — the only in-card search box pattern (`.table-search`).
+- `<Status published />` — `Terbit` (`.badge-success`) / `Draft` (`.badge-draft`)
+  lozenge. Model any new status pill on this component, not a new one.
 - `<MutationForm path label body saved onExpired>` — the only create/update form
   pattern: disables its fieldset while pending, shows `ErrorState` on failure, shows a
   literal `"Menyimpan…"` pending label, supports both JSON and multipart (file upload)
@@ -110,42 +167,53 @@ reimplemented per page:
 - `<Field label name .../>` — the only labeled input/textarea pattern
   (`.learning-field`, `.input`). Use `area` for a textarea, `type` for non-text inputs.
 
+Create flows on list pages follow the Jira pattern in `Foundation.tsx`: a primary
+`+ Action` button in `PageHeader` actions toggles an `.admin-form-card` panel above the
+list (focus moves to the first field), and the empty state offers the same action.
+
 ### Component class catalogue
 
 Grouped by what they're for. This is the full inventory in `app.css` — check here before
 adding a near-duplicate.
 
-- **Buttons**: `.button` (primary), `.button-secondary`, `.button-small` (compose:
-  `className="button-secondary button-small"`). Disabled state is automatic
-  (`button:disabled { opacity: .6; cursor: wait }`) — don't hand-roll disabled styling.
-- **Inputs**: `.input` on `input`/`select.input`/`textarea.input`. `44–46px` min-height
-  everywhere except `.button-small`/`.table-search .input` (`36px`) and
-  `.picker-points .input` (`96px` wide numeric field).
-- **Badges/status**: `.badge` (blue), `.badge-gold` (gold, all-caps eyebrow style),
-  `.badge-draft` (muted/gray). Compose `className="badge badge-draft"` etc.
-- **Cards**: `.card` (generic panel), `.admin-form-card`, `.lesson-card`,
-  `.submission-card`, `.question-item` — all a `.card`-like bordered block for a
-  specific content shape. Add a new suffixed variant rather than overloading `.card`
-  with one-off modifiers.
+- **Buttons**: `.button` (primary, 36px), `.button-secondary` (neutral gray),
+  `.button-small` (32px), `.icon-button` (36px square, transparent, for icon-only
+  controls with `aria-label`). Compose `className="button-secondary button-small"`.
+  Disabled state is automatic (`button:disabled { opacity: .6; cursor: not-allowed }`).
+- **Inputs**: `.input` on `input`/`select.input`/`textarea.input` — 40px, 1px
+  `--color-border-input`, blue border on focus. `.button-small`-sized contexts
+  (`.table-search .input`, `.choice-search`, `.picker-points .input`) are 32px.
+- **Lozenges**: `.badge` (blue, default/in progress), `.badge-success`, `.badge-draft`
+  (neutral), `.badge-gold`, `.badge-danger`, `.badge-discovery`. Sentence case, 12px
+  semibold. Compose `className="badge badge-success"`.
+- **Cards**: `.card` (generic panel), `.stat-card`, `.admin-form-card`, `.lesson-card`,
+  `.course-tile`, `.submission-card`, `.question-item` — add a new suffixed variant
+  rather than overloading `.card` with one-off modifiers. `.card-heading` (title row,
+  16px `h2`) and `.card-footer-link` (full-width footer link) frame a card.
 - **Tables**: `.table-scroll` > `.data-table` (+ `.table-search`, `.table-pagination`).
-  This is the only tabular data pattern — reuse verbatim for any new admin list.
-- **Tabs**: `.academic-tabs` + `.tab-active` on the active button.
-- **Page chrome**: `.breadcrumb`, `.page-heading` (+ `h1`/`p`/`.date-label`),
-  `.welcome-banner`, `.summary-grid` of `.card`s — the standard top-of-page pattern for
-  an app-shell screen.
-- **Empty/loading/error**: `.empty-state`/`.empty-symbol`, `.loading-state`/
-  `.loading-dot`, `.error-state`, `.success-state`.
-- **List rows / detail blocks**: `.task-item`, `.archive-item`, `.grade-entry`,
-  `.material-item`/`.activity-item`, `.picker-row` — all a `border-top`/`border-bottom`
-  hairline-separated row inside a card. Model a new list row on the nearest of these.
+  2px header rule, row hover. This is the only tabular data pattern — reuse verbatim.
+- **Tabs**: `nav.tabs` of buttons + `.tab-active` (+ `aria-current`) — Jira underline
+  tabs, scroll horizontally inside the bar on narrow screens. Place directly under
+  `PageHeader`.
+- **Page chrome**: `.page-header` (`.breadcrumbs`, `.page-header-main`,
+  `.page-header-text`, `.page-actions`), `.date-label`.
+- **Dashboard**: `.summary-grid` of `.stat-card`s (`.stat-icon` + `.stat-blue` /
+  `.stat-purple` / `.stat-gold`, `.summary-label`, `.summary-value`), `.dashboard-grid`.
+- **Empty/loading/error/messages**: `.empty-state`/`.empty-symbol`/`.empty-action`,
+  `.loading-state`/`.spinner`, `.error-state`, `.success-state` (green), `.info-state`
+  (blue, neutral notices such as "settings are locked").
+- **List rows / detail blocks**: `.task-item` (icon tile + `.task-body` + lozenge — the
+  Jira issue-row shape), `.archive-item`, `.grade-entry`, `.material-item`/
+  `.activity-item`, `.picker-row`, `.lesson-nav` — hairline-separated rows inside a card.
+  Model a new list row on the nearest of these.
 - **Forms in a grid**: `.admin-fields` (2-column grid, collapses to 1 column ≤760px) +
   `.admin-field`/`.learning-field`, `.field-wide` to span both columns,
   `.form-actions` to place the submit button.
 - **Assessment-specific** (question/attempt UI): `.option-row` (+
-  `.option-correct`/`.option-wrong` review states), `.attempt-bar` (sticky timer bar),
-  `.attempt-timer`/`.attempt-timer-low`, `.question-picker`/`.picker-row`. Only reuse
-  these for actual assessment UI, not as a generic "selectable row" — use `.option-row`'s
-  shape as a reference for a new selectable-row pattern instead of repurposing the class.
+  `.option-correct`/`.option-wrong` review states), `.attempt-bar` (sticky under the
+  topbar), `.attempt-timer`/`.attempt-timer-low`, `.question-picker`/`.picker-row`. Only
+  reuse these for actual assessment UI, not as a generic "selectable row" — use
+  `.option-row`'s shape as a reference for a new selectable-row pattern instead.
 
 ### Interaction-state contract
 
@@ -154,7 +222,8 @@ Every data view/form must implement:
 1. **Loading** — `<LoadingState />` (or equivalent inline `.loading-state`) while the
    first fetch is in flight.
 2. **Empty** — `<EmptyState />` with a title + one-line description when a list has zero
-   rows after loading (not a raw blank table).
+   rows after loading (not a raw blank table); add `action` when the user can create the
+   first item.
 3. **Error** — `<ErrorState message retry />`, `role="alert"`, with a retry action when
    the failure is retriable (`useData`'s `retry()`).
 4. **Pending mutation** — disable the form (`fieldset disabled={pending}`), swap the
@@ -168,17 +237,20 @@ Every data view/form must implement:
 
 ### Accessibility checklist
 
-- `:focus-visible` gets a `3px solid var(--color-blue)` outline globally — don't
-  suppress it with `outline: none` on a custom control.
+- `:focus-visible` gets a `2px solid var(--color-blue)` outline (offset 2px; inputs,
+  tabs, and menu items draw it inset) — don't suppress it with `outline: none`.
 - Use real `label`/`fieldset`/`legend`, `role="alert"` for errors, `role="status"` for
-  loading, `aria-current="page"` for active nav links (see `Shell.tsx`).
+  loading, `aria-current="page"` for active nav links and tabs, `aria-expanded` +
+  `aria-controls` on every toggle (sidebar, account menu, create panel, disclosure).
+- Popovers close on Escape and return focus to their trigger; menus move focus to the
+  first `menuitem` when opened.
 - `.skip-link` ("Langsung ke konten") is present in the app shell — keep it first in
   the DOM and keep `#main` as its target on any shell change.
 - Respect `prefers-reduced-motion` (already globally handled — don't add an animation
   that bypasses the global `@media (prefers-reduced-motion: reduce)` rule).
-- Minimum interactive height is `44px` for primary controls (`.button`, `.input`,
-  `.option-row`) — keep new tappable elements at or above that, `36px` only for
-  secondary/small controls that are not the primary action on a screen.
+- Target sizes: 36px buttons/nav items and 40px inputs on fine pointers;
+  `@media (pointer: coarse)` raises `.button`, `.input`, `.nav-item`, `.icon-button` to
+  44px. `.option-row` is always ≥44px (students answer on phones).
 
 ### Language
 
@@ -206,15 +278,15 @@ Nothing board-shaped exists in the codebase yet — don't treat the names below 
 classes. When Phase 4 is built, keep it inside this same kit instead of starting a
 parallel design language:
 
-- A board column is a `.card`-shaped container; a board card reuses `.card` sizing and
-  the existing hairline-row rhythm (`border-top`/`border-bottom`, `14–18px` vertical
-  padding) seen in `.task-item`/`.archive-item`, not a new shadow/elevation system —
-  this kit has no shadows, only 1px borders.
-  This is intentional: no elevation is used to signal depth anywhere in the app.
-- Status/priority pills reuse `.badge`/`.badge-gold`/`.badge-draft` rather than
-  introducing a new color-coded label system.
-  A new priority scale should map onto the existing token set (`--color-blue`,
-  `--color-gold`, `--color-danger`, `--color-muted`), not new hex colors.
+- Register Projects in `navigationFor` (replacing its "Segera" entry) and start the
+  screen with `PageHeader` + `.tabs` (e.g. Board / List).
+- A board column is a `--color-background` lane; a board card reuses `.card` sizing and
+  the `.task-item` anatomy (type icon tile, title, meta, lozenge). Cards stay flat with a
+  1px border — `--shadow-overlay` is reserved for overlays (a card being dragged counts
+  as an overlay).
+- Status/priority pills reuse the lozenge variants (`.badge`, `.badge-success`,
+  `.badge-draft`, `.badge-gold`, `.badge-danger`, `.badge-discovery`) rather than a new
+  color-coded label system; item types follow the `.task-*` icon tile colors.
 - Drag affordances, column headers, and the board scroll container should follow the
   `.table-scroll` precedent: the page never scrolls horizontally, only the board's own
   container does, and it must not break the 390px/820px no-horizontal-scroll rule.
