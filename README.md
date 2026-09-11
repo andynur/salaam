@@ -137,6 +137,25 @@ administrator already exists, never overwrites an account, and records an audit 
 Remove the variables after a successful run. Later accounts are created by an authorized
 administrator through the administration UI.
 
+## Demo dataset
+
+To explore or demo SALAAM with data that looks like a real term in progress — one academic
+year, three classes, two teachers, 36 students, a full JavaScript course following the
+"Modern JavaScript Programming" handbook curriculum, graded and ungraded assignments, a
+closed exam, an open quiz, and capstone projects at every review stage — run against a
+freshly migrated, empty development database:
+
+```sh
+bun run db:migrate
+bun run db:seed:demo
+```
+
+The script prints the shared demo password on success; every seeded account uses it. It is
+development-only, refuses to run twice against the same database (reset with
+`bun run db:migrate:reset` first), and runs in a single transaction so a failure leaves no
+partial data. It does not create an administrator; run `bun run db:bootstrap-admin` (or
+`db:seed`) separately.
+
 ## Database migrations
 
 ```sh

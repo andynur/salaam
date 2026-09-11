@@ -20,4 +20,7 @@ Use skill `add-migration` for the step-by-step procedure.
 - A migration that adds capabilities inserts them into `permissions` and
   `role_permissions`.
 - Seeds: `seed/admin.ts` creates a development-only admin; `seed/bootstrap-admin.ts` creates
-  the first admin in any environment and refuses when one exists.
+  the first admin in any environment and refuses when one exists; `seed/demo.ts` fills a
+  freshly migrated development database with a full realistic demo dataset (identity through
+  Phase 4 project learning) and refuses if it already ran. See the README's "Demo dataset"
+  section.
