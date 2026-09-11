@@ -107,6 +107,7 @@ Read on demand:
 - `docs/07_DEPLOYMENT_AND_OPERATIONS.md`
 - `docs/08_CODEX_VSCODE_HARNESS.md`
 - `docs/09_ENGINEERING_RULES_AND_DOD.md`
+- `DESIGN.md` (UI kit reference — tokens, components, class catalogue)
 
 Do not load all docs for every task.
 
@@ -117,6 +118,8 @@ Do not load all docs for every task.
 - White/navy/blue dominant with golden accent.
 - Reuse components and tokens.
 - Every data view handles loading/empty/error state.
+- Read `DESIGN.md` before building or changing any screen — it is the concrete token
+  and component reference for `src/web/`.
 
 ## Scope discipline
 
