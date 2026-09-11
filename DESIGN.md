@@ -90,7 +90,9 @@ layout:
 
 - **`.login-page`** — unauthenticated split screen (`grid-template-columns: 1fr 1fr`),
   dark `.login-intro` brand panel + light `.login-form-area` form panel. Collapses to a
-  single column under 760px. Login keeps 44px inputs/buttons. The product name in
+  single column under 760px. Login keeps 44px inputs/buttons. The form `.badge` holds
+  the Arabic salam greeting — the only Arabic-script copy allowed in the UI, because HSI
+  Boarding School is an Islamic school; see `docs/BRAND_GUIDELINES.md`. The product name in
   `.intro-footer` and `.login-footer`, and every `document.title`, come from `BRAND` and
   `brandTitle()` in `src/web/lib/brand.ts` — never hard-code the product name. Favicon,
   app icons, manifest, and social preview live in `assets/brand/`; see

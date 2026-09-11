@@ -32,6 +32,10 @@ peace, trust, and growing together.
 Use the Arabic script only in about or philosophy contexts, such as the README
 Philosophy section. Do not put it in UI chrome, page titles, icons, or notifications.
 
+**Exception — login greeting.** HSI Boarding School is an Islamic school, so the login
+form badge greets users with "السَّلاَمُ عَلَيْكُمْ وَرَحْمَةُ اللهِ وَبَرَكَاتُهُ". This is the only place in the UI
+where Arabic script appears; do not extend it to other screens.
+
 ## Voice and language
 
 - UI copy is Indonesian. The product name, tagline, and descriptor stay in English.
@@ -39,7 +43,8 @@ Philosophy section. Do not put it in UI chrome, page titles, icons, or notificat
   manifest description, and the README. Do not repeat it in page headers, empty states,
   errors, or buttons.
 - Keep the login page's Indonesian welcome copy; it speaks to students and staff, while
-  the product name marks the product.
+  the product name marks the product. The Arabic greeting in the login badge is the one
+  exception to Indonesian UI copy (see Meaning and philosophy).
 
 ## Logos
 
