@@ -1,4 +1,4 @@
-# Foundation validation
+# Phase 0 — Foundation validation
 
 Validated locally on 2026-09-11 with **Bun 1.4.2** and **PostgreSQL 17.9**.
 The machine's global Bun was 1.4.0; validation used a project-local 1.4.2 binary
@@ -47,5 +47,5 @@ Local databases `hsi_learning_os` and `hsi_learning_os_test` and ignored `.env` 
 created. The application database has the identity schema and baseline roles/
 permissions, with no remaining QA account. Seed your own development admin privately.
 
-Next task: **Phase 1 — Core Identity & Academic Foundation**, as defined in
-[the roadmap](03_MASTER_ROADMAP.md).
+The next task was **Phase 1 — Core Identity & Academic Foundation**, as defined in
+[the roadmap](../roadmap.md).

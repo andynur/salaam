@@ -5,6 +5,25 @@ Phase 3 is implemented for choice-based assessment. Before implementation, the p
 owner scoped the question types to single choice, multiple choice, and true/false, and
 left surveys out of this phase.
 
+## Workflow
+
+1. In a course, the teacher opens **Bank soal** and adds single-choice,
+   multiple-choice, or true/false questions with an answer key and optional explanation.
+2. In a lesson, the teacher adds a quiz or an exam, chooses questions and points, and
+   sets the window, time limit, attempts, shuffling, and result visibility. An exam
+   always has one attempt, a time limit, and a closing time.
+3. After publishing, students start the assessment from the lesson or dashboard. Each
+   attempt snapshots its questions, shuffles them per student when configured, and
+   fixes its deadline from server time.
+4. Answers autosave as they are chosen. Answers made while offline stay on the device
+   and are resent after the connection or page returns. Retried or late autosaves never
+   overwrite a newer answer.
+5. Students submit once; submission is idempotent. Attempts that reach their deadline
+   are finalized automatically with the last saved answers. Multiple-choice questions
+   score only when every choice is exact.
+6. Students see scores and explanations according to the visibility setting. Teachers
+   review attempts and append audited score adjustments with a reason.
+
 ## Delivered scope
 
 - Migration `0004_assessment_engine.sql`. It reuses `learning.manage` for authoring and

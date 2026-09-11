@@ -3,6 +3,14 @@
 Validated locally on 2026-09-11 with Bun 1.4.2 and PostgreSQL 17.9.
 All Phase 1 roadmap exit criteria are implemented and locally verified.
 
+## Workflow
+
+1. Create an academic year and terms whose dates fit inside that year.
+2. Create classes for the year and enroll active students.
+3. Create subjects and courses that connect a class, term, and subject.
+4. Assign active teachers to courses.
+5. Review the read-only audit log.
+
 ## Delivered scope
 
 - Admin creation/listing of users with student, teacher, or admin role profiles.
@@ -22,6 +30,15 @@ All Phase 1 roadmap exit criteria are implemented and locally verified.
   current actor's enrollment/assignment or academic management capability.
 - Responsive administration UI with loading, empty, error, retry, and success states.
   Tables and relation choices support search and 50-row pagination.
+
+## API
+
+The administration API exposes `GET` and `POST` routes under `/api/admin/{resource}` for
+`users`, `years`, `terms`, `classes`, `enrollments`, `subjects`, `courses`, and
+`teaching-assignments`. Audit records are available through `GET /api/admin/audit`.
+Lists accept `q` and `offset`, return at most 50 rows, and use the
+`{ items, nextOffset }` response shape. Server-side permissions and same-origin checks
+apply to every mutation.
 
 ## Verified behavior
 

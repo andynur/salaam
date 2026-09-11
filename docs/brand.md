@@ -1,7 +1,8 @@
 # SALAAM Brand Guidelines
 
 This is the reference for how SALAAM presents itself in the product, documentation, and
-shared links. The rebrand decisions and their scope are recorded in `REBRANDING.md`.
+shared links. The product was renamed from Learning OS to SALAAM in September 2026; the
+technical names that keep the old name on purpose are listed near the end.
 
 ## Identity
 

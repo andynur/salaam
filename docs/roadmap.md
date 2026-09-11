@@ -1,0 +1,111 @@
+# Roadmap
+
+SALAAM ships in independently testable and reviewable phases. Validate a phase before
+expanding scope. Every phase delivers focused behavior tests, a passing typecheck and build,
+updated documentation, a record in [`phases/`](phases/), and an explicit out-of-scope list.
+Coding agents follow skill `deliver-phase`.
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 0 | Repository and identity foundation | Delivered — [record](phases/00-foundation.md) |
+| 1 | Core identity and academic foundation | Delivered — [record](phases/01-identity-academic.md) |
+| 2 | Learning core | Delivered — [record](phases/02-learning-core.md) |
+| 3 | Assessment engine | Delivered for choice questions — [record](phases/03-assessment-engine.md) |
+| 4 | Project learning | Delivered — [record](phases/04-project-learning.md) |
+| 5 | Gamification | Next |
+| 6 | Attendance and classroom sessions | Planned |
+| 7 | QR attendance | Planned |
+| 8 | Calendar and notifications | Planned |
+| 9 | Reporting | Planned |
+| 10 | Advanced IT learning | Planned |
+| 11+ | Later evaluation | Backlog |
+
+## Delivered
+
+### Phase 0 — Repository and identity foundation
+
+Bun, TypeScript, and PostgreSQL repository, migration runner, secure sessions,
+authentication, role and permission checks, health endpoints, a web shell, and baseline
+tests.
+
+### Phase 1 — Core identity and academic foundation
+
+Role-linked profiles, first-admin bootstrap, academic years, terms, classes, student
+enrollment, subjects, courses, teacher assignments, audit records, and the responsive
+administration UI.
+
+### Phase 2 — Learning core
+
+Course modules, lessons, materials, publishing, archiving, assignments, submissions,
+grading, and student progress on the shared Activity Engine.
+
+### Phase 3 — Assessment engine
+
+Question banks, quizzes and exams, attempts, timers, randomization, autosave, reconnect
+recovery, automatic scoring, and idempotent final submission. Delivered for single-choice,
+multiple-choice, and true/false questions; the product owner deferred essays, rubrics, and
+surveys.
+
+### Phase 4 — Project learning
+
+Challenges, projects, teams, Kanban boards, reviews, showcases, and portfolio entries.
+
+## Planned
+
+### Phase 5 — Gamification
+
+XP, levels, badges, achievements, reward rules, and an auditable XP ledger. Earlier phases
+left these hooks to it: XP for lesson completion (Phase 2) and XP, badges, and rewards for
+projects (Phase 4).
+
+### Phase 6 — Attendance and classroom sessions
+
+Meeting sessions, rosters, manual attendance, notes, reports, and realtime classroom status.
+Attendance always references a defined session.
+
+### Phase 7 — QR attendance
+
+Short-lived QR or camera-assisted attendance validated on the server. QR values never
+become reusable authentication credentials.
+
+### Phase 8 — Calendar and notifications
+
+Academic events, deadlines, reminders, notification preferences, and delivery status.
+Calendar entries reference their source entity instead of duplicating deadlines.
+
+### Phase 9 — Reporting
+
+Operational dashboards, attendance summaries, learning progress reports, exports, and
+audit-friendly administrative views.
+
+### Phase 10 — Advanced IT learning
+
+Isolated coding challenges, only once a separate execution boundary, resource limits, a
+network policy, and a review process exist. The application never runs untrusted student
+code directly.
+
+### Phase 11 and later
+
+Local-server migration, advanced attendance improvements, and other
+[post-V1 items](product.md#after-v1), only with a measured operational need and an approved
+privacy and security review.
+
+## Deferred from delivered phases
+
+Items explicitly left out so far. Consider them when scoping later phases; each record's
+Boundaries section has the details.
+
+- **Phase 1:** profile editing, role reassignment, account recovery, class transfers, and
+  academic archive states.
+- **Phase 2:** hard deletion and bulk reordering; moving materials between lessons;
+  resubmission, returned work, late exceptions, and deadline extensions; malware scanning
+  and inline previews; rich text or Markdown.
+- **Phase 3:** essay and short-answer questions, manual grading, and rubrics; surveys and
+  questionnaires; partial credit and negative marking; time extensions and accommodations;
+  proctoring; question import, export, pools, and statistics; live monitoring over
+  WebSocket.
+- **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
+  attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
+  multiple reviewers; portfolio browsing, public pages, and export; project templates.
+- **Operations:** HTTPS proxy validation, backup and restore drills, and load testing on
+  school hardware.

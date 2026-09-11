@@ -3,6 +3,19 @@
 Validated locally on 2026-09-11 with Bun 1.4.2 and the local PostgreSQL server.
 All Phase 2 roadmap exit criteria are implemented and locally verified.
 
+## Workflow
+
+1. An assigned teacher or an administrator opens **Pembelajaran** and selects a course.
+2. Add modules and lessons, then add text, HTTP/HTTPS link, or file materials and
+   assignments. Lessons can move between active modules of the same course.
+3. Publish the course, module, lesson, and assignment. Students see content only when
+   every level is published and nothing on the path is archived.
+4. Enrolled students complete lessons and submit one final answer before the
+   server-side deadline: text, a file, or both.
+5. The teacher grades submissions from 0 to 100 with feedback and reviews class
+   progress. Corrections append a new grade and keep the earlier ones.
+6. Content that is no longer needed is archived instead of deleted and stays restorable.
+
 ## Delivered scope
 
 - Migration `0003_learning_core.sql` adds the capabilities `learning.view`
@@ -166,7 +179,7 @@ Lists accept `q` and `offset` and return `{ items, nextOffset }` with at most 50
 This is local validation, not deployment to the school production environment. The QA
 database, browser profile, uploaded QA files, and generated credentials were removed
 after validation. Back up PostgreSQL and `STORAGE_ROOT` together (see
-`07_DEPLOYMENT_AND_OPERATIONS.md`).
+[operations](../operations.md)).
 
 Phase 2 does not include:
 

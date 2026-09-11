@@ -1,0 +1,160 @@
+# Architecture
+
+SALAAM is a modular monolith. One Bun process serves the API and the React single-page
+application, and PostgreSQL is the source of truth. There is no backend framework, ORM,
+cache, queue, or second service; add a broker or multi-instance coordination only when a
+measured operational requirement exists.
+
+## Layout
+
+| Path | Role |
+| --- | --- |
+| `src/server.ts` | Loads config, opens the pool, wires routers, serves SPA routes and brand assets, shuts down |
+| `src/core/http.ts` | Request pipeline and top-level dispatch |
+| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`) |
+| `src/core/validation.ts` | Body parsing and field validators |
+| `src/core/{auth,permissions,audit,storage,database,config,errors}` | Platform services |
+| `src/modules/users`, `src/modules/academic` | Account provisioning, academic structure, dashboard summary |
+| `src/modules/learning` | Course access, modules, lessons, materials, publishing, archiving, progress, dashboard tasks |
+| `src/modules/activities` | Assignments, submissions, grading |
+| `src/modules/assessments` | Question bank, quiz and exam settings, attempts, scoring, adjustments |
+| `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
+| `src/shared/` | Types used by both server and web |
+| `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
+| `database/migrations/` | Ordered SQL migrations with `down/` scripts |
+| `storage/` | Default private storage root; never served |
+
+## Request flow
+
+1. `Bun.serve` matches static routes first: SPA paths such as `/dashboard`,
+   `/learning/courses/:id`, and `/projects/:id` return the bundled `index.html`, and brand
+   assets return fixed files. Everything else goes to `fetch`.
+2. `createHttpHandler` assigns a request ID and answers `/health/live`, `/health/ready`, and
+   `/api/auth/*` itself. Login is same-origin, rate limited, and capped at two concurrent
+   password checks.
+3. For `/api/learning/`, `/api/projects`, and `/api/admin/`, non-GET requests must pass
+   `requireSameOrigin`. The handler resolves the session actor and calls the router.
+4. The router checks the base capability, splits the path, parses the body (`jsonObject`
+   with a 64 KiB limit for learning and projects and 4 KiB elsewhere; `multipartInput` only
+   for material uploads and assignment submissions), and calls a service inside
+   `databaseInputError`, which turns constraint violations into 409 or 400.
+5. The service validates input with its module's `input.ts`, checks scope, and runs SQL in
+   a transaction.
+6. Errors become `{ error: { code, message, requestId } }`. Every response gets security
+   headers, `X-Request-ID`, and `Cache-Control: no-store`, and produces one structured log
+   line.
+
+## Authorization
+
+- Users hold roles (`admin`, `teacher`, `student`), and roles grant capabilities through
+  `role_permissions`. Code checks capabilities, never role names. The `Actor` carries `id`,
+  `displayName`, `roles`, and `permissions`.
+- Capabilities: `dashboard:view` (all roles); `admin.users.manage`, `academic.manage`, and
+  `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
+  `learning.manage.all` (admin); `learning.participate` (student).
+- Course scope comes from `courseAccess`. *Manage* needs `learning.manage` plus a teaching
+  assignment or `learning.manage.all`. *Participate* needs enrollment in the course's class
+  and a published course. *View* accepts either. Failing scope returns 404, so the API does
+  not reveal whether a resource exists. Project routes resolve the course from the project
+  and apply the same rules.
+
+## Domain model
+
+| Migration | Tables |
+| --- | --- |
+| `0001_identity` | `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, `sessions`, `audit_logs` |
+| `0002_academic_foundation` | `user_profiles`, `academic_years`, `terms`, `classes`, `class_members`, `subjects`, `courses`, `teaching_assignments` |
+| `0003_learning_core` | `course_modules`, `lessons`, `stored_files`, `lesson_materials`, `activities`, `submissions`, `submission_grades`, `lesson_completions` |
+| `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
+| `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
+
+- **Academic:** a course joins a class, a term, and a subject within one academic year;
+  composite foreign keys keep classes and terms in the same year. Teachers link to courses
+  through `teaching_assignments`, students to classes through `class_members`. Profiles
+  store a NIS or employee identifier that is unique per role.
+- **Learning:** Course → Module → Lesson → Material or Activity. Composite foreign keys on
+  `course_id` keep every descendant and stored file inside its course.
+
+### Activity Engine
+
+Assignments, quizzes, exams, and challenges are rows in `activities`, distinguished by
+`kind`; the kind constraint already accepts the planned kinds. Kind-specific configuration
+lives in a settings table keyed by `activity_id` (`assessment_settings`,
+`challenge_settings`). All kinds share lesson placement, publishing and archiving through
+`/activities/{id}/publish` and `/activities/{id}/archive`, progress, and dashboard tasks.
+Work records hang off the activity: `submissions` for assignments, `attempts` for quizzes
+and exams, `projects` for challenges. A new kind extends this model; it never gets a
+parallel engine.
+
+## Lifecycle rules
+
+- **Layered publishing.** Students see an item only when its course, module, lesson, and
+  activity are all published and none of them is archived. Managers also see drafts.
+- **Archive instead of delete.** Modules, lessons, materials, activities, questions, board
+  cards, and portfolio entries are archived and can be restored. Archived paths accept no
+  new work.
+- **Lock after first use.** An assignment's title, instructions, and deadline lock after the
+  first submission. An assessment's settings and question list, and the questions it uses,
+  lock after the first attempt. A challenge's team settings lock once a project exists, and
+  the whole definition locks once a project is submitted.
+- **Append-only history.** Grades, score adjustments, and project reviews append rows and
+  the latest row wins. Editors send the ID they read (`previousGradeId`,
+  `previousAdjustmentId`), so stale corrections fail with 409.
+
+## Concurrency and idempotency
+
+- Course mutations lock the course row `FOR UPDATE` first, so visibility and deadline checks
+  see one consistent state. Attempt traffic and project writes take the course row
+  `FOR SHARE` and then lock their own row; publishing still waits for them, but students do
+  not serialize on each other.
+- Uniqueness makes retries safe: one submission per student and activity, one open attempt
+  per student (a partial unique index plus an advisory lock), and one project per student
+  per challenge. An identical retry returns the existing result; different content returns
+  409.
+- Board cards carry a `version`, and moves renumber positions under the project row lock.
+- Attempts past their deadline are finalized lazily with their saved answers the next time
+  they are started, read, submitted, or listed.
+
+## Files
+
+`src/core/storage/files.ts` writes uploads to `STORAGE_ROOT/learning-files/<prefix>/<uuid>`
+as the last step of the database transaction and removes the file if the transaction fails.
+`stored_files` records course, uploader, display name, media type, size, and SHA-256.
+Downloads repeat the access checks and are served as sandboxed attachments; see
+[security](security.md#files).
+
+## Web client
+
+- `src/web/index.html` loads `main.tsx`, which fetches the session from `/api/auth/me` and
+  picks a page from `location.pathname`. There is no router library, so SPA paths must also
+  be listed in `src/server.ts`.
+- `layouts/Shell.tsx` renders the topbar, sidebar, and global search from
+  `layouts/navigation.ts`, filtered by capability.
+- Pages live in `pages/`. UI primitives are in `components/ui.tsx`, the data and form kit in
+  `components/learning.tsx`, project widgets in `components/projects.tsx`, and icons in
+  `components/icons.tsx`.
+- `lib/api.ts` wraps `fetch` with same-origin credentials and surfaces the server's
+  Indonesian error message. Exam answers made offline are queued in `localStorage` under
+  `learning-os:attempt:<id>`.
+- Styling is one Tailwind CSS v4 stylesheet of semantic classes; see
+  [`DESIGN.md`](../DESIGN.md).
+
+## Build and runtime
+
+- `bun run dev` imports `index.html` directly with hot reload. `bun run build`
+  (`scripts/build.ts`) bundles server and web into `dist/` with `publicPath: "/"`. The
+  bundled server switches its working directory to `dist/` after loading config, because
+  Bun resolves prebuilt HTML assets from the working directory.
+- The HTML shell is served with a strict Content-Security-Policy; see
+  [security](security.md#http-headers).
+- The PostgreSQL pool holds four connections. Shutdown stops the server, closes the pool,
+  and exits within ten seconds.
+- WebSocket is reserved for genuinely realtime features such as classroom status and
+  attendance dashboards. Nothing uses it yet; CRUD stays on HTTP.
+
+## Data conventions
+
+UUID identifiers, `timestamptz` values in UTC, and the configured school timezone for
+display. Business invariants are unique and check constraints; indexes follow real query
+paths. JSONB is only for flexible configuration or snapshots. Soft deletion is used only
+where history must be kept.

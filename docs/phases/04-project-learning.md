@@ -5,6 +5,29 @@ product owner asked for Phase 4 to be completed end to end without a separate sc
 round, so the scope decisions below were made during implementation. They are recorded
 here for review before production use.
 
+## Workflow
+
+1. In a lesson, the teacher adds a **challenge**: instructions, an optional submission
+   deadline, and either individual work or teams of 2–10 students. Challenges publish and
+   archive like other activities.
+2. For a team challenge, the teacher forms teams from the enrolled class roster. For an
+   individual challenge, each student starts their own project from the lesson; repeated
+   starts reopen the same project. A student belongs to at most one project per challenge.
+3. The team works on a **Kanban board** (Akan dikerjakan, Sedang dikerjakan, Ditinjau,
+   Selesai): cards with a description and an assignee from the team, moved by drag and
+   drop or by keyboard-accessible arrow buttons. Every card carries a version, so a stale
+   edit or move is refused instead of silently overwriting a teammate.
+4. The team writes a result summary, adds an optional HTTP/HTTPS link to the work, and
+   submits the project for review before the deadline. The board locks while it is
+   being reviewed.
+5. The teacher either requests changes, which reopens the board (resubmission is allowed
+   after the deadline), or approves the project with a score from 0 to 100. Reviews are
+   appended and audited; approval is final.
+6. The teacher can place approved projects in the **showcase**, which every signed-in
+   user can browse without scores or reviews. Team members add approved projects to
+   their **portfolio** with a personal reflection; entries remain theirs after the class
+   year ends.
+
 ## Scope decisions
 
 - **Challenges** are `challenge` activities on the shared activities table, with one
