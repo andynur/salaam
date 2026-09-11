@@ -17,7 +17,7 @@ Setup and commands are in the root [README](../README.md). Coding agents start f
 ## Phase records
 
 Each record describes what the phase delivered, its API, verified behavior, validation
-results, resolved findings, and out-of-scope items. Phases 1–4 also start with the user
+results, resolved findings, and out-of-scope items. Phases 1–5 also start with the user
 workflow.
 
 | Phase | Record |
@@ -27,6 +27,7 @@ workflow.
 | 2 — Learning core | [phases/02-learning-core.md](phases/02-learning-core.md) |
 | 3 — Assessment engine | [phases/03-assessment-engine.md](phases/03-assessment-engine.md) |
 | 4 — Project learning | [phases/04-project-learning.md](phases/04-project-learning.md) |
+| 5 — Gamification | [phases/05-gamification.md](phases/05-gamification.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

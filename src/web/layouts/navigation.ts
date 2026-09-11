@@ -16,6 +16,7 @@ export function navigationFor(actor: Actor) {
     ...(can("learning.view") ? [
       { href: "/learning", label: "Pembelajaran", icon: "book", active: (path: string) => path.startsWith("/learning") } satisfies NavItem,
       { href: "/projects", label: "Projects", icon: "board", active: (path: string) => path.startsWith("/projects") } satisfies NavItem,
+      { href: "/gamification", label: "Pertumbuhan", icon: "star", active: (path: string) => path.startsWith("/gamification") } satisfies NavItem,
     ] : []),
   ];
   const admin: NavItem[] = ([

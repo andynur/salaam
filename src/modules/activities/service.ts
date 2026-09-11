@@ -4,6 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { idField, invalid } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
+import { awardXp } from "../gamification/awards";
 import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
 import { courseAccess, lessonAccess, notFound } from "../learning/access";
 import { activityInput, gradeInput, submissionContentInput } from "../learning/input";
@@ -101,15 +102,17 @@ export async function gradeSubmission(db: SQL, actor: Actor, courseId: string, s
   const previousGradeId = body.previousGradeId === null ? null : idField(body, "previousGradeId");
   return db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "manage", true);
-    const submissions = await tx`SELECT s.id FROM submissions s JOIN activities a ON a.id = s.activity_id
-      WHERE s.id = ${submissionId} AND a.course_id = ${courseId} AND a.kind = 'assignment'`;
-    if (!submissions.length) notFound();
+    const submission = (await tx<{ studentId: string }[]>`SELECT s.student_id AS "studentId" FROM submissions s JOIN activities a ON a.id = s.activity_id
+      WHERE s.id = ${submissionId} AND a.course_id = ${courseId} AND a.kind = 'assignment'`)[0];
+    if (!submission) notFound();
     const latest = (await tx<Grade[]>`SELECT id, score::float8 AS score, feedback FROM submission_grades WHERE submission_id = ${submissionId} ORDER BY created_at DESC, id DESC LIMIT 1`)[0];
     if (latest && latest.score === score && latest.feedback === feedback) return { id: latest.id };
     if ((latest?.id ?? null) !== previousGradeId) throw new HttpError(409, "GRADE_CHANGED", "Nilai sudah diperbarui. Muat ulang jawaban sebelum menilai kembali.");
     const rows = await tx<{ id: string }[]>`INSERT INTO submission_grades (submission_id, grader_id, score, feedback)
       VALUES (${submissionId}, ${actor.id}, ${score}, ${feedback}) RETURNING id`;
     await recordAudit(tx, actor.id, "activity.graded", "submissions", submissionId, requestId);
+    // The first grade rewards the student; corrections and regrades add no further XP.
+    await awardXp(tx, submission.studentId, "assignment.graded", "submissions", submissionId, courseId, requestId);
     return rows[0]!;
   });
 }

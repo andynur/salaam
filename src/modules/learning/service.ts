@@ -4,6 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { idField, invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
+import { awardXp } from "../gamification/awards";
 import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
 import type { CourseDetail, CourseModule, Lesson, Material, LearningCourse, Progress, StoredFile } from "../../shared/learning";
 import { courseAccess, lessonAccess, notFound } from "./access";
@@ -185,7 +186,10 @@ export async function completeLesson(db: SQL, actor: Actor, courseId: string, le
     await courseAccess(tx, actor, courseId, "participate", true);
     await lessonAccess(tx, courseId, lessonId, false);
     const rows = await tx`INSERT INTO lesson_completions (lesson_id, student_id) VALUES (${lessonId}, ${actor.id}) ON CONFLICT DO NOTHING RETURNING lesson_id`;
-    if (rows.length) await recordAudit(tx, actor.id, "learning.lesson.completed", "lessons", lessonId, requestId);
+    if (rows.length) {
+      await recordAudit(tx, actor.id, "learning.lesson.completed", "lessons", lessonId, requestId);
+      await awardXp(tx, actor.id, "lesson.completed", "lessons", lessonId, courseId, requestId);
+    }
     return { completed: true };
   });
 }

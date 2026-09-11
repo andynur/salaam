@@ -4,6 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
+import { awardProjectApproval } from "../gamification/awards";
 import { courseAccess, notFound } from "../learning/access";
 import { memberIdsInput, projectInput, reviewInput, showcaseInput } from "./input";
 import type { ProjectDetail, ProjectMember, ProjectReview, ProjectRow, ProjectStatus, ProjectTask, ReviewDecision, TeamMode } from "../../shared/project";
@@ -222,6 +223,8 @@ export async function reviewProject(db: SQL, actor: Actor, projectId: string, bo
       VALUES (${projectId}, ${actor.id}, ${review.decision}, ${review.score}, ${review.feedback}) RETURNING id`)[0]!.id;
     await tx`UPDATE projects SET status = ${review.decision}, updated_at = clock_timestamp() WHERE id = ${projectId}`;
     await recordAudit(tx, actor.id, "project.reviewed", "projects", projectId, requestId);
+    // Approval is final, so every member is rewarded exactly once per project.
+    if (review.decision === "approved") await awardProjectApproval(tx, projectId, access.courseId, requestId);
     return { id, status: review.decision };
   });
 }

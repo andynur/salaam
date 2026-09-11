@@ -23,7 +23,7 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 4 are implemented and validated
+This is an active early-stage project. Phases 0 through 5 are implemented and validated
 locally. SALAAM is not yet presented as a production deployment for a school: HTTPS proxy
 configuration, backup and restore drills, capacity testing, and operational rollout still
 need environment-specific validation.
@@ -35,10 +35,11 @@ need environment-specific validation.
 | 2 — Learning core | Modules, lessons, text/link/file materials, layered publishing, archiving, assignments with attachments, grading with corrections, progress, dashboard tasks | [Phase 2](docs/phases/02-learning-core.md) |
 | 3 — Assessment engine | Question bank, quizzes and exams, server-timed attempts, per-student shuffling, offline-safe autosave, idempotent submission, automatic scoring, audited score adjustments | [Phase 3](docs/phases/03-assessment-engine.md) |
 | 4 — Project learning | Challenges, teacher-formed teams, Kanban boards with conflict-checked moves, reviews with revisions and scores, showcase, student portfolio | [Phase 4](docs/phases/04-project-learning.md) |
+| 5 — Gamification | Append-only XP ledger awarded with the event that earns it, derived levels, automatic badges, administrator-configurable reward rules, growth page and teacher leaderboard | [Phase 5](docs/phases/05-gamification.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
-The next milestone is **Phase 5 — Gamification**: XP, levels, badges, achievements, reward
-rules, and an auditable XP ledger. See the [roadmap](docs/roadmap.md).
+The next milestone is **Phase 6 — Attendance and classroom sessions**: meeting sessions,
+rosters, manual attendance, notes, and reports. See the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
@@ -61,6 +62,7 @@ The application is a modular monolith built with native Bun capabilities:
 | `src/modules/activities/` | Shared Activity Engine: assignments, submissions, and grading |
 | `src/modules/assessments/` | Question bank, quiz/exam settings, attempts, automatic scoring, and score adjustments |
 | `src/modules/projects/` | Challenges, teams, project boards, reviews, showcase, and portfolio entries |
+| `src/modules/gamification/` | XP ledger, badge awards, reward rules, growth summaries, and the class leaderboard |
 | `src/shared/` | Shared data contracts used by server and web layers |
 | `src/web/` | Application shell, pages, UI primitives, and design tokens |
 | `database/migrations/` | Ordered, immutable-after-apply SQL migrations with down scripts |
@@ -165,7 +167,7 @@ bun run db:migrate:reset      # undo every migration, then reapply all (drops al
 ```
 
 The runner uses a PostgreSQL advisory lock, validates checksums, and applies pending files
-atomically. Add the next numbered file, such as `0006_gamification.sql`, with a matching
+atomically. Add the next numbered file, such as `0007_attendance.sql`, with a matching
 down script in `database/migrations/down/`; never edit a migration that has been applied.
 Rollback and reset refuse to run when `NODE_ENV=production`; use a forward migration there.
 
@@ -188,7 +190,7 @@ TEST_DATABASE_URL=postgres://localhost:5432/salaam_test bun test
 
 Integration tests create and drop random schemas and never modify the public schema. They
 cover permissions, constraints, audit rollback, idempotency, and 125-student concurrency
-runs for submissions, exams, and project boards. Uploaded test files go to the ignored
+runs for submissions, exams, project boards, and XP awards. Uploaded test files go to the ignored
 `.test-artifacts/` directory and are removed afterwards.
 
 ## Production

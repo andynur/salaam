@@ -11,7 +11,7 @@ measured operational requirement exists.
 | --- | --- |
 | `src/server.ts` | Loads config, opens the pool, wires routers, serves SPA routes and brand assets, shuts down |
 | `src/core/http.ts` | Request pipeline and top-level dispatch |
-| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`) |
+| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`), `gamification` (`/api/gamification`) |
 | `src/core/validation.ts` | Body parsing and field validators |
 | `src/core/{auth,permissions,audit,storage,database,config,errors}` | Platform services |
 | `src/modules/users`, `src/modules/academic` | Account provisioning, academic structure, dashboard summary |
@@ -19,6 +19,7 @@ measured operational requirement exists.
 | `src/modules/activities` | Assignments, submissions, grading |
 | `src/modules/assessments` | Question bank, quiz and exam settings, attempts, scoring, adjustments |
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
+| `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
 | `database/migrations/` | Ordered SQL migrations with `down/` scripts |
@@ -67,6 +68,7 @@ measured operational requirement exists.
 | `0003_learning_core` | `course_modules`, `lessons`, `stored_files`, `lesson_materials`, `activities`, `submissions`, `submission_grades`, `lesson_completions` |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
+| `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
 
 - **Academic:** a course joins a class, a term, and a subject within one academic year;
   composite foreign keys keep classes and terms in the same year. Teachers link to courses
@@ -85,6 +87,20 @@ lives in a settings table keyed by `activity_id` (`assessment_settings`,
 Work records hang off the activity: `submissions` for assignments, `attempts` for quizzes
 and exams, `projects` for challenges. A new kind extends this model; it never gets a
 parallel engine.
+
+### Gamification
+
+`xp_entries` is an append-only ledger and the only source of truth for XP: totals, the
+counters behind badges, and the leaderboard are all aggregates of it. Every award runs in
+the transaction that records the event it rewards, so a rolled back completion, grade,
+attempt, or review leaves no XP. `UNIQUE (student_id, source_type, source_id)` makes awards
+idempotent — a regrade, a second attempt, a retried request, and concurrent writers all
+produce one row — and an entry keeps the points it was granted with, so changing a reward
+rule only affects later awards. Levels are not stored: `levelFor()` in
+`src/shared/gamification.ts` derives them from the total, so changing a threshold re-levels
+everyone without a backfill. Badges are evaluated right after an award; the
+`badge_awards` primary key makes a concurrent double award a no-op, and each new badge is
+audited as a system event.
 
 ## Lifecycle rules
 

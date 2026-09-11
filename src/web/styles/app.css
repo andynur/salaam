@@ -535,3 +535,41 @@
   .board-column { scroll-snap-align: start; }
   .portfolio-entry { padding: 16px; }
 }
+
+/* Gamification: XP level card, badge tiles, and the reward rule editor. */
+@layer components {
+  .dashboard-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .card-hint { margin: 0; padding: 0 20px 12px; color: var(--color-muted); font-size: 12px; }
+
+  .growth-level { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 16px 24px; padding: 20px; margin-bottom: 16px; }
+  .growth-level-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .growth-level-mark { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--color-gold-soft); color: var(--color-navy); }
+  .growth-level-main p { margin: 4px 0 0; color: var(--color-muted); font-size: 12px; }
+  .growth-progress { display: grid; gap: 6px; min-width: min(260px, 100%); padding: 0 20px 16px; }
+  .growth-level .growth-progress { padding: 0; }
+  .growth-progress progress { display: block; width: 100%; height: 8px; appearance: none; border: 0; border-radius: 999px; overflow: hidden; background: var(--color-neutral); }
+  .growth-progress progress::-webkit-progress-bar { background: var(--color-neutral); }
+  .growth-progress progress::-webkit-progress-value { background: var(--color-blue); }
+  .growth-progress progress::-moz-progress-bar { background: var(--color-blue); }
+  .growth-progress-meta { color: var(--color-muted); font-size: 12px; }
+
+  .award-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 0; padding: 16px 20px; list-style: none; }
+  .award-tile { display: flex; align-items: start; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); }
+  .award-tile.is-locked { background: var(--color-background); }
+  .award-tile.is-locked .award-icon { background: var(--color-neutral); color: var(--color-muted); }
+  .award-icon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--color-gold-soft); color: var(--color-navy); }
+  .award-text { min-width: 0; }
+  .award-text strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+  .award-text p { margin: 2px 0 0; color: var(--color-subtle); font-size: 12px; overflow-wrap: anywhere; }
+  .award-meta { display: block; margin-top: 6px; color: var(--color-muted); font-size: 11px; font-weight: 600; }
+
+  .xp-row, .rule-row { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; padding: 12px 20px; }
+  .rule-row .learning-form { margin: 0; }
+  .rule-row .admin-fields { align-items: end; grid-template-columns: minmax(0, 120px) auto; gap: 12px; }
+  .rule-row .form-actions { margin: 0; }
+}
+@media (max-width: 760px) {
+  .growth-level { align-items: stretch; flex-direction: column; }
+  .award-grid { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+  .xp-row, .rule-row { align-items: stretch; flex-direction: column; padding: 12px 16px; }
+}

@@ -30,6 +30,12 @@ drills, or school approval of privacy and retention policies.
   passwords, hashes, or tokens. An event without an actor is a system action such as
   deadline finalization.
 - Kanban card edits are working notes and are not audited.
+- XP is awarded inside the transaction that records the event it rewards, so a rolled back
+  completion, grade, attempt, or review awards nothing. Individual ledger entries are not
+  audited separately — the append-only ledger is itself the record — while each badge award
+  is audited as a system action. Reward rules and the badge catalogue are administration:
+  they require `academic.manage` and every change is audited. Changing a rule never rewrites
+  past entries, so a student's history stays explainable.
 
 ## Request safety
 

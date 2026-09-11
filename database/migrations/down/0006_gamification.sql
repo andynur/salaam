@@ -1,0 +1,5 @@
+-- Reverses 0006_gamification.sql.
+DROP TABLE IF EXISTS badge_awards CASCADE;
+DROP TABLE IF EXISTS badges CASCADE;
+DROP TABLE IF EXISTS xp_entries CASCADE;
+DROP TABLE IF EXISTS reward_rules CASCADE;

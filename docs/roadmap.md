@@ -12,8 +12,8 @@ Coding agents follow skill `deliver-phase`.
 | 2 | Learning core | Delivered — [record](phases/02-learning-core.md) |
 | 3 | Assessment engine | Delivered for choice questions — [record](phases/03-assessment-engine.md) |
 | 4 | Project learning | Delivered — [record](phases/04-project-learning.md) |
-| 5 | Gamification | Next |
-| 6 | Attendance and classroom sessions | Planned |
+| 5 | Gamification | Delivered — [record](phases/05-gamification.md) |
+| 6 | Attendance and classroom sessions | Next |
 | 7 | QR attendance | Planned |
 | 8 | Calendar and notifications | Planned |
 | 9 | Reporting | Planned |
@@ -50,13 +50,14 @@ surveys.
 
 Challenges, projects, teams, Kanban boards, reviews, showcases, and portfolio entries.
 
-## Planned
-
 ### Phase 5 — Gamification
 
-XP, levels, badges, achievements, reward rules, and an auditable XP ledger. Earlier phases
-left these hooks to it: XP for lesson completion (Phase 2) and XP, badges, and rewards for
-projects (Phase 4).
+An append-only XP ledger, derived levels, a badge catalogue with automatic awards, and
+administrator-configurable reward rules. XP is awarded in the same transaction as the event
+that earns it: lesson completion (the Phase 2 hook), assignment grading, a finished quiz or
+exam, and an approved project (the Phase 4 hook).
+
+## Planned
 
 ### Phase 6 — Attendance and classroom sessions
 
@@ -107,5 +108,8 @@ Boundaries section has the details.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
+- **Phase 5:** XP decay, penalties, and manual XP grants; streaks, seasons, and resets;
+  leaderboards visible to students; badge artwork beyond the built-in icons; level-up
+  notifications (Phase 8); XP for attendance (Phase 6).
 - **Operations:** HTTPS proxy validation, backup and restore drills, and load testing on
   school hardware.

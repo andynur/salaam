@@ -3,6 +3,7 @@ import type { Actor } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { invalid } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
+import { awardXp } from "../gamification/awards";
 import { courseAccess, notFound } from "../learning/access";
 import { answerInput } from "./input";
 import type { AttemptDetail, AttemptQuestion, QuestionOption, QuestionType, ResultsVisibility } from "../../shared/assessment";
@@ -17,13 +18,18 @@ function shuffled<T>(items: T[]) {
 }
 
 // Choice answers are all-or-nothing: the sorted selection must equal the sorted key.
-async function finalizeAttempt(tx: SQL, attemptId: string, reason: "student" | "expired") {
+async function finalizeAttempt(tx: SQL, attemptId: string, reason: "student" | "expired", requestId: string) {
   await tx`UPDATE attempt_answers ans SET awarded = CASE WHEN ans.selected = q.correct THEN q.points ELSE 0 END
     FROM attempt_questions q WHERE q.attempt_id = ans.attempt_id AND q.question_id = ans.question_id AND ans.attempt_id = ${attemptId}`;
-  await tx`UPDATE attempts SET submission_reason = ${reason},
+  const finalized = await tx<{ studentId: string; activityId: string; courseId: string }[]>`UPDATE attempts SET submission_reason = ${reason},
       submitted_at = CASE WHEN ${reason} = 'expired' THEN deadline_at ELSE clock_timestamp() END,
       score = (SELECT COALESCE(sum(ans.awarded), 0) FROM attempt_answers ans WHERE ans.attempt_id = attempts.id)
-    WHERE id = ${attemptId} AND submitted_at IS NULL`;
+    WHERE id = ${attemptId} AND submitted_at IS NULL
+    RETURNING student_id AS "studentId", activity_id AS "activityId",
+      (SELECT a.course_id FROM activities a WHERE a.id = attempts.activity_id) AS "courseId"`;
+  // The assessment itself is the source, so only the first finished attempt earns XP,
+  // however many attempts the settings allow.
+  for (const done of finalized) await awardXp(tx, done.studentId, "assessment.completed", "activities", done.activityId, done.courseId, requestId);
 }
 
 // Attempts past their server deadline are finalized lazily by whoever reads or writes them next.
@@ -35,7 +41,7 @@ export async function finalizeExpired(db: SQL, scope: { attemptId?: string; acti
       AND (${attemptId}::uuid IS NULL OR id = ${attemptId}::uuid) AND (${activityId}::uuid IS NULL OR activity_id = ${activityId}::uuid)
       FOR UPDATE SKIP LOCKED`;
     for (const row of rows) {
-      await finalizeAttempt(tx, row.id, "expired");
+      await finalizeAttempt(tx, row.id, "expired", requestId);
       await recordAudit(tx, null, "assessment.attempt.expired", "attempts", row.id, requestId);
     }
   });
@@ -57,7 +63,7 @@ export async function startAttempt(db: SQL, actor: Actor, courseId: string, acti
       FROM attempts WHERE activity_id = ${activityId} AND student_id = ${actor.id} AND submitted_at IS NULL FOR UPDATE`)[0];
     if (open && !open.expired) return { id: open.id, resumed: true };
     if (open) {
-      await finalizeAttempt(tx, open.id, "expired");
+      await finalizeAttempt(tx, open.id, "expired", requestId);
       await recordAudit(tx, null, "assessment.attempt.expired", "attempts", open.id, requestId);
     }
     if (!settings.opened) throw new HttpError(409, "NOT_OPEN", "Penilaian belum dibuka.");
@@ -161,7 +167,7 @@ export async function submitAttempt(db: SQL, actor: Actor, courseId: string, att
     // Final submit is idempotent: repeated or concurrent requests all see one submission.
     if (!attempt.submitted) {
       const reason = attempt.expired ? "expired" : "student";
-      await finalizeAttempt(tx, attemptId, reason);
+      await finalizeAttempt(tx, attemptId, reason, requestId);
       await recordAudit(tx, reason === "expired" ? null : actor.id, `assessment.attempt.${reason === "expired" ? "expired" : "submitted"}`, "attempts", attemptId, requestId);
     }
     return (await tx<{ id: string; submittedAt: string; submissionReason: "student" | "expired" }[]>`SELECT id, submitted_at AS "submittedAt", submission_reason AS "submissionReason"

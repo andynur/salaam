@@ -234,6 +234,12 @@ adding a near-duplicate.
   `.member-picker`, `.board-progress` (inline done/total bar in tables), showcase tiles
   (`.course-tile` with `.showcase-summary`/`.showcase-team`/`.showcase-links`),
   `.portfolio-entry` with `.portfolio-reflection` (gold rule).
+- **Gamification**: `.growth-level` (XP/level header card) with `.growth-level-main` and
+  `.growth-level-mark`, `.growth-progress` (+ `progress` bar and `.growth-progress-meta`),
+  `.award-grid` of `.award-tile` (`.is-locked` for an unearned badge) with `.award-icon`,
+  `.award-text`, `.award-meta`, plus the `.xp-row` and `.rule-row` list rows.
+  `.dashboard-side` stacks cards in the dashboard's right column, and `.card-hint` is a
+  muted one-line note under a `.card-heading`.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title

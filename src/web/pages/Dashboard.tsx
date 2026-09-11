@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Actor } from "../../core/permissions";
 import type { LearningTask } from "../../shared/learning";
+import type { Level } from "../../shared/gamification";
 import { ApiError, api } from "../lib/api";
 import { Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Icon, type IconName } from "../components/icons";
 
-interface DashboardData { academic: string | null; courses: number; classes: number; tasks: LearningTask[]; events: never[] }
+interface DashboardData { academic: string | null; courses: number; classes: number; tasks: LearningTask[]; events: never[]; growth: { level: Level; badges: number } | null }
 const taskTypes: Record<LearningTask["type"], { label: string; icon: IconName; badge: string }> = {
   assignment: { label: "Kumpulkan tugas", icon: "assignment", badge: "" },
   quiz: { label: "Kerjakan quiz", icon: "quiz", badge: "badge-discovery" },
@@ -60,7 +61,18 @@ export function Dashboard({ actor, timezone, onExpired }: { actor: Actor; timezo
             </a></li>)}</ul>}
           {actor.permissions.includes("learning.view") && <a href="/learning" className="card-footer-link">Buka Pembelajaran<Icon name="arrowRight" /></a>}
         </Card>
-        <Card><div className="card-heading"><h2>Agenda mendatang</h2><span className="badge badge-draft">Segera</span></div><EmptyState icon="calendar" title="Belum ada agenda" description="Jadwal akademik dan kegiatan sekolah akan hadir di ruang ini." /></Card>
+        <div className="dashboard-side">
+          {data.growth && <Card><div className="card-heading"><h2>Pertumbuhan</h2><span className="badge badge-gold">Level {data.growth.level.level}</span></div>
+            <div className="growth-progress">
+              <progress value={data.growth.level.nextAt === null ? 1 : data.growth.level.total - data.growth.level.levelAt}
+                max={data.growth.level.nextAt === null ? 1 : data.growth.level.nextAt - data.growth.level.levelAt}
+                aria-label={`Kemajuan level, ${data.growth.level.total} XP`} />
+              <span className="growth-progress-meta">{data.growth.level.total} XP · {data.growth.badges} lencana</span>
+            </div>
+            <a href="/gamification" className="card-footer-link">Lihat pertumbuhan<Icon name="arrowRight" /></a>
+          </Card>}
+          <Card><div className="card-heading"><h2>Agenda mendatang</h2><span className="badge badge-draft">Segera</span></div><EmptyState icon="calendar" title="Belum ada agenda" description="Jadwal akademik dan kegiatan sekolah akan hadir di ruang ini." /></Card>
+        </div>
       </div>
     </>}
   </>;
