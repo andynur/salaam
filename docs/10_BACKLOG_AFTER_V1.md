@@ -1,90 +1,32 @@
-# Post-V1 Backlog
+# Backlog After V1
 
-Dokumen ini sengaja memisahkan ide menarik dari V1 agar scope tidak melebar.
+This backlog keeps promising ideas separate from the committed V1 scope.
 
-## Learning
+## Learning and assessment
 
-- lesson prerequisites,
-- learning paths,
-- certificate,
-- reusable course template,
-- advanced rubric,
-- peer review.
+- Rich authoring and reusable lesson templates.
+- Advanced rubrics, moderation, and grade review.
+- Offline-first lesson and submission support.
+- Plagiarism or similarity review with an explicit privacy policy.
 
-## Assessment
+## Classroom operations
 
-- richer question types,
-- question difficulty/tagging,
-- item analysis,
-- exam blueprint,
-- import/export question bank,
-- plagiarism checks where appropriate.
+- Parent or guardian portal after access and consent requirements are defined.
+- Calendar integrations and notification delivery providers.
+- Additional attendance workflows after the core session model is stable.
 
-## Project
+## Platform operations
 
-- Git repository links,
-- project milestones,
-- peer evaluation,
-- team contribution metrics,
-- teacher review workflow.
+- Backup automation and restore verification.
+- Metrics, tracing, and long-term audit retention policies.
+- Multi-instance deployment only after measured capacity evidence.
+- Object storage support behind a private storage interface.
 
-## Portfolio
+## Advanced technology
 
-- printable/export portfolio,
-- graduation portfolio,
-- external-public portfolio with policy,
-- endorsement/teacher comment.
+- Isolated coding challenge execution.
+- Camera-assisted attendance improvements.
+- Carefully reviewed AI assistance for authoring or feedback.
 
-## Gamification
-
-- seasonal challenges,
-- class quests,
-- collaborative XP,
-- mastery path,
-- reward shop only if school policy wants it.
-
-Avoid manipulative streak mechanics.
-
-## Communication
-
-- announcements,
-- email notification,
-- push/PWA,
-- parent notification,
-- WhatsApp integration if institutionally approved.
-
-## Smart classroom
-
-- kiosk mode,
-- room device integration,
-- optional face recognition study,
-- classroom display.
-
-## IT education
-
-- code editor,
-- coding challenge,
-- judge worker,
-- test cases,
-- language sandbox,
-- Git exercises,
-- code review exercises.
-
-## Analytics
-
-- teacher intervention flags,
-- learning progress trends,
-- question performance,
-- cohort comparison.
-
-Only build after enough clean data exists.
-
-## Infrastructure
-
-- object storage,
-- Redis/Valkey,
-- multi-instance app,
-- dedicated job worker,
-- monitoring stack.
-
-Add only after load/operations justify it.
+Every backlog item requires a scoped proposal, security/privacy review, migration plan,
+behavior tests, and operational acceptance criteria before implementation.

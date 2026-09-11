@@ -1,178 +1,36 @@
-# Data, Security & Reliability
+# Data Security and Reliability
 
-## 1. Authentication
+## Identity and sessions
 
-For internal web app prefer server-managed session cookies.
+Use Argon2id password hashing, opaque server-managed cookies, absolute expiry, session
+rotation, logout revocation, generic login errors, and rate limits. Never log
+passwords, cookies, session tokens, or raw database errors.
 
-Cookie baseline:
+## Authorization and audit
 
-- `HttpOnly`
-- `Secure` in production
-- appropriate `SameSite`
-- short enough session exposure
-- rotation on sensitive auth events
+Enforce permissions on the server for every protected route. A role name alone must
+never bypass a permission check. Record sensitive identity, academic, grading, and
+attendance mutations transactionally. If the audit write fails, roll back the mutation.
 
-Passwords:
+## Input and database safety
 
-- hash with Bun password API / Argon2id.
-- never log password.
-- never store plaintext recovery data.
+Use parameterized SQL, strict JSON validation, bounded request bodies, explicit date and
+identifier validation, foreign keys, unique constraints, and transaction-scoped locks.
+Never trust user-provided filenames or paths.
 
-## 2. Authorization
+## Attendance and QR security
 
-Authentication is not authorization.
+Attendance must reference an explicit meeting/session. QR values must be short-lived,
+opaque, server-validated, and unusable as authentication credentials. Corrections must
+remain visible in audit history.
 
-Every server operation must validate:
+## Backups and recovery
 
-1. authenticated actor,
-2. target resource,
-3. required permission,
-4. resource/course/class membership if relevant.
+Back up PostgreSQL and private storage to a separate location, encrypt backup access,
+monitor job status, and run restore drills before production use. Define retention and
+recovery objectives before enabling destructive cleanup.
 
-Never rely on hidden UI button as security.
+## Operational limits
 
-## 3. CSRF/XSS
-
-- Use safe cookie strategy.
-- Apply CSRF mitigation appropriate to architecture.
-- Escape user-generated content.
-- Avoid raw HTML rendering.
-- Sanitize rich text if rich text is introduced.
-- Set security headers.
-
-## 4. Exam reliability
-
-### Client state
-
-During active exam:
-
-- current answers persisted locally using IndexedDB or appropriate browser storage;
-- server autosave runs periodically/debounced;
-- UI displays `saving / saved / offline`.
-
-### Server state
-
-- server time controls open/close/deadline.
-- save answer endpoints idempotent where relevant.
-- final submit is atomic/idempotent.
-- attempt ownership is checked on every write.
-
-### Reconnect
-
-On reconnect:
-
-1. fetch authoritative attempt status;
-2. compare local pending changes;
-3. sync safely;
-4. never overwrite newer server data blindly.
-
-## 5. File security
-
-- allowlist supported MIME/type.
-- max file size.
-- generated filename.
-- path traversal impossible.
-- do not serve private upload as unrestricted static folder.
-- permission-check download route or signed access mechanism.
-- virus/malware scanning can be added when operationally feasible.
-
-## 6. QR attendance security
-
-QR student identifier should not be equivalent to account credential.
-
-Server verifies:
-
-- active attendance session,
-- student enrollment,
-- duplicate check,
-- time window.
-
-Attendance correction leaves audit history.
-
-## 7. Privacy
-
-Collect only data needed for schooling.
-
-For camera/biometric feature in the future:
-
-- define purpose,
-- consent/policy,
-- retention,
-- storage,
-- deletion,
-- false match handling,
-- manual alternative.
-
-Do not add face recognition just because camera attendance exists.
-
-## 8. Backups
-
-Backup includes:
-
-- PostgreSQL.
-- uploaded files.
-- critical configuration.
-
-Recommended logical baseline:
-
-- daily automated backup,
-- retention tiers,
-- copy to separate physical/device/location,
-- periodic restore test.
-
-Backup without restore test is not considered complete.
-
-## 9. Audit-worthy actions
-
-Examples:
-
-- user/role changes,
-- grade override,
-- grade publication,
-- attendance correction,
-- exam attempt reset,
-- course deletion/archive,
-- student enrollment change,
-- system settings.
-
-## 10. Rate limiting
-
-Apply selectively to:
-
-- login,
-- password/reset endpoints,
-- QR scan,
-- expensive exports,
-- upload.
-
-Do not introduce distributed rate-limit infrastructure until needed.
-
-## 11. Threat model checklist
-
-Before each major module ask:
-
-- Who can read this?
-- Who can change it?
-- Can IDs be guessed?
-- Can request be replayed?
-- Can same request duplicate state?
-- Can user upload dangerous content?
-- Can browser disconnect halfway?
-- Can teacher accidentally publish draft?
-- Can admin action be traced?
-- What happens after server restart?
-
-## 12. Student code execution
-
-Never execute student-submitted code directly in Bun app process.
-
-Future code runner must have:
-
-- separate isolated execution boundary,
-- CPU limit,
-- memory limit,
-- timeout,
-- no network by default,
-- ephemeral filesystem,
-- restricted syscalls/container profile,
-- queue/worker architecture.
+Local validation does not replace HTTPS proxy review, load testing, backup/restore
+drills, or school-specific privacy and retention approval.

@@ -1,8 +1,8 @@
-# AGENTS.md — HSI Learning OS
+# AGENTS.md — Learning OS
 
 ## Product
 
-HSI Learning OS is an internal HSI Boarding School platform for learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
+Learning OS is an internal HSI Boarding School platform for learning, assessment, projects, portfolio, gamification, attendance, calendar, and classroom operations.
 
 ## Stack
 

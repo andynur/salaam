@@ -1,268 +1,40 @@
-# Module & Domain Plan
+# Module and Domain Plan
 
-## 1. Core
+## Identity and access
 
-### Auth
+Users have role assignments and server-side permissions. Sessions are opaque,
+short-lived, rotated on login, and revocable. Sensitive mutations produce audit events.
 
-Responsibilities:
+## Academic foundation
 
-- login/logout,
-- password hashing,
-- sessions,
-- session rotation/revocation,
-- password reset flow if added later.
+The academic module owns academic years, terms, classes, student memberships, subjects,
+courses, and teacher assignments. Composite foreign keys keep classes and terms inside
+the same academic year. Historical records are append-oriented in the initial release.
 
-### Permission
+## Learning core
 
-Prefer capability-based permission:
+Courses contain modules and lessons. Lessons may reference materials and activities.
+Publishing controls student visibility, while progress records learner completion.
 
-```text
-course.create
-course.update
-course.publish
-grade.write
-grade.publish
-attendance.write
-project.review
-admin.users.manage
-```
+## Activity engine
 
-Role mengelompokkan permission.
+One Activity aggregate supports assignments, quizzes, exams, surveys, questionnaires,
+and challenges. Attempts, answers, submissions, grading, and rewards are separate
+records linked to the activity.
 
-### Audit
+## Projects and portfolios
 
-Record:
+Challenges can produce projects. Projects contain teams, Kanban states, reviews, and
+showcase eligibility. Published work may appear in a student portfolio.
 
-- actor,
-- action,
-- resource type/id,
-- timestamp,
-- request id,
-- relevant metadata.
+## Attendance and calendar
 
-Do not store password/token secrets in audit metadata.
+Attendance belongs to a defined meeting/session. Calendar events reference their source
+entity instead of duplicating deadlines. QR attendance must use short-lived,
+server-validated identifiers and must never become a reusable login credential.
 
-### Files
+## Operations
 
-Central file service handles:
-
-- file validation,
-- safe paths,
-- metadata,
-- image transform,
-- deletion,
-- quota.
-
----
-
-## 2. Academic
-
-Entities:
-
-- academic_years
-- terms
-- classes
-- class_members
-- subjects
-- teaching_assignments
-
-Rules:
-
-- historical academic records should not silently mutate.
-- term/year status: draft/active/closed where useful.
-
----
-
-## 3. Courses
-
-Entities:
-
-- courses
-- course_enrollments
-- modules
-- lessons
-- lesson_resources
-- lesson_progress
-
-Common states:
-
-```text
-draft
-published
-archived
-```
-
----
-
-## 4. Activities
-
-Central abstraction.
-
-Entities:
-
-- activities
-- activity_items
-- activity_item_options
-- activity_targets
-
-Possible types:
-
-```text
-assignment
-quiz
-exam
-survey
-challenge
-practice
-```
-
-Settings examples:
-
-- time limit,
-- attempts,
-- randomization,
-- grading mode,
-- anonymous response,
-- late submission,
-- reward XP.
-
----
-
-## 5. Assessment
-
-Entities:
-
-- attempts
-- answers
-- submissions
-- grades
-- feedback
-- rubrics
-- rubric_items
-
-Important invariants:
-
-- one active attempt rule if configured,
-- final submit idempotent,
-- answer ownership verified server-side,
-- server time authoritative,
-- score cannot exceed max score without explicit override mechanism.
-
----
-
-## 6. Attendance
-
-Entities:
-
-- meetings
-- attendance_records
-- attendance_events
-
-Statuses:
-
-- present
-- late
-- absent
-- excused
-
-Keep change history for teacher/admin corrections.
-
----
-
-## 7. Projects
-
-Entities:
-
-- projects
-- project_members
-- project_tasks
-- project_columns
-- project_reviews
-- project_links
-
-A project can link to:
-
-- challenge,
-- assignment,
-- course,
-- team.
-
----
-
-## 8. Portfolio
-
-Entities:
-
-- portfolios
-- portfolio_projects
-- skill_tags
-- student_skills
-- achievements
-
-Portfolio visibility:
-
-- private,
-- school-only,
-- publishable/public if school policy allows.
-
----
-
-## 9. Gamification
-
-Entities:
-
-- xp_transactions
-- levels
-- badges
-- badge_rules
-- student_badges
-
-Never use only:
-
-```text
-users.xp = 3000
-```
-
-XP must have ledger source.
-
-Idempotency key prevents double reward.
-
----
-
-## 10. Calendar
-
-Prefer deriving event when possible:
-
-- exam opens/closes,
-- assignment deadline,
-- project milestone,
-- school event.
-
-Custom events remain possible.
-
----
-
-## 11. Notifications
-
-Types:
-
-- activity published,
-- deadline reminder,
-- grade published,
-- badge unlocked,
-- project review,
-- calendar reminder.
-
-V1 channel:
-
-- in-app.
-
-Email/WhatsApp/push can be future adapters.
-
----
-
-## 12. Reporting
-
-Start from transactional data using well-indexed queries/materialized summary only when required.
-
-Avoid creating analytics infrastructure prematurely.
+Audit logs, permission checks, backup status, and operational health belong to the
+platform foundation. Future modules must reuse the shared activity, identity, and
+audit boundaries.

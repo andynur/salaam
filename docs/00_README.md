@@ -1,71 +1,64 @@
-# HSI Learning OS — Planning Pack
+# Learning OS — Planning Pack
 
-Dokumen ini adalah baseline perencanaan pengembangan **HSI Learning OS**, aplikasi internal HSI Boarding School yang berfokus pada pembelajaran, assessment, project-based learning, gamification, portfolio siswa, absensi, dan operasional kelas.
+This directory is the planning baseline for Learning OS, an HSI Boarding School
+platform for learning, assessment, project-based learning, gamification, portfolios,
+attendance, and classroom operations.
 
-> Baseline teknis: **Bun 1.4.2**, TypeScript, React, Tailwind CSS, PostgreSQL melalui `Bun.SQL`, `Bun.serve()`, native WebSocket, local file storage, dan deployment awal pada Ubuntu Server VPS 2 vCPU / 2 GB RAM.
+The technical baseline is Bun 1.4.2, TypeScript, React, Tailwind CSS, PostgreSQL via
+`Bun.SQL`, `Bun.serve()`, native WebSocket support, private local storage, and an
+initial Ubuntu Server deployment target.
 
-## Tujuan utama
+## Product goals
 
-HSI Learning OS **bukan sekadar LMS**. Sistem ini dirancang sebagai *School Learning Operating System* yang menyatukan:
+Learning OS is a school learning operating system rather than a narrow LMS. The
+planned product brings together courses, activities, submissions, grading, projects,
+portfolios, XP and badges, calendars, attendance, notifications, auditability,
+backups, and future isolated coding challenges.
 
-- Course, module, lesson, dan material pembelajaran.
-- Assignment, quiz, exam, survey, questionnaire, challenge.
-- Question bank, submission, attempt, grading, rubric.
-- Task management, Kanban, dan project-based learning.
-- Student showcase dan portfolio.
-- XP, level, badge, challenge, dan achievement.
-- Kalender akademik dan event.
-- Absensi kelas per pertemuan.
-- QR/camera-assisted attendance.
-- Realtime notification dan classroom status.
-- Audit, permission, backup, dan observability dasar.
-- Fitur IT-learning lanjutan seperti coding challenge dan isolated code runner.
+The product follows these principles:
 
-## Prinsip produk
+1. Start with a modular monolith.
+2. Keep runtime dependencies minimal.
+3. Prefer native Bun capabilities before adding packages.
+4. Treat PostgreSQL as the source of truth.
+5. Do not require Redis or Valkey for V1.
+6. Use private local storage as the initial storage boundary.
+7. Share one Activity Engine across assignments, quizzes, exams, surveys, and challenges.
+8. Keep teacher/admin screens dense and productive while keeping student screens focused.
+9. Build reconnect resilience into online exams.
+10. Keep biometrics and face recognition outside the MVP.
+11. Never execute untrusted student code in the main application process.
+12. Design security, auditability, backup, and restore from the beginning.
 
-1. **Modular monolith dahulu.**
-2. **Minimum dependencies.**
-3. Gunakan kemampuan native Bun sebelum menambah package.
-4. PostgreSQL sebagai source of truth.
-5. Redis/Valkey **tidak diperlukan di V1**.
-6. Local filesystem sebagai storage awal.
-7. Satu Activity Engine untuk assignment, quiz, exam, survey, dan challenge.
-8. UI guru/admin lebih padat seperti Jira; UI siswa lebih sederhana.
-9. Offline/reconnect resilience wajib untuk online exam.
-10. Fitur biometrik/face recognition bukan MVP.
-11. Student code tidak pernah dieksekusi langsung di main application process.
-12. Security, auditability, backup, dan restore harus dibangun sejak awal.
+## Reading order
 
-## Urutan membaca
+1. [Product vision and scope](01_PRODUCT_VISION_AND_SCOPE.md)
+2. [Architecture and stack](02_ARCHITECTURE_AND_STACK.md)
+3. [Master roadmap](03_MASTER_ROADMAP.md)
+4. [Module and domain plan](04_MODULE_AND_DOMAIN_PLAN.md)
+5. [Security and reliability](05_DATA_SECURITY_RELIABILITY.md)
+6. [UI/UX design system](06_UI_UX_DESIGN_SYSTEM.md)
+7. [Deployment and operations](07_DEPLOYMENT_AND_OPERATIONS.md)
+8. [Codex/VS Code harness](08_CODEX_VSCODE_HARNESS.md)
+9. [Engineering rules and Definition of Done](09_ENGINEERING_RULES_AND_DOD.md)
+10. [Post-V1 backlog](10_BACKLOG_AFTER_V1.md)
+11. [Agent instruction template](AGENTS_TEMPLATE.md)
+12. [Initial setup prompt](MASTER_PROMPT.md)
 
-1. `01_PRODUCT_VISION_AND_SCOPE.md`
-2. `02_ARCHITECTURE_AND_STACK.md`
-3. `03_MASTER_ROADMAP.md`
-4. `04_MODULE_AND_DOMAIN_PLAN.md`
-5. `05_DATA_SECURITY_RELIABILITY.md`
-6. `06_UI_UX_DESIGN_SYSTEM.md`
-7. `07_DEPLOYMENT_AND_OPERATIONS.md`
-8. `08_CODEX_VSCODE_HARNESS.md`
-9. `09_ENGINEERING_RULES_AND_DOD.md`
-10. `10_BACKLOG_AFTER_V1.md`
-11. `AGENTS_TEMPLATE.md`
-12. `MASTER_PROMPT.md`
+## Working with the planning pack
 
-## Cara memakai paket ini dengan Codex
+Read only the documents relevant to the current task. Implement the roadmap one phase
+at a time, and give each phase a specific goal, scope, acceptance criteria, and list of
+relevant files or modules. Keep completed phases independently testable and reviewable.
 
-- Letakkan folder dokumen ini di repo, idealnya sebagai `/docs`.
-- Salin `AGENTS_TEMPLATE.md` menjadi `/AGENTS.md` setelah setup awal.
-- Jalankan isi `MASTER_PROMPT.md` sebagai instruksi awal Codex.
-- Setelah foundation terbentuk, kerjakan roadmap **per fase**, bukan seluruh sistem sekaligus.
-- Untuk setiap fase baru, beri Codex task spesifik dengan goal, scope, acceptance criteria, dan file/module yang relevan.
+## V1 success path
 
-## Definition of success V1
+V1 is successful when a teacher can create a course, lesson, and activity; a student
+can submit work safely; the teacher can grade it; progress and XP can be updated; a
+project can enter a showcase or portfolio; attendance and calendar operations work;
+and audit and backup workflows are available.
 
-V1 dianggap berhasil jika sekolah dapat melakukan alur berikut secara stabil:
+## Validation
 
-**Teacher membuat course → lesson → activity → siswa mengerjakan → jawaban/submission tersimpan aman → teacher menilai → progress/XP diperbarui → project dapat masuk showcase/portfolio → absensi dan kalender dapat dikelola → audit dan backup tersedia.**
-
-## Implementation validation
-
-- [Phase 0 — Foundation](11_FOUNDATION_VALIDATION.md).
-- [Phase 1 — Identity & Academic Foundation](12_PHASE1_VALIDATION.md).
+- [Phase 0 validation](11_FOUNDATION_VALIDATION.md)
+- [Phase 1 validation](12_PHASE1_VALIDATION.md)

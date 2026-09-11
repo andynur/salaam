@@ -1,169 +1,32 @@
-# Deployment & Operations
+# Deployment and Operations
 
-## 1. Development / Pilot VPS
+## Runtime
 
-Target:
+Build with Bun 1.4.2, run migrations before routing traffic, and start the bundled
+server as a non-root user behind an HTTPS reverse proxy. Keep private storage outside
+the static asset directory.
 
-- Ubuntu Server.
-- 2 vCPU.
-- 2 GB RAM.
-- Sumopod VPS.
+## Configuration
 
-Services:
+Provide production values through a secret manager or protected environment file.
+Require HTTPS in production, set the school timezone explicitly, and keep database
+credentials out of source control.
 
-```text
-Caddy
-Bun application
-PostgreSQL
-systemd
-local storage
-backup scripts
-```
+## Health and shutdown
 
-Avoid Docker unless it clearly simplifies your own operational workflow. The application should not *require* Docker for deployment.
+Use `/health/live` for process liveness and `/health/ready` for database readiness.
+The server must close the PostgreSQL pool during graceful shutdown and enforce a finite
+shutdown timeout.
 
-## 2. Suggested paths
+## Backups and maintenance
 
-```text
-/srv/hsi-learning/
-  app/
-  storage/
-    avatars/
-    courses/
-    assignments/
-    projects/
-    temp/
-  backups/
-  logs/
-```
+Rotate logs, monitor disk and database connections, back up PostgreSQL and private
+storage to another location, and verify restores regularly. Apply migrations as a
+release step and keep applied migration files immutable.
 
-Runtime user should have only required permissions.
+## Rollout checklist
 
-## 3. Reverse proxy
-
-Caddy responsibilities:
-
-- HTTPS,
-- certificate management,
-- request forwarding,
-- safe upload/request size limits where appropriate.
-
-Application remains aware of trusted proxy setup.
-
-## 4. Service manager
-
-Use `systemd`.
-
-Requirements:
-
-- restart on unexpected failure,
-- startup after boot,
-- environment file or secure env mechanism,
-- working directory fixed,
-- logs accessible through journal or configured logger.
-
-## 5. PostgreSQL
-
-For 2 GB VPS:
-
-- keep connection pool conservative,
-- monitor RAM,
-- avoid excessive max connections,
-- index based on workload,
-- use slow-query review when performance issues appear.
-
-## 6. Health endpoints
-
-Example:
-
-- `/health/live`
-- `/health/ready`
-
-Readiness may test DB connectivity with lightweight query.
-
-Do not expose sensitive runtime information.
-
-## 7. Backup
-
-Automate:
-
-- `pg_dump` or appropriate PostgreSQL backup method,
-- storage archive/sync,
-- checksum,
-- retention cleanup.
-
-Copy backup away from the same server.
-
-## 8. Production school LAN
-
-Recommended:
-
-```text
-Internet (optional)
-      |
-Gateway/Firewall
-      |
-HSI Server
-  |-- Caddy
-  |-- Bun
-  |-- PostgreSQL
-  |-- Storage
-      |
-Gigabit LAN
-  |--- AP
-  |--- AP
-  |--- AP
-```
-
-Main exam traffic stays in LAN.
-
-## 9. HTTPS on LAN
-
-Keep HTTPS even for internal deployment because modern browser functionality such as camera/PWA/service-worker features generally expects secure context.
-
-Plan internal DNS/certificate strategy deliberately.
-
-## 10. Production migration checklist
-
-- freeze deployment window,
-- fresh backup,
-- provision server,
-- install Bun pinned baseline,
-- PostgreSQL migration,
-- copy storage,
-- restore DB,
-- run migrations,
-- validate permissions,
-- smoke test,
-- load test,
-- verify HTTPS,
-- verify backup target,
-- DNS cutover,
-- rollback plan.
-
-## 11. Observability V1
-
-Keep it light:
-
-- structured application log,
-- request ID,
-- request duration,
-- error counts,
-- DB failure log,
-- disk usage check,
-- backup status.
-
-Do not deploy a heavyweight monitoring stack until needed.
-
-## 12. Capacity test before school-wide exam
-
-Simulate:
-
-- 125 logged-in users,
-- start exam wave,
-- answer autosave burst,
-- reconnect,
-- final submit wave,
-- teacher dashboard open.
-
-Test over realistic WLAN, not only localhost.
+Freeze the deployment window, run the test suite and build, apply migrations, verify
+health endpoints, perform a smoke login and permission check, confirm backup status,
+and record the release identifier. Keep a rollback plan for application code and
+database changes.

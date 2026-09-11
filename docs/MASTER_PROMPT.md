@@ -1,10 +1,10 @@
-# MASTER PROMPT — HSI Learning OS Initial Setup
+# MASTER PROMPT — Learning OS Initial Setup
 
 Copy the prompt below into Codex from the root folder that will become the repository.
 
 ---
 
-You are the primary implementation agent for a new internal school platform named **HSI Learning OS**.
+You are the primary implementation agent for a new internal school platform named **Learning OS**.
 
 Your job in this task is to create the **initial production-minded foundation only**. Do not attempt to build the full LMS in one turn.
 
@@ -46,7 +46,7 @@ If `AGENTS_TEMPLATE.md` exists and root `AGENTS.md` does not, create root `AGENT
 
 ## 3. Product
 
-HSI Learning OS is an internal HSI Boarding School application for:
+Learning OS is an internal HSI Boarding School application for:
 
 - course/module/lesson,
 - assignment/quiz/exam/form/challenge,

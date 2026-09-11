@@ -1,182 +1,79 @@
-# Product Vision & Scope
+# Product Vision and Scope
 
-## 1. Product statement
+## Product statement
 
-**HSI Learning OS** adalah platform internal HSI Boarding School untuk mengelola pembelajaran dan aktivitas akademik dalam satu sistem yang ringan, cepat, mudah dipelihara, dan dapat berjalan baik di jaringan lokal sekolah.
+Learning OS is an internal HSI Boarding School platform for learning and academic
+operations. It combines LMS workflows with project management, portfolios,
+gamification, classroom attendance, and academic administration in a lightweight
+system that can run reliably on the school network.
 
-Platform menggabungkan konsep LMS, task/project management, portfolio, gamification, classroom attendance, dan academic workflow.
+## Primary users
 
-## 2. Primary users
+### Students
 
-### Student
+- View the current learning plan and continue the latest lesson.
+- Submit assignments and complete quizzes, exams, and challenges.
+- Track progress, XP, levels, badges, projects, portfolios, calendars, and deadlines.
 
-Kebutuhan utama:
+### Teachers and mentors
 
-- Melihat pembelajaran hari ini.
-- Melanjutkan lesson terakhir.
-- Mengumpulkan tugas.
-- Mengerjakan quiz/exam.
-- Menjalankan challenge.
-- Melihat project dan Kanban.
-- Melihat progress, XP, level, badge.
-- Membangun portfolio.
-- Melihat kalender dan deadline.
+- Create courses and activities and use question banks.
+- Grade work, provide feedback, and manage attendance.
+- Review student progress, projects, teams, Kanban boards, and classroom activity.
+- Select projects for a showcase.
 
-### Teacher / Mentor
+### Academic administrators
 
-Kebutuhan utama:
+- Manage academic years, terms, students, classes, course assignments, calendars,
+  roles, permissions, audit records, and backup status.
 
-- Membuat dan mengelola course.
-- Membuat activity.
-- Menggunakan question bank.
-- Memberi nilai dan feedback.
-- Mengelola attendance.
-- Melihat progress siswa.
-- Mengelola project/team/Kanban.
-- Memilih project untuk showcase.
-- Melihat classroom activity secara realtime.
+### System administrators
 
-### Academic/Admin
+System administrators have broad access, but every sensitive action remains visible in
+the audit log.
 
-Kebutuhan utama:
+## Product pillars
 
-- Academic year/term.
-- Student/class management.
-- Course assignment.
-- Kalender akademik.
-- Permission dan role.
-- Audit log.
-- System configuration.
-- Backup/restore status.
+- Learning: Course → Module → Lesson → Activity.
+- Assessment: Question bank → Attempt → Answer → Grade → Feedback.
+- Project learning: Challenge → Project → Team → Kanban → Review → Showcase.
+- Student growth: Activity/project events → XP → Level → Badge → Portfolio.
+- Classroom operations: Meeting → Attendance → Calendar → Realtime status.
 
-### Super Admin
+## Activity Engine
 
-Hak akses sistem penuh, tetapi tetap tercatat pada audit log.
+Assignments, quizzes, exams, surveys, questionnaires, and challenges share one
+`Activity` aggregate. Type-specific behavior is configuration: availability, attempts,
+timers, question types, grading mode, randomization, anonymity, submission type, and
+reward rules. This prevents parallel implementations that drift apart.
 
-## 3. Product pillars
+## V1 scope
 
-### Learning
+V1 includes authentication and sessions, users and permissions, academic structure,
+course/module/lesson foundations, simple assignments and quizzes, submissions and
+grading, meeting attendance, projects and Kanban, showcases, basic portfolios,
+XP/levels/badges, calendars, notification foundations, audit logs, and backup basics.
 
-Course → Module → Lesson → Activity.
+V1 excludes face recognition, chat/video conferencing, a complex parent portal,
+AI grading, a spreadsheet-style form builder, an online judge or container runner,
+advanced analytics warehousing, multi-tenant SaaS, microservices, distributed caches,
+and Elasticsearch.
 
-### Assessment
+## UX principles
 
-Question bank → Attempt → Answer → Grade → Feedback.
+Teacher and administrator interfaces should be productive and information-dense, with
+Jira-inspired patterns. Student interfaces should remain task-oriented, simple, and
+progress-focused.
 
-### Project Learning
+## Success metrics
 
-Challenge → Project → Team → Kanban → Review → Showcase.
+Track course completion, on-time assignment submission, quiz/exam completion,
+attendance, active projects, challenge completion, portfolio completion, exam errors,
+autosave reliability, API latency, backup success, and restore-drill success.
 
-### Student Growth
+## Capacity target
 
-Activity/Project events → XP → Level → Badge → Portfolio.
-
-### Classroom Operation
-
-Meeting → Attendance → Calendar → Realtime status.
-
-## 4. One Activity Engine
-
-Jangan membuat mesin terpisah untuk:
-
-- Assignment
-- Quiz
-- Exam
-- Survey
-- Questionnaire
-- Challenge
-
-Semua menggunakan satu aggregate `Activity`.
-
-Perbedaan ditentukan oleh konfigurasi:
-
-- `activity.type`
-- availability
-- attempts
-- timer
-- question/item types
-- grading mode
-- randomization
-- anonymity
-- submission type
-- reward rules
-
-Contoh:
-
-| Type | Grading | Attempt | Timer | Reward |
-|---|---|---:|---|---|
-| Assignment | Manual/Rubric | configurable | optional | optional |
-| Quiz | Auto + manual | configurable | optional | optional |
-| Exam | Auto + manual | usually 1 | usually yes | normally no |
-| Survey | none | configurable | no | no |
-| Challenge | auto/manual | configurable | optional | yes |
-
-## 5. Product boundaries V1
-
-### Masuk V1
-
-- Authentication/session.
-- User, role, permission.
-- Academic structure.
-- Course/module/lesson.
-- Assignment + simple quiz.
-- Submission/attempt.
-- Grading.
-- Attendance per meeting.
-- Project + simple Kanban.
-- Showcase.
-- Basic portfolio.
-- XP/level/badge.
-- Calendar.
-- Notification foundation.
-- Audit log.
-- Backup basics.
-
-### Tidak masuk V1
-
-- Face recognition.
-- Chat/video conference.
-- Complex parent portal.
-- AI grading.
-- Full-feature spreadsheet-like form builder.
-- Online judge/container code runner.
-- Advanced analytics warehouse.
-- Multi-tenant SaaS.
-- Microservices.
-- Distributed cache.
-- Elasticsearch.
-
-## 6. UX principle
-
-**Teacher UI:** productive, information-dense, Jira-inspired.
-
-**Student UI:** task-oriented, simplified, progress-focused.
-
-Hindari membuat UI siswa sepadat admin dashboard.
-
-## 7. Success metrics
-
-Minimal indikator yang perlu dipantau:
-
-- Course completion rate.
-- Assignment on-time rate.
-- Quiz/exam completion.
-- Attendance rate.
-- Active project count.
-- Challenge completion.
-- Student portfolio completion.
-- Error rate saat exam.
-- Autosave success/failure.
-- Median API latency.
-- Backup success.
-- Restore drill success.
-
-## 8. Capacity target
-
-Baseline:
-
-- 50–125 concurrent students.
-- Development/pilot server: 2 vCPU / 2 GB RAM.
-- Production LAN server recommended target: 4+ CPU core, 8 GB RAM, SSD/NVMe, UPS, wired Gigabit backbone.
-
-Optimize for correctness and WLAN reliability before micro-optimizing raw request throughput.
+The initial target is 50–125 concurrent students on a development or pilot server with
+2 vCPUs and 2 GB RAM. A school production LAN should target at least four CPU cores,
+8 GB RAM, SSD/NVMe storage, UPS protection, and a wired Gigabit backbone. Correctness
+and WLAN reliability take priority over premature throughput optimization.

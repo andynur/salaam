@@ -33,6 +33,6 @@ export function Login({ onLogin }: { onLogin: () => Promise<void> }) {
         <Button type="submit" disabled={pending}>{pending ? "Sedang masuk…" : "Masuk ke ruang belajar"}<span aria-hidden="true">→</span></Button>
       </form>
       <p className="login-help">Belum memiliki akun atau kesulitan masuk?<br />Hubungi administrator sekolah.</p>
-    </div><p className="login-footer">HSI Learning OS <span>Platform internal sekolah</span></p></section>
+    </div><p className="login-footer">Learning OS <span>Platform internal sekolah</span></p></section>
   </main>;
 }
