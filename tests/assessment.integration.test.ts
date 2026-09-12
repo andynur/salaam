@@ -143,6 +143,19 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     expect((await db`SELECT count(*)::int AS count FROM audit_logs WHERE event = 'assessment.questions.imported' AND resource_id = ${imported.importId}`)[0]!.count).toBe(1);
   });
 
+  test("question pools select a bounded snapshot and keep the maximum score deterministic", async () => {
+    const f = await course();
+    const pooled = await assessment(f.courseId, f.lessonId, { selectionCount: 2, maxAttempts: 1 }, questionBodies, [2, 2, 2]);
+    const attempt = await json<{ id: string }>(start(f.courseId, pooled.id), 201);
+    expect((await detail(f.courseId, attempt.id)).questions).toHaveLength(2);
+    expect((await detail(f.courseId, attempt.id)).maxScore).toBe(4);
+    const f2 = await course();
+    const q1 = (await json<{ id: string }>(post(f2.courseId, "questions", questionBodies[0]), 201)).id;
+    const q2 = (await json<{ id: string }>(post(f2.courseId, "questions", questionBodies[1]), 201)).id;
+    const assessmentId = (await json<{ id: string }>(post(f2.courseId, "assessments", { lessonId: f2.lessonId, kind: "quiz", title: "Pool invalid", instructions: "x", selectionCount: 2 }), 201)).id;
+    expect((await post(f2.courseId, `assessments/${assessmentId}/items`, { items: [{ questionId: q1, points: 1 }, { questionId: q2, points: 2 }] })).status).toBe(400);
+  });
+
   test("quiz attempts snapshot questions, autosave forward-only, submit idempotently and score automatically", async () => {
     const f = await course();
     const draft = (await json<{ id: string }>(post(f.courseId, "assessments", { lessonId: f.lessonId, kind: "quiz", title: "Empty", instructions: "x" }), 201)).id;

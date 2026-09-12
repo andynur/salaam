@@ -187,9 +187,9 @@ Phase 3 does not include:
 - surveys and questionnaires
 - per-question custom marking policy is delivered in Phase 19; question weighting beyond
   points remains out of scope
-- time extensions, attempt resets, or per-student accommodations
+- attempt resets remain out of scope; per-student time accommodations were delivered in Phase 20
 - proctoring, tab-switch detection, or lockdown browsers
-- question import/export, question pools with random subsets, or item statistics
+- item statistics remain out of scope; question import/export was delivered in Phase 21 and question pools in Phase 22
 - WebSocket live monitoring; autosave uses HTTP
 
 Expired attempts are finalized lazily. Until a student, teacher list, or retry touches

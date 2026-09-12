@@ -51,11 +51,11 @@ export async function finalizeExpired(db: SQL, scope: { attemptId?: string; acti
   });
 }
 
-type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; extraMinutes: number; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; scoringMode: string };
+type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; extraMinutes: number; selectionCount: number | null; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; scoringMode: string };
 export async function startAttempt(db: SQL, actor: Actor, courseId: string, activityId: string, requestId: string) {
   return db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "participate", "share");
-    const settings = (await tx<Settings[]>`SELECT s.time_limit_minutes AS "timeLimitMinutes", s.closes_at AS "closesAt", s.max_attempts AS "maxAttempts", s.scoring_mode AS "scoringMode",
+    const settings = (await tx<Settings[]>`SELECT s.time_limit_minutes AS "timeLimitMinutes", s.closes_at AS "closesAt", s.max_attempts AS "maxAttempts", s.scoring_mode AS "scoringMode", s.selection_count AS "selectionCount",
         s.shuffle_questions AS "shuffleQuestions", s.shuffle_options AS "shuffleOptions", (s.opens_at IS NULL OR s.opens_at <= clock_timestamp()) AS opened
         , COALESCE((SELECT ac.extra_minutes FROM assessment_accommodations ac WHERE ac.activity_id = a.id AND ac.student_id = ${actor.id}), 0) AS "extraMinutes"
       FROM activities a JOIN assessment_settings s ON s.activity_id = a.id JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
@@ -78,10 +78,12 @@ export async function startAttempt(db: SQL, actor: Actor, courseId: string, acti
       SELECT q.id AS "questionId", q.type, q.prompt, q.options, q.correct, q.explanation, aq.points
       FROM assessment_questions aq JOIN questions q ON q.id = aq.question_id WHERE aq.activity_id = ${activityId} ORDER BY aq.position, q.id`;
     if (!questions.length) throw new HttpError(409, "NO_QUESTIONS", "Penilaian belum memiliki soal.");
-    const snapshot = (settings.shuffleQuestions ? shuffled(questions) : questions).map((question, position) => ({
+    if (settings.selectionCount !== null && settings.selectionCount > questions.length) throw new HttpError(409, "POOL_TOO_SMALL", "Jumlah soal acak melebihi isi pool.");
+    const selected = settings.selectionCount === null ? questions : shuffled(questions).slice(0, settings.selectionCount);
+    const snapshot = (settings.shuffleQuestions ? shuffled(selected) : selected).map((question, position) => ({
       ...question, position, scoring_mode: settings.scoringMode, options: settings.shuffleOptions ? shuffled(question.options) : question.options,
     }));
-    const maxScore = questions.reduce((total, question) => total + Number(question.points), 0);
+    const maxScore = selected.reduce((total, question) => total + Number(question.points), 0);
     // One clock reading fixes the start, the window check, and the deadline together.
     const created = await tx<{ id: string }[]>`INSERT INTO attempts (activity_id, student_id, number, started_at, deadline_at, max_score)
       SELECT ${activityId}, ${actor.id}, ${used + 1}, now.at,

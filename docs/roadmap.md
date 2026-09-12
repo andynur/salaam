@@ -29,6 +29,7 @@ Coding agents follow skill `deliver-phase`.
 | 19 | Assessment marking | In progress — [record](phases/19-assessment-marking.md) |
 | 20 | Assessment accommodations | In progress — [record](phases/20-assessment-accommodations.md) |
 | 21 | Question bank import and export | In progress — [record](phases/21-question-import-export.md) |
+| 22 | Assessment question pools | In progress — [record](phases/22-assessment-question-pools.md) |
 
 ## Delivered
 
@@ -152,7 +153,7 @@ Boundaries section has the details.
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
   scanning and inline previews; rich text or Markdown.
-- **Phase 3:** proctoring; question pools and statistics; live monitoring over
+- **Phase 3:** proctoring; question statistics; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and

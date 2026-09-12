@@ -31,7 +31,7 @@ test("question CSV import requires a bounded, valid and retry-safe shape", () =>
 test("quiz and exam settings enforce windows, limits and exam integrity rules", () => {
   expect(assessmentKindInput({ kind: "exam" })).toBe("exam");
   expect(() => assessmentKindInput({ kind: "assignment" })).toThrow();
-  expect(settingsInput({}, "quiz")).toEqual({ opensAt: null, closesAt: null, timeLimitMinutes: null, maxAttempts: 1, shuffleQuestions: true, shuffleOptions: true, resultsVisibility: "after_submit", scoringMode: "all_or_nothing" });
+  expect(settingsInput({}, "quiz")).toEqual({ opensAt: null, closesAt: null, timeLimitMinutes: null, maxAttempts: 1, shuffleQuestions: true, shuffleOptions: true, resultsVisibility: "after_submit", scoringMode: "all_or_nothing", selectionCount: null });
   expect(settingsInput({ scoringMode: "negative_marking" }, "quiz").scoringMode).toBe("negative_marking");
   const exam = settingsInput({ opensAt: "2026-09-12T01:00:00Z", closesAt: "2026-09-12T03:00:00Z", timeLimitMinutes: 90, shuffleOptions: false, resultsVisibility: "after_close" }, "exam");
   expect(exam).toMatchObject({ opensAt: "2026-09-12T01:00:00.000Z", closesAt: "2026-09-12T03:00:00.000Z", timeLimitMinutes: 90, maxAttempts: 1, shuffleOptions: false });

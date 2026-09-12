@@ -44,6 +44,7 @@ workflow.
 | 19 — Assessment marking | [phases/19-assessment-marking.md](phases/19-assessment-marking.md) |
 | 20 — Assessment accommodations | [phases/20-assessment-accommodations.md](phases/20-assessment-accommodations.md) |
 | 21 — Question bank import and export | [phases/21-question-import-export.md](phases/21-question-import-export.md) |
+| 22 — Assessment question pools | [phases/22-assessment-question-pools.md](phases/22-assessment-question-pools.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

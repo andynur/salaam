@@ -84,6 +84,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
       shuffleQuestions: form.get("shuffleQuestions") === "on", shuffleOptions: form.get("shuffleOptions") === "on",
       resultsVisibility: form.get("resultsVisibility"),
       scoringMode: form.get("scoringMode"),
+      selectionCount: form.get("selectionCount") ? Number(form.get("selectionCount")) : null,
     };
     saving.current = true; setPending(true); setError("");
     try {
@@ -105,6 +106,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
       {kind === "quiz" && <Field name="maxAttempts" type="number" min={1} max={10} step="1" label="Jumlah percobaan" value={settings?.maxAttempts ?? 1} />}
       <label className="learning-field"><span>Tampilan hasil untuk santri</span><select className="input" name="resultsVisibility" defaultValue={settings?.resultsVisibility ?? (kind === "exam" ? "after_close" : "after_submit")}>{Object.entries(visibilityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label className="learning-field"><span>Skema penilaian</span><select className="input" name="scoringMode" defaultValue={settings?.scoringMode ?? "all_or_nothing"}>{Object.entries(scoringLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <Field name="selectionCount" type="number" required={false} min={1} max={100} step="1" label="Jumlah soal acak dari pool (opsional)" value={settings?.selectionCount ?? ""} />
       <label className="submission-confirm"><input type="checkbox" name="shuffleQuestions" defaultChecked={settings?.shuffleQuestions ?? true} /> Acak urutan soal per santri</label>
       <label className="submission-confirm"><input type="checkbox" name="shuffleOptions" defaultChecked={settings?.shuffleOptions ?? true} /> Acak urutan opsi per santri</label>
       <Field name="instructions" label="Instruksi" area max={20000} value={value?.instructions} />

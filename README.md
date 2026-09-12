@@ -53,6 +53,7 @@ environment-specific validation.
 | 19 — Assessment marking | Partial credit and bounded negative marking for choice assessments | [Phase 19](docs/phases/19-assessment-marking.md) |
 | 20 — Assessment accommodations | Auditable per-student time extensions for timed assessments | [Phase 20](docs/phases/20-assessment-accommodations.md) |
 | 21 — Question bank import and export | Bounded, atomic CSV exchange for course question banks | [Phase 21](docs/phases/21-question-import-export.md) |
+| 22 — Assessment question pools | Random, snapshotted question selection with deterministic scoring | [Phase 22](docs/phases/22-assessment-question-pools.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

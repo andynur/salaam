@@ -97,7 +97,9 @@ export function settingsInput(body: Record<string, unknown>, kind: AssessmentKin
   if (kind === "exam" && (maxAttempts !== 1 || timeLimitMinutes === null || !closesAt)) invalid("Ujian wajib satu kali percobaan, memiliki batas waktu, dan waktu tutup.");
   const scoringMode = body.scoringMode ?? "all_or_nothing";
   if (scoringMode !== "all_or_nothing" && scoringMode !== "partial_credit" && scoringMode !== "negative_marking") invalid("Mode penilaian tidak valid.");
-  return { opensAt, closesAt, timeLimitMinutes: timeLimitMinutes as number | null, maxAttempts, shuffleQuestions: flag(body, "shuffleQuestions", true), shuffleOptions: flag(body, "shuffleOptions", true), resultsVisibility: resultsVisibility as ResultsVisibility, scoringMode: scoringMode as ScoringMode };
+  const selectionCount = body.selectionCount ?? null;
+  if (selectionCount !== null && (typeof selectionCount !== "number" || !Number.isInteger(selectionCount) || selectionCount < 1 || selectionCount > 100)) invalid("Jumlah soal acak harus 1–100.");
+  return { opensAt, closesAt, timeLimitMinutes: timeLimitMinutes as number | null, maxAttempts, shuffleQuestions: flag(body, "shuffleQuestions", true), shuffleOptions: flag(body, "shuffleOptions", true), resultsVisibility: resultsVisibility as ResultsVisibility, scoringMode: scoringMode as ScoringMode, selectionCount: selectionCount as number | null };
 }
 export function itemsInput(body: Record<string, unknown>) {
   const items = body.items;

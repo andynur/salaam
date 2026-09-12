@@ -34,8 +34,12 @@ export async function saveAssessment(db: SQL, actor: Actor, courseId: string, bo
       await tx`UPDATE activities SET title = ${title}, instructions = ${instructions}, due_at = ${settings.closesAt} WHERE id = ${id}`;
       await tx`UPDATE assessment_settings SET opens_at = ${settings.opensAt}, closes_at = ${settings.closesAt}, time_limit_minutes = ${settings.timeLimitMinutes},
           max_attempts = ${settings.maxAttempts}, shuffle_questions = ${settings.shuffleQuestions}, shuffle_options = ${settings.shuffleOptions},
-          results_visibility = ${settings.resultsVisibility}, scoring_mode = ${settings.scoringMode}
+          results_visibility = ${settings.resultsVisibility}, scoring_mode = ${settings.scoringMode}, selection_count = ${settings.selectionCount}
         WHERE activity_id = ${id}`;
+      if (settings.selectionCount !== null) {
+        const points = await tx<{ points: number }[]>`SELECT DISTINCT points::float8 AS points FROM assessment_questions WHERE activity_id = ${id}`;
+        if (points.length > 1) invalid("Semua soal dalam pool harus memiliki poin yang sama agar nilai maksimum konsisten.");
+      }
       activityId = id;
     } else {
       const lessonId = idField(body, "lessonId");
@@ -43,9 +47,9 @@ export async function saveAssessment(db: SQL, actor: Actor, courseId: string, bo
       // due_at mirrors the closing time so deadline-aware views need no assessment join.
       activityId = (await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at)
         VALUES (${courseId}, ${lessonId}, ${kind}, ${title}, ${instructions}, ${settings.closesAt}) RETURNING id`)[0]!.id;
-      await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility, scoring_mode)
+      await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility, scoring_mode, selection_count)
         VALUES (${activityId}, ${kind}, ${settings.opensAt}, ${settings.closesAt}, ${settings.timeLimitMinutes}, ${settings.maxAttempts},
-          ${settings.shuffleQuestions}, ${settings.shuffleOptions}, ${settings.resultsVisibility}, ${settings.scoringMode})`;
+          ${settings.shuffleQuestions}, ${settings.shuffleOptions}, ${settings.resultsVisibility}, ${settings.scoringMode}, ${settings.selectionCount})`;
     }
     await recordAudit(tx, actor.id, `assessment.${id ? "updated" : "created"}`, "activities", activityId, requestId);
     return { id: activityId };
@@ -62,6 +66,9 @@ export async function setAssessmentItems(db: SQL, actor: Actor, courseId: string
     const found = await tx`SELECT id FROM questions WHERE course_id = ${courseId} AND archived_at IS NULL
       AND id = ANY(string_to_array(${items.map(item => item.questionId).join(",")}, ',')::uuid[])`;
     if (found.length !== items.length) notFound();
+    const settings = (await tx<{ selectionCount: number | null }[]>`SELECT selection_count AS "selectionCount" FROM assessment_settings WHERE activity_id = ${activityId}`)[0];
+    if (settings && settings.selectionCount !== null && settings.selectionCount > items.length) invalid("Jumlah soal acak tidak boleh melebihi isi pool.");
+    if (settings && settings.selectionCount !== null && new Set(items.map(item => item.points)).size !== 1) invalid("Semua soal dalam pool harus memiliki poin yang sama agar nilai maksimum konsisten.");
     await tx`DELETE FROM assessment_questions WHERE activity_id = ${activityId}`;
     await tx`INSERT INTO assessment_questions (activity_id, course_id, question_id, position, points)
       SELECT ${activityId}, ${courseId}, item."questionId", item.position, item.points
@@ -104,9 +111,9 @@ export async function listRubrics(db: SQL, actor: Actor, courseId: string, activ
 export async function listAssessments(db: SQL, actor: Actor, courseId: string, manager: boolean) {
   return db<Assessment[]>`SELECT a.id, a.lesson_id AS "lessonId", a.kind, a.title, a.instructions, a.published, a.archived_at IS NOT NULL AS archived,
       json_build_object('opensAt', s.opens_at, 'closesAt', s.closes_at, 'timeLimitMinutes', s.time_limit_minutes, 'maxAttempts', s.max_attempts,
-        'shuffleQuestions', s.shuffle_questions, 'shuffleOptions', s.shuffle_options, 'resultsVisibility', s.results_visibility, 'scoringMode', s.scoring_mode) AS settings,
+        'shuffleQuestions', s.shuffle_questions, 'shuffleOptions', s.shuffle_options, 'resultsVisibility', s.results_visibility, 'scoringMode', s.scoring_mode, 'selectionCount', s.selection_count) AS settings,
       (SELECT count(*)::int FROM assessment_questions aq WHERE aq.activity_id = a.id) AS "questionCount",
-      (SELECT COALESCE(sum(aq.points), 0)::float8 FROM assessment_questions aq WHERE aq.activity_id = a.id) AS "maxScore",
+      (SELECT COALESCE(CASE WHEN s.selection_count IS NULL THEN sum(aq.points) ELSE s.selection_count * min(aq.points) END, 0)::float8 FROM assessment_questions aq WHERE aq.activity_id = a.id) AS "maxScore",
       EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id) AS locked,
       CASE WHEN ${manager} THEN (SELECT COALESCE(json_agg(json_build_object('questionId', aq.question_id, 'position', aq.position, 'points', aq.points) ORDER BY aq.position), '[]'::json)
         FROM assessment_questions aq WHERE aq.activity_id = a.id) END AS items,
