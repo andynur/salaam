@@ -23,7 +23,7 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 7 are implemented and validated
+This is an active early-stage project. Phases 0 through 9 are implemented and validated
 locally, and HTTPS proxy behavior plus a backup and restore drill were validated on
 2026-09-12. SALAAM is not yet presented as a production deployment for a school: capacity
 testing on school hardware and WLAN and the operational rollout still need
@@ -39,10 +39,12 @@ environment-specific validation.
 | 5 — Gamification | Append-only XP ledger awarded with the event that earns it, derived levels, automatic badges, administrator-configurable reward rules, growth page and teacher leaderboard | [Phase 5](docs/phases/05-gamification.md) |
 | 6 — Attendance & classroom sessions | Session rosters, manual attendance, private notes, correction history, reports, dashboard tasks, authenticated realtime updates | [Phase 6](docs/phases/06-attendance.md) |
 | 7 — QR attendance | Rotating short-lived check-in codes stored only as digests, camera or typed santri check-in, late thresholds, teacher corrections that still win | [Phase 7](docs/phases/07-qr-attendance.md) |
+| 8 — Calendar & notifications | Scoped academic events, live deadlines and assessment windows, in-app reminders, level and QR notifications, preferences and read receipts | [Phase 8](docs/phases/08-calendar-notifications.md) |
+| 9 — Reporting | Cross-course operational overview, per-course rows, attendance and learning-progress summaries per santri, filtered audit view, and CSV exports behind `reports.view` | [Phase 9](docs/phases/09-reporting.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
-The next milestone is **Phase 8 — Calendar and notifications**: academic events, deadline
-reminders, notification preferences, and delivery status. See the
+The next milestone is **Phase 10 — Advanced IT learning**, subject to an isolated execution
+boundary and an approved security review. See the
 [roadmap](docs/roadmap.md).
 
 ## Architecture

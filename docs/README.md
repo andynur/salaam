@@ -30,6 +30,8 @@ workflow.
 | 5 — Gamification | [phases/05-gamification.md](phases/05-gamification.md) |
 | 6 — Attendance & classroom sessions | [phases/06-attendance.md](phases/06-attendance.md) |
 | 7 — QR attendance | [phases/07-qr-attendance.md](phases/07-qr-attendance.md) |
+| 8 — Calendar & notifications | [phases/08-calendar-notifications.md](phases/08-calendar-notifications.md) |
+| 9 — Reporting | [phases/09-reporting.md](phases/09-reporting.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

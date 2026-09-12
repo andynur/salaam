@@ -255,6 +255,14 @@ adding a near-duplicate.
   `.checkin-video` camera preview and its close button. The camera is never the only path:
   a typed code field sits beside it for keyboard use and unsupported browsers, and the QR
   carries an `aria-label` spelling out the code.
+- **Reports**: `Reports.tsx` reuses `.summary-grid`/`.stat-card`, `.tabs`, `.card-tools`,
+  `.table-scroll`, and the search/pager kit. New here: `.report-filter-card` (the filter
+  bar in its own card above the report), `.report-filters` + `.report-filter` (labelled
+  filter selects that go full width below 760px), and `.report-metrics` (a grid of
+  label/value tiles for figures that do not warrant a stat card). Each report keeps its own
+  table instance — the call site passes `key={kind}` — so rows fetched for the previous
+  report are never rendered with another report's columns. A CSV export is a plain
+  `<a className="button button-secondary button-small">`, not a fetch.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title
@@ -348,3 +356,16 @@ portfolio), `src/web/pages/ProjectBoard.tsx` (one project: board + overview), an
   (`.board-card.is-dragging`) is the one card that gets `--shadow-overlay`.
 - Project stages follow the Jira flow in copy too: "Kirim untuk review" → guru "Setujui
   proyek" (0–100) or "Minta revisi". Locked states explain themselves with `.info-state`.
+
+## Calendar and notifications (Phase 8)
+
+`Calendar.tsx` reuses `PageHeader`, the mutation/field kit, agenda task rows, date filters,
+search, pagination, and lozenges. Times and datetime form labels explicitly use WIB. Creation
+focuses the title; edits retain a version snapshot, and archiving requires confirmation.
+The dashboard reuses the agenda API for its next-seven-days shortcut.
+
+`.calendar-description` preserves description line breaks, `.calendar-preference` aligns
+checkbox labels, and `.notification-row` wraps source links, delivery status and receipt
+controls on phones. Pending, delivered, suppressed and read states have distinct Indonesian
+labels; delivery alone never claims the notification was read. No new color token or icon
+library is needed. The navigation hides its future group when there are no unavailable pages.

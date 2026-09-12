@@ -2,7 +2,7 @@
 
 SALAAM (repository and package `salaam`) is the Learning & Growth Platform for
 HSI Boarding School. It is a modular monolith: one Bun process serves the API and a React
-SPA, and PostgreSQL is the source of truth. Phases 0–7 are delivered; `docs/roadmap.md`
+SPA, and PostgreSQL is the source of truth. Phases 0–9 are delivered; `docs/roadmap.md`
 lists what comes next.
 
 ## Commands
@@ -32,6 +32,7 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 | `src/core/http.ts` | Health, auth, same-origin check, dispatch by URL prefix |
 | `src/core/{foundation,learning,project}-http.ts` | Routers for `/api/admin`, `/api/learning/courses`, `/api/projects` |
 | `src/core/attendance-{http,realtime}.ts` | Attendance HTTP routes and authenticated WebSocket invalidations |
+| `src/core/reporting-http.ts` | Read-only report and CSV export routes under `/api/reports` |
 | `src/core/` | Config, `HttpError`, validation helpers, permissions, auth, audit, storage, logger, migrations |
 | `src/modules/<domain>/` | `input.ts` validates bodies; `service.ts` and siblings hold SQL and rules |
 | `src/modules/learning/access.ts` | `courseAccess` and `lessonAccess`: scope checks and course locks |
@@ -52,7 +53,8 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
   capabilities, never role names.
 - Capabilities (seeded by migrations): `dashboard:view`, `admin.users.manage`,
   `academic.manage`, `audit.view`, `learning.view`, `learning.manage`,
-  `learning.manage.all`, `learning.participate`. Reuse them before adding new ones.
+  `learning.manage.all`, `learning.participate`, `reports.view`. Reuse them before adding
+  new ones.
 - Mutations run in one `db.begin(async tx => …)`: lock the course row first (`FOR UPDATE`,
   or `"share"` for concurrent student traffic such as attempts and project boards), write,
   then call `recordAudit(tx, …)` for audited events so a failed audit rolls back.
@@ -60,6 +62,9 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
   edits get 409 through `version` columns or `previous…Id` checks.
 - Lists query `LIMIT 51 OFFSET n` and return `{ items, nextOffset }` with 50 items;
   `listInput` parses and escapes `q` and `offset`.
+- Reports are read-only: they derive figures in one
+  `ISOLATION LEVEL REPEATABLE READ READ ONLY` transaction, filter scope instead of looking
+  a resource up, and audit each export. Never add a stored aggregate for a report.
 - The database clock decides deadlines and exam windows. Columns are `timestamptz`; JSON
   carries ISO strings.
 - Bind JSON as `${JSON.stringify(value)}::text::jsonb`; a plain `::jsonb` cast stores a

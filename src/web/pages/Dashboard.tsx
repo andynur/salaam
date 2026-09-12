@@ -1,3 +1,4 @@
+import { AgendaShortcut } from "./Calendar";
 import { useEffect, useState } from "react";
 import type { Actor } from "../../core/permissions";
 import type { LearningTask } from "../../shared/learning";
@@ -72,7 +73,7 @@ export function Dashboard({ actor, timezone, onExpired }: { actor: Actor; timezo
             </div>
             <a href="/gamification" className="card-footer-link">Lihat pertumbuhan<Icon name="arrowRight" /></a>
           </Card>}
-          <Card><div className="card-heading"><h2>Agenda mendatang</h2><span className="badge badge-draft">Segera</span></div><EmptyState icon="calendar" title="Belum ada agenda" description="Jadwal akademik dan kegiatan sekolah akan hadir di ruang ini." /></Card>
+          <AgendaShortcut onExpired={onExpired} />
         </div>
       </div>
     </>}

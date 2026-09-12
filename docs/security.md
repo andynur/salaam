@@ -116,6 +116,25 @@ reasons at 500, session duration at 24 hours, and rosters at 500 active students
 return 50 records per page. No new capability, dependency, file upload, or credential type
 is introduced.
 
+## Reporting and exports
+
+Reporting is read-only and adds no table. `reports.view` (administrators and teachers) opens
+the cross-course reports; the audit report keeps `audit.view`, so only administrators read
+it. A teacher's scope is applied inside every query — `learning.manage.all` or a teaching
+assignment — so a report can only aggregate courses that actor already manages, and santri
+have no access at all. Reads run in one repeatable-read, read-only transaction and cannot
+change data.
+
+An export repeats its report's query with a hard 5,000-row cap and writes one
+`report.<kind>.exported` audit row carrying the narrowest scoped identifier and nothing
+about the exported rows. CSV output is UTF-8 with a BOM, served as an attachment with
+`Content-Type: text/csv; charset=utf-8` and a sanitized filename; the response, like every
+other, carries `Cache-Control: no-store`. Cells are quoted and internal quotes doubled, and
+a cell beginning with `=`, `+`, `-`, `@`, a tab, or a carriage return is prefixed with an
+apostrophe so a spreadsheet shows school data as text instead of evaluating it as a formula.
+Exports are a real disclosure surface: a CSV leaves the audit trail once it is downloaded,
+so the row cap, the scope filter, and the audit row are the controls that remain.
+
 ## QR check-in
 
 A check-in code is a proof of presence, never a credential. It authenticates nobody: the
@@ -149,3 +168,19 @@ messages close the read-only connection. Authorization is rechecked before inval
 and every ten seconds; revoked sessions, inactive accounts, unpublished courses, and lost
 scope close the socket. Messages contain only `{ "type": "changed" }`; HTTP refetches
 repeat authorization. Connected sockets are not proof of classroom attendance.
+
+## Calendar and notifications
+
+Personal calendar and inbox APIs require `dashboard:view`; learning sources additionally
+resolve current learning capabilities, course publication, membership and attendance roster.
+School-event management requires `academic.manage`; course events use `courseAccess` with
+`learning.manage`. Users cannot choose another recipient when reading an inbox, saving
+preferences or marking a notification read. Source access is resolved again on every inbox
+read and receipt, so revocation or archival hides old titles and links.
+
+JSON bodies are capped at 16 KiB; event descriptions at 2,000 characters, titles at 150,
+date ranges and event duration at 93 days, and lists at 50 items. Mutations require the exact
+application Origin. Course scope cannot be moved by editing an event; stale versions fail
+with 409. Reminder and QR notices contain source links, never check-in codes or credentials.
+Delivery is in-app only. Worker failures log a fixed event without source text, recipient
+information or exception payloads. No external provider receives school data.

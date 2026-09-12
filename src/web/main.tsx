@@ -1,3 +1,4 @@
+import { Calendar, Notifications } from "./pages/Calendar";
 import { Component, useCallback, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { Actor } from "../core/permissions";
@@ -10,6 +11,7 @@ import { Learning } from "./pages/Learning";
 import { Projects } from "./pages/Projects";
 import { Attendance } from "./pages/Attendance";
 import { Growth } from "./pages/Growth";
+import { Reports } from "./pages/Reports";
 import { Shell } from "./layouts/Shell";
 
 type Session = { actor: Actor; timezone: string };
@@ -21,7 +23,7 @@ function App() {
   const expired = useCallback(() => { setSession(null); history.replaceState(null, "", "/login"); }, []);
   const loadSession = useCallback(async () => {
     setLoading(true); setError("");
-    try { setSession(await api<Session>("/api/auth/me")); if (!location.pathname.startsWith("/admin/") && !location.pathname.startsWith("/learning") && !location.pathname.startsWith("/projects") && !location.pathname.startsWith("/gamification") && !location.pathname.startsWith("/attendance")) history.replaceState(null, "", "/dashboard"); }
+    try { setSession(await api<Session>("/api/auth/me")); if (!location.pathname.startsWith("/calendar") && !location.pathname.startsWith("/notifications") && !location.pathname.startsWith("/admin/") && !location.pathname.startsWith("/learning") && !location.pathname.startsWith("/projects") && !location.pathname.startsWith("/gamification") && !location.pathname.startsWith("/reports") && !location.pathname.startsWith("/attendance")) history.replaceState(null, "", "/dashboard"); }
     catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) expired();
       else setError(cause instanceof Error ? cause.message : "Sesi tidak dapat dimuat.");
@@ -40,9 +42,10 @@ function App() {
   const path = location.pathname;
   const adminPage = path.startsWith("/admin/");
   const permission = path === "/admin/users" ? "admin.users.manage" : path === "/admin/audit" ? "audit.view" : "academic.manage";
-  const content = path.startsWith("/attendance") ? <Attendance timezone={session.timezone} onExpired={expired} /> : path.startsWith("/learning") ? <Learning timezone={session.timezone} onExpired={expired} />
+  const content = path === "/calendar" ? <Calendar actor={session.actor} onExpired={expired} /> : path === "/notifications" ? <Notifications onExpired={expired} /> : path.startsWith("/attendance") ? <Attendance timezone={session.timezone} onExpired={expired} /> : path.startsWith("/learning") ? <Learning timezone={session.timezone} onExpired={expired} />
     : path.startsWith("/projects") ? <Projects actor={session.actor} timezone={session.timezone} onExpired={expired} />
-    : path.startsWith("/gamification") ? <Growth actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
+    : path.startsWith("/gamification") ? <Growth actor={session.actor} timezone={session.timezone} onExpired={expired} />
+    : path.startsWith("/reports") ? <Reports actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
   return <Shell actor={session.actor} onLogout={() => void logout()} onExpired={expired} pending={loggingOut}>{error && <ErrorState message={error} />}{content}</Shell>;
 }
 

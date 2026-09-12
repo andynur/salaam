@@ -218,3 +218,27 @@ rotation and stop at 2,000 per window; an abandoned display therefore cannot gro
 bound. Camera scanning needs HTTPS or localhost, so the reverse proxy must terminate TLS
 before santri can use the camera path; the typed code works either way. This was confirmed
 in a browser on 2026-09-12 — see the reverse-proxy validation above.
+
+## Calendar and notification worker
+
+Apply `0010_calendar_notifications.sql` before starting the updated server. It is included
+in the normal migration runner and has a destructive down script; prefer forward fixes once
+real events, preferences, or notification history exist. Back up its three tables with the
+existing PostgreSQL backup. No new environment variables, provider credentials, storage
+paths, proxy settings, or runtime service are required.
+
+The Bun process runs a notification tick at startup and every 15 seconds. A tick generates
+at most 250 reminders and handles at most 250 pending deliveries; five-second SQL statement
+timeouts bound expensive statements. A PostgreSQL advisory lock prevents overlapping ticks,
+and each tick is atomic. Shutdown stops the timer and waits for its in-flight transaction
+before closing the database. Monitor the fixed `notification.delivery.failed` log event and
+pending queue age/count (`notifications.status = 'pending'`). Failed transactions remain
+retryable; do not manually mark them delivered.
+
+Delivery means insertion into the in-app inbox, not email, push, or proof of reading.
+Users refresh the inbox manually or open it from navigation. Preferences apply to future
+delivery. During downtime no delivery runs; startup retries existing pending rows and
+suppresses expired or inaccessible sources. It generates reminders only for sources still
+upcoming within 24 hours, so expired agenda items are not backfilled. Backlogs can require
+multiple ticks; measure queue age and latency on school hardware. The whole application
+still uses the existing single-instance deployment model.

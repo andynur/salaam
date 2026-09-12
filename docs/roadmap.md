@@ -15,8 +15,8 @@ Coding agents follow skill `deliver-phase`.
 | 5 | Gamification | Delivered — [record](phases/05-gamification.md) |
 | 6 | Attendance and classroom sessions | Delivered — [record](phases/06-attendance.md) |
 | 7 | QR attendance | Delivered — [record](phases/07-qr-attendance.md) |
-| 8 | Calendar and notifications | Next |
-| 9 | Reporting | Planned |
+| 8 | Calendar and notifications | Delivered — [record](phases/08-calendar-notifications.md) |
+| 9 | Reporting | Delivered — [record](phases/09-reporting.md) |
 | 10 | Advanced IT learning | Planned |
 | 11+ | Later evaluation | Backlog |
 
@@ -71,17 +71,22 @@ validates the code, the roster, the session, and the window, then writes the fir
 attendance record for that santri. Codes are proofs of presence, never authentication
 credentials, and a teacher's correction always wins.
 
-## Planned
-
 ### Phase 8 — Calendar and notifications
 
-Academic events, deadlines, reminders, notification preferences, and delivery status.
-Calendar entries reference their source entity instead of duplicating deadlines.
+Scoped academic events and a live agenda of activity deadlines, assessment windows, and
+classroom sessions; in-app reminders, level-up and QR-opening notifications, personal
+preferences, delivery status and read receipts. A bounded PostgreSQL-backed worker runs
+inside Bun. Calendar entries reference their sources rather than duplicate deadlines.
 
 ### Phase 9 — Reporting
 
-Operational dashboards, attendance summaries, learning progress reports, exports, and
-audit-friendly administrative views.
+Cross-course operational reporting for administrators and teachers behind the new
+`reports.view` capability: an operational overview, per-course rows, per-santri attendance
+and learning-progress summaries, a filtered audit view, and a CSV export of each. Reporting
+only reads; every figure is derived in one read-only transaction from the rows the earlier
+phases already own.
+
+## Planned
 
 ### Phase 10 — Advanced IT learning
 
@@ -114,14 +119,20 @@ Boundaries section has the details.
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5:** XP decay, penalties, and manual XP grants; streaks, seasons, and resets;
-  leaderboards visible to students; badge artwork beyond the built-in icons; level-up
-  notifications (Phase 8); XP for attendance (deferred pending a correction/reversal policy).
+  leaderboards visible to students; badge artwork beyond the built-in icons; XP for attendance
+  (deferred pending a correction/reversal policy).
 - **Phase 6:** attendance XP; recurring meetings, bulk marking/import, roster adjustments
-  after creation, history browsing, exports, and cross-course reports; multi-instance
-  realtime delivery.
+  after creation, and history browsing; multi-instance realtime delivery. Exports and
+  cross-course reports are delivered in Phase 9.
 - **Phase 7:** attendance XP (still deferred); geofencing, device binding, proctoring, and
   biometric identification; recurring check-in windows and bulk check-in import;
-  notifications when a window opens (Phase 8); cross-course QR reporting and exports
-  (Phase 9).
+  Cross-course attendance reporting and
+  exports are delivered in Phase 9; a QR-specific breakdown is not.
+- **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder
+  lead times, notification attachments, and scheduled report delivery.
+- **Phase 9:** charts and trend lines; scheduled, emailed, or subscribed reports (delivery
+  belongs to Phase 8); PDF and spreadsheet exports; per-activity, per-question, and cohort
+  analytics; saved report definitions and custom columns; an audit retention policy and
+  exports beyond 5,000 rows.
 - **Operations:** load testing on school hardware. HTTPS proxy behavior and a backup and
   restore drill were validated on 2026-09-12; [operations](operations.md) records both.

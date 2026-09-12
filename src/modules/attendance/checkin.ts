@@ -1,3 +1,4 @@
+import { enqueueCheckin } from "../calendar/notifications";
 import type { SQL } from "bun";
 import type { Actor } from "../../core/permissions";
 import { requirePermission } from "../../core/permissions";
@@ -50,6 +51,7 @@ export async function changeCheckinWindow(db: SQL, actor: Actor, courseId: strin
       last_operation = ${operation}::text::jsonb, updated_at = clock_timestamp() WHERE session_id = ${sessionId}`;
     else await tx`INSERT INTO attendance_checkin_windows (session_id, status, rotate_seconds, late_after, opened_by, last_operation)
       VALUES (${sessionId}, ${status}, ${input.rotateSeconds}, ${input.lateAfter}, ${actor.id}, ${operation}::text::jsonb)`;
+    if (input.action === "start") await enqueueCheckin(tx, sessionId);
     // Stopping retires every live code so a photographed display cannot be used afterwards.
     if (input.action === "stop") await tx`UPDATE attendance_checkin_codes SET expires_at = clock_timestamp() WHERE session_id = ${sessionId} AND expires_at > clock_timestamp()`;
     await recordAudit(tx, actor.id, `classroom.checkin.${input.action === "start" ? "started" : "stopped"}`, "attendance_checkin_windows", sessionId, requestId);

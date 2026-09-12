@@ -11,7 +11,7 @@ measured operational requirement exists.
 | --- | --- |
 | `src/server.ts` | Loads config, opens the pool, wires routers, serves SPA routes and brand assets, shuts down |
 | `src/core/http.ts` | Request pipeline and top-level dispatch |
-| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`), `gamification` (`/api/gamification`), `attendance` (`/api/attendance`) |
+| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`), `gamification` (`/api/gamification`), `attendance` (`/api/attendance`), `reporting` (`/api/reports`) |
 | `src/core/validation.ts` | Body parsing and field validators |
 | `src/core/{auth,permissions,audit,storage,database,config,errors}` | Platform services |
 | `src/modules/users`, `src/modules/academic` | Account provisioning, academic structure, dashboard summary |
@@ -21,6 +21,7 @@ measured operational requirement exists.
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
 | `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
+| `src/modules/reporting` | Cross-course report queries, filter parsing, CSV encoding |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
 | `database/migrations/` | Ordered SQL migrations with `down/` scripts |
@@ -55,7 +56,8 @@ measured operational requirement exists.
   account recovery through `POST /api/admin/users/:id/password`, which rewrites the hash,
   deletes every session of that account and audits `user.password_reset` in one
   transaction), `academic.manage`, and `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
-  `learning.manage.all` (admin); `learning.participate` (student).
+  `learning.manage.all` (admin); `learning.participate` (student); `reports.view` (admin,
+  teacher) for cross-course reports and their CSV exports.
 - Course scope comes from `courseAccess`. *Manage* needs `learning.manage` plus a teaching
   assignment or `learning.manage.all`. *Participate* needs enrollment in the course's class
   and a published course. *View* accepts either. Failing scope returns 404, so the API does
@@ -74,6 +76,7 @@ measured operational requirement exists.
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
 | `0007_attendance` | `classroom_sessions`, `classroom_roster`, `attendance_records`, `classroom_session_events` |
 | `0008_qr_attendance` | `attendance_checkin_windows`, `attendance_checkin_codes`, `attendance_checkins` |
+| `0009_reporting` | No table: the `reports.view` capability and report-query indexes |
 
 - **Academic:** a course joins a class, a term, and a subject within one academic year;
   composite foreign keys keep classes and terms in the same year. Teachers link to courses
@@ -174,6 +177,22 @@ Downloads repeat the access checks and are served as sandboxed attachments; see
   WebSocket. Committed session changes trigger invalidations, and clients fetch scoped HTTP
   state. Reconnect also fetches state; PostgreSQL remains authoritative. CRUD stays on HTTP.
 
+## Reporting
+
+Reporting derives every figure from the rows the other modules own; it stores nothing, so
+there is no aggregate to keep in step. Scope is a filter rather than a lookup:
+`learning.manage.all` covers every course, and anyone else only the courses they are
+assigned to teach, so a course outside that set produces no rows instead of a 404. The
+audit report keeps `audit.view`.
+
+Each read runs in one `ISOLATION LEVEL REPEATABLE READ READ ONLY` transaction, so the
+figures in a report describe one consistent moment and reports never block classroom
+writes. Lists page with the usual `LIMIT 51 OFFSET n`; an export repeats the same query
+with a 5,000-row cap, is audited as `report.<kind>.exported` with the narrowest scoped
+identifier, and returns a UTF-8 CSV attachment whose cells are quoted and, when they start
+with a formula trigger, prefixed with an apostrophe. Attendance and completion percentages
+reuse the Phase 6 definitions, and attempt scores use the latest Phase 3 adjustment.
+
 ## Data conventions
 
 UUID identifiers, `timestamptz` values in UTC, and the configured school timezone for
@@ -228,3 +247,28 @@ Course reports exclude cancelled sessions. Attendance percentages count present/
 closed sessions, while unrecorded and status counts include other noncancelled sessions.
 Dashboard tasks link managers to open sessions and students to nonexpired scheduled/open
 sessions. Attendance does not change learning completion or award XP.
+
+## Calendar and notification delivery
+
+Migration `0010_calendar_notifications` adds `academic_events`, `notification_preferences`,
+and `notifications`. `calendar_sources` resolves event, activity, assessment-setting and
+classroom timestamps live; `calendar_audience` resolves active users and current capabilities,
+teaching assignments, enrollment, publication, and session rosters. Calendar APIs never copy
+an activity deadline into a second editable record. The `/api/calendar` and
+`/api/notifications` routes are dispatched through `calendar-http.ts`; `/calendar` and
+`/notifications` are SPA routes.
+
+Events use existing academic/learning capabilities, immutable course scope, creation keys,
+and versioned edits. Course locks precede event locks; creation-key advisory locks also cover
+school events. XP awards serialize per student before calculating crossed levels. Level and
+QR notification creation runs inside its triggering domain transaction. Preferences and
+manual event mutations write their audits in that same transaction.
+
+A worker runs every 15 seconds with a schema-specific PostgreSQL advisory lock, at most
+250 generated reminders and 250 deliveries per tick, and five-second statement timeouts.
+Pending rows transition to delivered or suppressed. Delivery checks current preferences,
+source dates, access and completion; inbox reads and read receipts also resolve current
+source access. Reminders deduplicate on recipient/source/time, level notices on recipient
+and level, and QR notices on the specific window update. Read receipts preserve their first
+timestamp. No broker, provider, copied content snapshot, or runtime dependency is introduced.
+See [Phase 8](phases/08-calendar-notifications.md) for limits and API behavior.

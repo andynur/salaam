@@ -1,3 +1,4 @@
+import type { CalendarHandler } from "./calendar-http";
 import type { Config } from "./config";
 import type { AuthService } from "./auth/service";
 import { LoginLimiter } from "./auth/rate-limit";
@@ -10,6 +11,7 @@ import type { LearningHandler } from "./learning-http";
 import type { ProjectHandler } from "./project-http";
 import type { AttendanceHandler } from "./attendance-http";
 import type { GamificationHandler } from "./gamification-http";
+import type { ReportingHandler } from "./reporting-http";
 import { jsonObject } from "./validation";
 
 export function securityHeaders(production: boolean): Record<string, string> {
@@ -43,7 +45,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
   return { email: body.email.trim().toLowerCase(), password: body.password };
 }
 
-export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler }) {
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler }) {
   const limiter = new LoginLimiter();
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
@@ -89,9 +91,15 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if (path.startsWith("/api/gamification/") && services?.gamification) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.gamification(request, await auth.actor(request), requestId);
+      } else if (path.startsWith("/api/reports/") && services?.reports) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.reports(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/attendance/") && services?.attendance) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.attendance(request, await auth.actor(request), requestId);
+      } else if ((path === "/api/calendar" || path.startsWith("/api/calendar/") || path === "/api/notifications" || path.startsWith("/api/notifications/")) && services?.calendar) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.calendar(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/admin/") && services) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.foundation(request, await auth.actor(request), requestId);

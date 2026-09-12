@@ -65,10 +65,10 @@ export function Shell({ actor, onLogout, onExpired, pending, children }: PropsWi
             return <li key={item.href}><a href={item.href} className={`nav-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={20} /><span>{item.label}</span></a></li>;
           })}</ul>
         </div>)}
-        <div className="nav-group">
+        {future.length > 0 && <div className="nav-group">
           <button type="button" className="nav-heading nav-disclosure" aria-expanded={futureOpen} aria-controls="nav-future" onClick={() => setFutureOpen(!futureOpen)}><span>Segera hadir</span><Icon name={futureOpen ? "chevronDown" : "chevronRight"} /></button>
           <ul id="nav-future" hidden={!futureOpen}>{future.map(item => <li key={item.label}><span className="nav-item nav-item-disabled" aria-disabled="true"><Icon name={item.icon} size={20} /><span>{item.label}</span><span className="nav-soon">Segera</span></span></li>)}</ul>
-        </div>
+        </div>}
       </nav>
       <p className="sidebar-footer"><span className="gold-dot" aria-hidden="true" />{BRAND.tagline}</p>
     </aside>

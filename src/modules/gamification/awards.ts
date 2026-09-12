@@ -1,3 +1,5 @@
+import { enqueueLevel } from "../calendar/notifications";
+import { levelFor } from "../../shared/gamification";
 import type { SQL } from "bun";
 import { recordAudit } from "../../core/audit/repository";
 import type { RewardRuleKey, XpSourceType } from "../../shared/gamification";
@@ -36,11 +38,15 @@ async function evaluateBadges(tx: SQL, studentId: string, requestId: string) {
 }
 
 export async function awardXp(tx: SQL, studentId: string, ruleKey: RewardRuleKey, sourceType: XpSourceType, sourceId: string, courseId: string | null, requestId: string) {
-  const inserted = await tx<{ id: string }[]>`INSERT INTO xp_entries (student_id, rule_key, source_type, source_id, course_id, points)
+  await tx`SELECT pg_advisory_xact_lock(hashtextextended(${"xp:" + studentId}, 0))`;
+  const inserted = await tx<{ id: string; points: number }[]>`INSERT INTO xp_entries (student_id, rule_key, source_type, source_id, course_id, points)
     SELECT ${studentId}, ${ruleKey}, ${sourceType}, ${sourceId}, ${courseId}::uuid, r.points FROM reward_rules r WHERE r.key = ${ruleKey}
-    ON CONFLICT (student_id, source_type, source_id) DO NOTHING RETURNING id`;
+    ON CONFLICT (student_id, source_type, source_id) DO NOTHING RETURNING id, points`;
   // Nothing changed on a repeat, so badges do not need re-evaluating.
   if (!inserted.length) return { awarded: false, badges: 0 };
+  const [total] = await tx<{ total: number }[]>`SELECT COALESCE(sum(points), 0)::int AS total FROM xp_entries WHERE student_id = ${studentId}`;
+  const previousLevel = levelFor(total!.total - inserted[0]!.points).level;
+  for (let level = previousLevel + 1; level <= levelFor(total!.total).level; level++) await enqueueLevel(tx, studentId, level);
   return { awarded: true, badges: await evaluateBadges(tx, studentId, requestId) };
 }
 
