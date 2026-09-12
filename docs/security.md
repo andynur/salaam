@@ -110,6 +110,10 @@ errors.
 - **Recurring meetings** are limited to 52 materialized sessions and 365 days between starts.
   Each occurrence gets its own roster snapshot and normal session authorization. QR defaults are
   copied into the generated session's window only when a teacher opens that session.
+- **Academic lifecycle** operations are administrator-only. Role changes revoke sessions and are
+  blocked when role-specific relations would become invalid; the last active administrator cannot
+  be demoted or deactivated. Transfers and archive/restore writes are audited and do not delete
+  historical attendance or learning records.
 
 ## Backups and recovery
 

@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from "./components/ui";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Foundation, AcademicFoundation, StudentImport } from "./pages/Foundation";
+import { ClassTransfer } from "./pages/AcademicOperations";
 import { Learning } from "./pages/Learning";
 import { Projects } from "./pages/Projects";
 import { Attendance } from "./pages/Attendance";
@@ -45,7 +46,7 @@ function App() {
   const content = path === "/calendar" ? <Calendar actor={session.actor} onExpired={expired} /> : path === "/notifications" ? <Notifications onExpired={expired} /> : path.startsWith("/attendance") ? <Attendance timezone={session.timezone} onExpired={expired} /> : path.startsWith("/learning") ? <Learning timezone={session.timezone} onExpired={expired} />
     : path.startsWith("/projects") ? <Projects actor={session.actor} timezone={session.timezone} onExpired={expired} />
     : path.startsWith("/gamification") ? <Growth actor={session.actor} timezone={session.timezone} onExpired={expired} />
-    : path.startsWith("/reports") ? <Reports actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : path === "/admin/import" ? <StudentImport onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
+    : path.startsWith("/reports") ? <Reports actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : path === "/admin/import" ? <StudentImport onExpired={expired} /> : path === "/admin/transfers" ? <ClassTransfer onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
   return <Shell actor={session.actor} onLogout={() => void logout()} onExpired={expired} pending={loggingOut}>{error && <ErrorState message={error} />}{content}</Shell>;
 }
 

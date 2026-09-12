@@ -46,8 +46,9 @@ WLAN behavior, backup scheduling, restore operation, and release rollback.
 
 ## Out of scope
 
-Attendance XP, recurring meetings, roster editing, external notification providers, analytics
-expansion, multi-instance realtime delivery, and an online-code runner remain deferred.
+Attendance XP, roster editing after session creation, external notification providers,
+analytics expansion, multi-instance realtime delivery, and an online-code runner remain
+deferred.
 
 ## Validation status
 

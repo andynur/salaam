@@ -36,6 +36,7 @@ workflow.
 | 11 — Advanced attendance operations | [phases/11-advanced-attendance.md](phases/11-advanced-attendance.md) |
 | 12 — Pilot readiness and operational hardening | [phases/12-pilot-readiness.md](phases/12-pilot-readiness.md) |
 | 13 — Academic operations | [phases/13-academic-operations.md](phases/13-academic-operations.md) |
+| 14 — Academic lifecycle | [phases/14-academic-lifecycle.md](phases/14-academic-lifecycle.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

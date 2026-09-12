@@ -21,9 +21,11 @@ export async function courseAccess(db: SQL, actor: Actor, courseId: string, mode
     FROM courses c JOIN classes cl ON cl.id = c.class_id JOIN terms t ON t.id = c.term_id JOIN academic_years y ON y.id = c.academic_year_id
     WHERE c.id = ${courseId}`;
   const course = rows[0];
-  if (!course || (mode === "manage" ? !course.canManage : mode === "participate" ? !(course.enrolled && course.published) : !(course.canManage || (course.enrolled && course.published)))) notFound();
+  const academicActive = await db`SELECT 1 FROM courses c JOIN classes cl ON cl.id = c.class_id JOIN terms t ON t.id = c.term_id JOIN academic_years y ON y.id = c.academic_year_id WHERE c.id = ${courseId} AND cl.archived_at IS NULL AND t.archived_at IS NULL AND y.archived_at IS NULL`;
+  const active = academicActive.length > 0;
+  if (!course || (mode === "manage" ? !course.canManage : mode === "participate" ? !(course.enrolled && course.published && active) : !(course.canManage || (course.enrolled && course.published && active)))) notFound();
   const { enrolled, ...summary } = course;
-  return { course: summary, canParticipate: enrolled && course.published && actor.permissions.includes("learning.participate") };
+  return { course: summary, canParticipate: active && enrolled && course.published && actor.permissions.includes("learning.participate") };
 }
 
 // Archived lessons and lessons in archived modules accept no new work or children.

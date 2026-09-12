@@ -22,7 +22,7 @@ export async function listCourses(db: SQL, actor: Actor, pattern: string, offset
     WHERE (c.name ILIKE ${pattern} OR cl.name ILIKE ${pattern}) AND (
       (${actor.permissions.includes("learning.manage")} AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS
         (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id}))) OR
-      (c.published AND EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id})))
+      (c.published AND cl.archived_at IS NULL AND t.archived_at IS NULL AND y.archived_at IS NULL AND EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id})))
     ORDER BY y.starts_on DESC, c.name, c.id LIMIT 51 OFFSET ${offset}`;
 }
 

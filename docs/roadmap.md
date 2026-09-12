@@ -21,6 +21,7 @@ Coding agents follow skill `deliver-phase`.
 | 11 | Advanced attendance operations | Delivered — [record](phases/11-advanced-attendance.md) |
 | 12 | Pilot readiness and operational hardening | In progress — [record](phases/12-pilot-readiness.md) |
 | 13 | Academic operations | Delivered — [record](phases/13-academic-operations.md) |
+| 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
 
 ## Delivered
 
@@ -100,6 +101,16 @@ Bulk marking for open sessions and manager-only, paginated session history. Both
 reuse the existing roster snapshot, append-only attendance chain, lifecycle events, and
 course authorization rules.
 
+### Phase 13 — Academic operations
+
+Administrator-only student import with preview and atomic writes, plus recurring meeting
+series generation with bounded QR attendance windows.
+
+### Phase 14 — Academic lifecycle
+
+Administrator profile editing with safe role and last-admin guards, reversible academic-year,
+term, and class archiving, and auditable student class transfers.
+
 ## Planned
 
 ### Phase 12 and later
@@ -112,9 +123,9 @@ operational need and an approved privacy and security review.
 Items explicitly left out so far. Consider them when scoping later phases; each record's
 Boundaries section has the details.
 
-- **Phase 1:** profile editing, role reassignment, class transfers, and academic archive
-  states. Account recovery is delivered: an administrator resets a password and every
-  session of that account ends with it.
+- **Phase 1:** Account recovery is delivered: an administrator resets a password and every
+  session of that account ends with it. Profile editing, role reassignment, class transfers,
+  and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons;
   resubmission, returned work, late exceptions, and deadline extensions; malware scanning
   and inline previews; rich text or Markdown.
@@ -127,8 +138,8 @@ Boundaries section has the details.
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
   penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;
-  badge artwork beyond built-in icons; recurring meetings, bulk import, roster adjustments
-  after creation, and recurring check-in windows; geofencing, device binding, proctoring,
+  badge artwork beyond built-in icons; roster adjustments after session creation and recurring
+  check-in windows; geofencing, device binding, proctoring,
   and biometric identification. Multi-instance realtime delivery remains unsupported.
 - **Phase 6:** roster adjustments after session creation. Bulk import and recurring meetings are
   delivered in Phase 13. Exports and cross-course reports are delivered in Phase 9.

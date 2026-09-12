@@ -19,6 +19,16 @@ function passwordField(body: Record<string, unknown>): string {
   if (typeof password !== "string" || password.length < 12 || password.length > 128) invalid("Kata sandi harus 12–128 karakter.");
   return password;
 }
+function profileInput(body: Record<string, unknown>) {
+  const name = textField(body, "name");
+  const email = textField(body, "email", 254).toLowerCase();
+  if (!/^([^\s@]+)@([^\s@]+)\.([^\s@]+)$/.test(email)) invalid("Email tidak valid.");
+  const role = textField(body, "role", 20);
+  if (!["student", "teacher", "admin"].includes(role)) invalid("Role tidak valid.");
+  const identifier = textField(body, "identifier", 50);
+  if (typeof body.isActive !== "boolean") invalid("Status akun tidak valid.");
+  return { name, email, role, identifier, isActive: body.isActive };
+}
 async function userInput(body: Record<string, unknown>) {
   const name = textField(body, "name");
   const email = textField(body, "email", 254).toLowerCase();
@@ -64,5 +74,33 @@ export async function resetPassword(db: SQL, userId: string, body: Record<string
     const revoked = await tx`DELETE FROM sessions WHERE user_id = ${userId} RETURNING user_id`;
     await recordAudit(tx, actorId, "user.password_reset", "user", userId, requestId);
     return { id: userId, sessionsRevoked: revoked.length };
+  });
+}
+export async function updateUser(db: SQL, userId: string, body: Record<string, unknown>, actorId: string, requestId: string) {
+  const input = profileInput(body);
+  return db.begin(async tx => {
+    const [current] = await tx<{ id: string; email: string; isActive: boolean }[]>`SELECT id, email, is_active AS "isActive" FROM users WHERE id = ${userId} FOR UPDATE`;
+    if (!current) throw new HttpError(404, "NOT_FOUND", "Akun tidak ditemukan.");
+    const roles = await tx<{ key: string; roleId: string }[]>`SELECT r.key, r.id AS "roleId" FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ${userId} FOR SHARE`;
+    const currentKeys = new Set(roles.map(role => role.key));
+    if ((currentKeys.has("student") && input.role !== "student" && (await tx`SELECT 1 FROM class_members WHERE student_id = ${userId} LIMIT 1`).length) ||
+      (currentKeys.has("teacher") && input.role !== "teacher" && (await tx`SELECT 1 FROM teaching_assignments WHERE teacher_id = ${userId} LIMIT 1`).length)) {
+      throw new HttpError(409, "ROLE_HAS_RELATIONS", "Selesaikan relasi akademik akun sebelum mengganti role.");
+    }
+    if (currentKeys.has("admin") && (input.role !== "admin" || !input.isActive)) {
+      const [admins] = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id JOIN users u ON u.id = ur.user_id WHERE r.key = 'admin' AND u.is_active`;
+      if ((admins?.count ?? 0) <= 1) throw new HttpError(409, "LAST_ADMIN", "Sistem harus memiliki minimal satu admin aktif.");
+    }
+    const [role] = await tx<{ id: string }[]>`SELECT id FROM roles WHERE key = ${input.role}`;
+    if (!role) throw new Error("Baseline role missing");
+    const roleChanged = !currentKeys.has(input.role);
+    await tx`UPDATE users SET display_name = ${input.name}, email = ${input.email}, is_active = ${input.isActive}, updated_at = clock_timestamp() WHERE id = ${userId}`;
+    await tx`DELETE FROM user_roles WHERE user_id = ${userId}`;
+    await tx`INSERT INTO user_roles (user_id, role_id) VALUES (${userId}, ${role.id})`;
+    await tx`INSERT INTO user_profiles (user_id, role_id, identifier) VALUES (${userId}, ${role.id}, ${input.identifier})`;
+    if (roleChanged || current.email !== input.email || current.isActive !== input.isActive) await tx`DELETE FROM sessions WHERE user_id = ${userId}`;
+    await recordAudit(tx, actorId, "user.updated", "user", userId, requestId);
+    if (roleChanged) await recordAudit(tx, actorId, "user.role_changed", "user", userId, requestId);
+    return { id: userId };
   });
 }

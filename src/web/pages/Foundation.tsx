@@ -14,9 +14,9 @@ const definitions: Record<FoundationResource, Definition> = {
   users: { title: "Akun & profil", action: "Buat akun", description: "Daftarkan santri, guru, dan admin beserta nomor identitasnya.",
     columns: [["name", "Nama"], ["email", "Email"], ["roles", "Role"], ["identifier", "Nomor identitas"], ["isActive", "Aktif"]],
     fields: [name, { key: "email", label: "Email", type: "email", max: 254 }, { key: "role", label: "Role", type: "role" }, { key: "identifier", label: "NIS / nomor pegawai", max: 50 }, { key: "password", label: "Kata sandi awal (12–128 karakter)", type: "password", max: 128 }] },
-  years: { title: "Tahun ajaran", action: "Tambah tahun ajaran", description: "Atur rentang tahun ajaran sebelum membuat semester dan kelas.", columns: [["name", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"]], fields: [name, ...dateFields] },
-  terms: { title: "Semester", action: "Tambah semester", description: "Tanggal semester harus berada di dalam rentang tahun ajaran.", columns: [["name", "Semester"], ["year", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"]], fields: [name, year, ...dateFields] },
-  classes: { title: "Kelas", action: "Tambah kelas", description: "Setiap kelas terikat pada satu tahun ajaran.", columns: [["name", "Kelas"], ["year", "Tahun ajaran"]], fields: [name, year] },
+  years: { title: "Tahun ajaran", action: "Tambah tahun ajaran", description: "Atur rentang tahun ajaran sebelum membuat semester dan kelas.", columns: [["name", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Arsip"]], fields: [name, ...dateFields] },
+  terms: { title: "Semester", action: "Tambah semester", description: "Tanggal semester harus berada di dalam rentang tahun ajaran.", columns: [["name", "Semester"], ["year", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Arsip"]], fields: [name, year, ...dateFields] },
+  classes: { title: "Kelas", action: "Tambah kelas", description: "Setiap kelas terikat pada satu tahun ajaran.", columns: [["name", "Kelas"], ["year", "Tahun ajaran"], ["archived", "Arsip"]], fields: [name, year] },
   enrollments: { title: "Enrollment", action: "Enroll santri", description: "Daftarkan santri ke satu kelas per tahun ajaran.", columns: [["name", "Santri"], ["email", "Email"], ["class", "Kelas"], ["year", "Tahun ajaran"]], fields: [{ key: "studentId", label: "Santri", source: "users", role: "student" }, classField] },
   subjects: { title: "Mata pelajaran", action: "Tambah mata pelajaran", description: "Buat katalog mata pelajaran sekolah dengan kode yang unik.", columns: [["code", "Kode"], ["name", "Mata pelajaran"]], fields: [{ key: "code", label: "Kode mata pelajaran", max: 30 }, name] },
   courses: { title: "Course dasar", action: "Tambah course", description: "Hubungkan mata pelajaran, kelas, dan semester dalam tahun ajaran yang sama.", columns: [["name", "Course"], ["subject", "Mata pelajaran"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [name, { key: "subjectId", label: "Mata pelajaran", source: "subjects" }, classField, { key: "termId", label: "Semester", source: "terms" }] },
@@ -26,7 +26,7 @@ const definitions: Record<FoundationResource, Definition> = {
 function optionLabel(row: RecordRow) {
   return [row.name, row.email, row.code, row.class, row.term, row.year].filter(Boolean).join(" · ");
 }
-function Choice({ field, onExpired }: { field: Field; onExpired: () => void }) {
+export function Choice({ field, onExpired }: { field: Field; onExpired: () => void }) {
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<RecordPage | null>(null);
@@ -62,10 +62,13 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   const definition = definitions[resource];
   const [creating, setCreating] = useState(false);
   const [recovery, setRecovery] = useState<RecordRow | null>(null);
+  const [editingUser, setEditingUser] = useState<RecordRow | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const recoveryPanel = useRef<HTMLDivElement>(null);
+  const editPanel = useRef<HTMLDivElement>(null);
   useEffect(() => { if (creating) panel.current?.querySelector<HTMLElement>("input, select")?.focus(); }, [creating]);
   useEffect(() => { if (recovery) recoveryPanel.current?.querySelector<HTMLElement>("input")?.focus(); }, [recovery]);
+  useEffect(() => { if (editingUser) editPanel.current?.querySelector<HTMLElement>("input")?.focus(); }, [editingUser]);
   const [page, setPage] = useState<RecordPage | null>(null);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
@@ -117,6 +120,25 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
       else setSaveError(cause instanceof Error ? cause.message : "Kata sandi tidak dapat diperbarui.");
     } finally { saving.current = false; setPending(false); }
   }
+  async function submitUserEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving.current || !editingUser) return;
+    saving.current = true; setPending(true); setSaveError(""); setSuccess("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await api(`/api/admin/users/${editingUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), email: form.get("email"), identifier: form.get("identifier"), role: form.get("role"), isActive: form.get("isActive") === "on" }) });
+      setSuccess("Profil akun diperbarui."); setEditingUser(null); setRevision(value => value + 1);
+    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setSaveError(cause instanceof Error ? cause.message : "Profil tidak dapat diperbarui."); }
+    finally { saving.current = false; setPending(false); }
+  }
+  const archivable = ["years", "terms", "classes"].includes(resource);
+  async function toggleArchive(row: RecordRow) {
+    const archived = row.archived === true;
+    if (!window.confirm(`${archived ? "Pulihkan" : "Arsipkan"} ${row.name ?? "data ini"}?`)) return;
+    setSaveError(""); setSuccess("");
+    try { await api(`/api/admin/academic/${resource}/${row.id}/archive`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived: !archived }) }); setSuccess(`${archived ? "Data dipulihkan" : "Data diarsipkan"}.`); setRevision(value => value + 1); }
+    catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setSaveError(cause instanceof Error ? cause.message : "Status arsip tidak dapat diubah."); }
+  }
   function display(row: RecordRow, key: string) {
     const value = row[key];
     if (key === "createdAt" && typeof value === "string") return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
@@ -124,8 +146,9 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   }
   const canCreate = definition.fields.length > 0;
   const recoverable = resource === "users";
-  function toggleCreate(open: boolean) { setCreating(open); setRecovery(null); setSuccess(""); setSaveError(""); }
-  function openRecovery(row: RecordRow) { setCreating(false); setSuccess(""); setSaveError(""); setRecovery(row); }
+  function toggleCreate(open: boolean) { setCreating(open); setRecovery(null); setEditingUser(null); setSuccess(""); setSaveError(""); }
+  function openRecovery(row: RecordRow) { setCreating(false); setEditingUser(null); setSuccess(""); setSaveError(""); setRecovery(row); }
+  function openEdit(row: RecordRow) { setCreating(false); setRecovery(null); setSuccess(""); setSaveError(""); setEditingUser(row); }
   return <>
     <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title={title ?? definition.title} description={definition.description}
       actions={canCreate && <Button aria-expanded={creating} aria-controls="create-panel" className={creating ? "button-secondary" : ""} onClick={() => toggleCreate(!creating)}><Icon name={creating ? "close" : "plus"} />{creating ? "Tutup formulir" : definition.action}</Button>} />
@@ -145,9 +168,12 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
       </fieldset></form>
       {saveError && <ErrorState message={saveError} />}
     </Card></div>}
+    {recoverable && editingUser && <div id="edit-user-panel" ref={editPanel}><Card className="admin-form-card"><h2>Edit profil akun</h2>
+      <form onSubmit={event => void submitUserEdit(event)}><fieldset disabled={pending} className="admin-fields"><div className="admin-field"><label htmlFor="edit-name">Nama</label><input className="input" id="edit-name" name="name" required maxLength={100} defaultValue={String(editingUser.name ?? "")} /></div><div className="admin-field"><label htmlFor="edit-email">Email</label><input className="input" id="edit-email" name="email" type="email" required maxLength={254} defaultValue={String(editingUser.email ?? "")} /></div><div className="admin-field"><label htmlFor="edit-identifier">NIS / nomor pegawai</label><input className="input" id="edit-identifier" name="identifier" required maxLength={50} defaultValue={String(editingUser.identifier ?? "").split(",")[0] ?? ""} /></div><div className="admin-field"><label htmlFor="edit-role">Role</label><select className="input" id="edit-role" name="role" defaultValue={String(editingUser.roles ?? "student").split(",")[0]}><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select></div><label className="admin-field"><span> </span><span><input type="checkbox" name="isActive" defaultChecked={editingUser.isActive === true} /> Akun aktif</span></label><div className="form-actions"><Button type="submit">Simpan profil</Button><Button type="button" className="button-secondary" onClick={() => setEditingUser(null)}>Batal</Button></div></fieldset></form>{saveError && <ErrorState message={saveError} />}
+    </Card></div>}
     {success && <p className="success-state" role="status">{success}</p>}
     <Card><div className="card-heading"><h2>Daftar {definition.title.toLowerCase()}</h2><form className="table-search" onSubmit={event => { event.preventDefault(); setSearch(q); setOffset(0); }}><input className="input" type="search" aria-label="Cari data" placeholder="Cari data…" maxLength={100} value={q} onChange={event => setQ(event.target.value)} /><Button className="button-secondary button-small" type="submit">Cari</Button></form></div>
-      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}{recoverable && <th scope="col">Aksi</th>}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}{recoverable && <td className="table-action"><Button className="button-secondary button-small" aria-expanded={recovery?.id === row.id} aria-controls="recovery-panel" onClick={() => openRecovery(row)}><Icon name="key" />Atur ulang sandi</Button></td>}</tr>)}</tbody></table></div>}
+      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}{(recoverable || archivable) && <th scope="col">Aksi</th>}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}{(recoverable || archivable) && <td className="table-action">{recoverable && <><Button className="button-secondary button-small" aria-expanded={editingUser?.id === row.id} aria-controls="edit-user-panel" onClick={() => openEdit(row)}><Icon name="edit" />Edit</Button><Button className="button-secondary button-small" aria-expanded={recovery?.id === row.id} aria-controls="recovery-panel" onClick={() => openRecovery(row)}><Icon name="key" />Atur ulang sandi</Button></>}{archivable && <Button className="button-secondary button-small" onClick={() => void toggleArchive(row)}>{row.archived ? "Pulihkan" : "Arsipkan"}</Button>}</td>}</tr>)}</tbody></table></div>}
       <div className="table-pagination"><span>{page ? `${page.items.length ? offset + 1 : 0}–${offset + page.items.length} ditampilkan` : "Memuat…"}</span><div><Button className="button-secondary button-small" disabled={!page || offset === 0} onClick={() => setOffset(offset - 50)}>Sebelumnya</Button><Button className="button-secondary button-small" disabled={!page || page.nextOffset === null} onClick={() => setOffset(page!.nextOffset!)}>Berikutnya</Button></div></div>
     </Card>
   </>;

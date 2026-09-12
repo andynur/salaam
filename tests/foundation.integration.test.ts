@@ -21,6 +21,7 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
   function request(path: string, cookie = adminCookie, body?: unknown, origin = config.baseUrl) {
     return handle(new Request(`${config.baseUrl}${path}`, { method: body === undefined ? "GET" : "POST", headers: { cookie, origin, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), crypto.randomUUID());
   }
+  const patch = (path: string, body: unknown, cookie = adminCookie) => handle(new Request(`${config.baseUrl}${path}`, { method: "PATCH", headers: { cookie, origin: config.baseUrl, "Content-Type": "application/json" }, body: JSON.stringify(body) }), crypto.randomUUID());
   const post = (resource: string, body: unknown, cookie = adminCookie) => request(`/api/admin/${resource}`, cookie, body);
   async function create(resource: string, body: unknown) {
     const response = await post(resource, body);
@@ -168,6 +169,25 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect((await post("imports/students", { mode: "commit", classId, rows: valid })).status).toBe(200);
     expect(await (await post("imports/students", { mode: "commit", classId, rows: valid })).json()).toMatchObject({ created: 0, skipped: 1 });
     expect((await db`SELECT count(*)::int AS count FROM class_members m JOIN users u ON u.id = m.student_id WHERE u.email = 'import-one@example.test'`)[0].count).toBe(1);
+  });
+  test("profile edits, role guards, transfers and academic archive are audited and reversible", async () => {
+    const student = (await db`SELECT id FROM users WHERE email = 'student@example.test'`)[0].id as string;
+    expect((await patch(`/api/admin/users/${student}`, { name: "Santri Diperbarui", email: "student@example.test", identifier: "NIS-001", role: "teacher", isActive: true })).status).toBe(409);
+    expect((await patch(`/api/admin/users/${student}`, { name: "Santri Diperbarui", email: "student@example.test", identifier: "NIS-001", role: "student", isActive: true })).status).toBe(200);
+    const year = await create("years", { name: "Archive Year", startsOn: "2035-07-01", endsOn: "2036-06-30" });
+    const term = await create("terms", { yearId: year, name: "Archive Term", startsOn: "2035-07-01", endsOn: "2035-12-31" });
+    const source = await create("classes", { yearId: year, name: "Archive Source" });
+    const target = await create("classes", { yearId: year, name: "Archive Target" });
+    await create("enrollments", { classId: source, studentId: student });
+    expect((await post("transfers", { studentId: student, toClassId: target, reason: "Penyesuaian kelas" })).status).toBe(201);
+    expect((await db`SELECT class_id FROM class_members WHERE student_id = ${student} AND academic_year_id = ${year}`)[0].class_id).toBe(target);
+    expect((await post("transfers", { studentId: student, toClassId: target, reason: "Tidak berubah" })).status).toBe(409);
+    expect((await patch(`/api/admin/academic/classes/${target}/archive`, { archived: true })).status).toBe(200);
+    expect((await post("enrollments", { classId: target, studentId: student })).status).toBe(400);
+    expect((await patch(`/api/admin/academic/classes/${target}/archive`, { archived: false })).status).toBe(200);
+    expect((await patch(`/api/admin/academic/terms/${term}/archive`, { archived: true })).status).toBe(200);
+    expect((await patch(`/api/admin/academic/terms/${term}/archive`, { archived: false })).status).toBe(200);
+    expect((await db`SELECT event FROM audit_logs WHERE event IN ('user.updated', 'academic.class_transfer.created', 'academic.classes.archived')`).length).toBeGreaterThanOrEqual(3);
   });
   test("duplicate profiles roll back user, role and audit; concurrent enrollment has a single winner", async () => {
     const base = { name: "Concurrent Student", email: "concurrent@example.test", role: "student", identifier: "NIS-C", password };

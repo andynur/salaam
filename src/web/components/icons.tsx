@@ -36,6 +36,7 @@ const paths = {
   timer: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M10 2h4" /></>,
   key: <><circle cx="8" cy="15" r="4" /><path d="M11 12 21 2" /><path d="m18 5 2 2" /><path d="m15 8 2 2" /></>,
   pen: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
+  edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof paths;
