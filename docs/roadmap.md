@@ -22,6 +22,7 @@ Coding agents follow skill `deliver-phase`.
 | 12 | Pilot readiness and operational hardening | In progress — [record](phases/12-pilot-readiness.md) |
 | 13 | Academic operations | Delivered — [record](phases/13-academic-operations.md) |
 | 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
+| 15 | Submission lifecycle | In progress — [record](phases/15-submission-lifecycle.md) |
 
 ## Delivered
 
@@ -111,6 +112,12 @@ series generation with bounded QR attendance windows.
 Administrator profile editing with safe role and last-admin guards, reversible academic-year,
 term, and class archiving, and auditable student class transfers.
 
+### Phase 15 — Submission lifecycle
+
+Assignment submissions can be returned with a reason, resubmitted as numbered revisions, and
+graded against the current revision. Teachers can grant student-specific deadline exceptions;
+all actions preserve history and are audited.
+
 ## Planned
 
 ### Phase 12 and later
@@ -126,9 +133,8 @@ Boundaries section has the details.
 - **Phase 1:** Account recovery is delivered: an administrator resets a password and every
   session of that account ends with it. Profile editing, role reassignment, class transfers,
   and academic archive states are delivered in Phase 14.
-- **Phase 2:** hard deletion and bulk reordering; moving materials between lessons;
-  resubmission, returned work, late exceptions, and deadline extensions; malware scanning
-  and inline previews; rich text or Markdown.
+- **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
+  scanning and inline previews; rich text or Markdown.
 - **Phase 3:** essay and short-answer questions, manual grading, and rubrics; surveys and
   questionnaires; partial credit and negative marking; time extensions and accommodations;
   proctoring; question import, export, pools, and statistics; live monitoring over

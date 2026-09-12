@@ -6,7 +6,7 @@ import { databaseInputError, idField, jsonObject, listInput, multipartInput } fr
 import { fileResponse } from "./storage/files";
 import { maxUploadBytes } from "../shared/learning";
 import { archiveContent, completeLesson, courseDetail, courseProgress, listCourses, materialFile, publishContent, saveContent } from "../modules/learning/service";
-import { gradeHistory, gradeSubmission, listSubmissions, saveActivity, submissionFile, submitActivity } from "../modules/activities/service";
+import { grantDeadlineException, gradeHistory, gradeSubmission, listSubmissions, returnSubmission, saveActivity, submissionFile, submitActivity } from "../modules/activities/service";
 import { archiveQuestion, listQuestions, saveQuestion } from "../modules/assessments/questions";
 import { saveAssessment, setAssessmentItems } from "../modules/assessments/service";
 import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modules/assessments/attempts";
@@ -70,6 +70,11 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await submitActivity(db, storageRoot, actor, courseId, id, body, file, requestId);
         } else if (itemAction && resource === "submissions" && action === "grade") {
           result = await gradeSubmission(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "submissions" && action === "return") {
+          result = await returnSubmission(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "activities" && action === "deadline-exception") {
+          const studentId = idField(body, "studentId");
+          result = await grantDeadlineException(db, actor, courseId, id, studentId, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "items") {
           result = await setAssessmentItems(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "attempts") {

@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
-import { activityInput, archivedInput, gradeInput, materialInput, positionInput, publishedInput, submissionContentInput } from "../src/modules/learning/input";
+import { activityInput, archivedInput, deadlineExceptionInput, gradeInput, materialInput, positionInput, publishedInput, returnInput, submissionContentInput } from "../src/modules/learning/input";
 import { jsonObject, multipartInput } from "../src/core/validation";
 import { loginInput } from "../src/core/http";
 import { fileResponse, storedFilePath, uploadInput, withFileCleanup } from "../src/core/storage/files";
@@ -43,6 +43,12 @@ test("grades require bounded precision and meaningful feedback; submission text 
   expect(submissionContentInput({})).toBe("");
   expect(submissionContentInput({ content: " Jawaban " })).toBe("Jawaban");
   for (const content of [42, "a".repeat(20001)]) expect(() => submissionContentInput({ content })).toThrow();
+});
+test("submission returns and deadline exceptions require bounded operator input", () => {
+  expect(returnInput({ reason: "Perbaiki referensi." }).reason).toBe("Perbaiki referensi.");
+  expect(deadlineExceptionInput({ dueAt: "2026-09-15T12:00:00Z", reason: "Sakit." }).dueAt).toBe("2026-09-15T12:00:00.000Z");
+  for (const reason of ["", "a".repeat(5001)]) expect(() => returnInput({ reason })).toThrow();
+  for (const value of [null, "2026-09-15", "tomorrow"]) expect(() => deadlineExceptionInput({ dueAt: value, reason: "Alasan" })).toThrow();
 });
 test("learning JSON has a byte limit while login and administration retain 4 KiB", async () => {
   const request = (body: unknown) => new Request("http://localhost", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

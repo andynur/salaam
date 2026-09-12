@@ -171,6 +171,23 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
     expect((await db`SELECT * FROM audit_logs WHERE event = 'activity.graded' AND resource_id = ${submissionId}`).length).toBe(2);
   });
 
+  test("teachers return work, students resubmit with revision history, and deadline exceptions use the effective deadline", async () => {
+    const f = await fixture();
+    const submitted = await post(f.courseId, `activities/${f.activityId}/submit`, { content: "Versi pertama" }, student);
+    const submissionId = (await submitted.json() as { id: string }).id;
+    expect((await post(f.courseId, `submissions/${submissionId}/return`, { reason: "Tambahkan sumber." })).status).toBe(200);
+    expect((await post(f.courseId, `submissions/${submissionId}/return`, { reason: "Alasan berbeda." })).status).toBe(200);
+    expect((await post(f.courseId, `activities/${f.activityId}/submit`, { content: "Versi kedua" }, student)).status).toBe(200);
+    const current = await (await request(path(f.courseId, `activities/${f.activityId}/submissions`), teacher)).json() as Page<Submission>;
+    expect(current.items[0]).toMatchObject({ revision: 2, status: "submitted", content: "Versi kedua" });
+    expect((await db`SELECT revision, reason FROM submission_returns WHERE submission_id = ${submissionId}`).length).toBe(1);
+    expect((await db`SELECT event FROM audit_logs WHERE event IN ('activity.returned', 'activity.resubmitted') AND resource_id = ${submissionId}`).length).toBe(2);
+    await db`UPDATE activities SET due_at = clock_timestamp() - interval '1 second' WHERE id = ${f.activityId}`;
+    expect((await post(f.courseId, `activities/${f.activityId}/submit`, { content: "Tidak boleh" }, peer)).status).toBe(409);
+    expect((await post(f.courseId, `activities/${f.activityId}/deadline-exception`, { studentId: peerId, dueAt: new Date(Date.now() + 3600000).toISOString(), reason: "Sakit." })).status).toBe(200);
+    expect((await post(f.courseId, `activities/${f.activityId}/submit`, { content: "Dengan dispensasi" }, peer)).status).toBe(200);
+  });
+
   test("every course boundary, mutation capability, authentication and origin is enforced", async () => {
     const f = await fixture();
     expect((await request("/api/learning/courses", "")).status).toBe(401);

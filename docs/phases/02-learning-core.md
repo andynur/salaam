@@ -188,7 +188,7 @@ Phase 2 does not include:
 - Quizzes, exams, surveys, questionnaires, challenges, attempts, rubrics, or timers
   (Phase 3 and later).
 - Resubmission, returning work for revision, late-submission exceptions, or deadline
-  extensions.
+  extensions (delivered in Phase 15).
 - Rich text or Markdown rendering; content is shown as plain text.
 - XP on completion (Phase 5), or calendar deadlines and reminders (Phase 8).
 

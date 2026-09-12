@@ -56,6 +56,14 @@ export function submissionContentInput(body: Record<string, unknown>) {
   if (typeof content !== "string" || content.trim().length > 20000) invalid("Jawaban maksimal 20000 karakter.");
   return content.trim();
 }
+export function returnInput(body: Record<string, unknown>) {
+  return { reason: textField(body, "reason", 5000) };
+}
+export function deadlineExceptionInput(body: Record<string, unknown>) {
+  const dueAt = timestampInput(body, "dueAt", "Tenggat baru");
+  if (!dueAt) invalid("Tenggat baru wajib diisi.");
+  return { dueAt, reason: textField(body, "reason", 500) };
+}
 export function gradeInput(body: Record<string, unknown>) {
   const score = body.score;
   if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > 100 || Math.abs(score * 100 - Math.round(score * 100)) > 0.000001) invalid("Nilai harus 0–100, maksimal dua desimal.");

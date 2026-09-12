@@ -93,17 +93,20 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
   });
   // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
   test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
-    expect(await rollback(db)).toBe("0012_academic_lifecycle.sql");
-    for (const table of ["class_transfers"]) {
+    expect(await rollback(db)).toBe("0013_submission_lifecycle.sql");
+    for (const table of ["submission_returns", "submission_deadline_exceptions"]) {
       expect((await db`SELECT to_regclass(${table}) AS relation`)[0].relation).toBeNull();
     }
-    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_name = 'classes' AND column_name = 'archived_at'`).length).toBe(0);
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'submissions' AND column_name IN ('revision', 'status')`).length).toBe(0);
+    expect(await rollback(db)).toBe("0012_academic_lifecycle.sql");
+    expect((await db`SELECT to_regclass('class_transfers') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'classes' AND column_name = 'archived_at'`).length).toBe(0);
     expect(await rollback(db)).toBe("0011_roster_meeting_series.sql");
     expect((await db`SELECT to_regclass('classroom_meeting_series') AS relation`)[0].relation).toBeNull();
     for (const table of ["classroom_meeting_series"]) {
       expect((await db`SELECT to_regclass(${table}) AS relation`)[0].relation).toBeNull();
     }
-    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_name = 'classroom_sessions' AND column_name = 'series_id'`).length).toBe(0);
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'classroom_sessions' AND column_name = 'series_id'`).length).toBe(0);
     expect(await rollback(db)).toBe("0010_calendar_notifications.sql");
     for (const table of ["academic_events", "notifications", "notification_preferences", "calendar_sources", "calendar_audience"]) {
       expect((await db`SELECT to_regclass(${table}) AS relation`)[0].relation).toBeNull();
@@ -112,7 +115,7 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
 
     const allNames = (await readMigrations("database/migrations")).map(migration => migration.name);
     const result = await reset(db);
-    expect(result.rolledBack).toEqual(allNames.slice(0, -3).reverse());
+    expect(result.rolledBack).toEqual(allNames.slice(0, -4).reverse());
     expect(result.applied).toEqual(allNames);
     expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).not.toBeNull();
     expect((await db`SELECT * FROM users`).length).toBe(0);

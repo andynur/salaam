@@ -72,6 +72,7 @@ measured operational requirement exists.
 | `0001_identity` | `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, `sessions`, `audit_logs` |
 | `0002_academic_foundation` | `user_profiles`, `academic_years`, `terms`, `classes`, `class_members`, `subjects`, `courses`, `teaching_assignments` |
 | `0003_learning_core` | `course_modules`, `lessons`, `stored_files`, `lesson_materials`, `activities`, `submissions`, `submission_grades`, `lesson_completions` |
+| `0013_submission_lifecycle` | submission revision/status fields, `submission_returns`, `submission_deadline_exceptions` |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
@@ -123,6 +124,8 @@ audited as a system event.
   first submission. An assessment's settings and question list, and the questions it uses,
   lock after the first attempt. A challenge's team settings lock once a project exists, and
   the whole definition locks once a project is submitted.
+- **Assignment revisions.** A returned submission can be resubmitted. The current revision is
+  graded, while prior return and grade rows remain append-only history.
 - **Append-only history.** Grades, score adjustments, and project reviews append rows and
   the latest row wins. Editors send the ID they read (`previousGradeId`,
   `previousAdjustmentId`), so stale corrections fail with 409.

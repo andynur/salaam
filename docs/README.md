@@ -37,6 +37,7 @@ workflow.
 | 12 — Pilot readiness and operational hardening | [phases/12-pilot-readiness.md](phases/12-pilot-readiness.md) |
 | 13 — Academic operations | [phases/13-academic-operations.md](phases/13-academic-operations.md) |
 | 14 — Academic lifecycle | [phases/14-academic-lifecycle.md](phases/14-academic-lifecycle.md) |
+| 15 — Submission lifecycle | [phases/15-submission-lifecycle.md](phases/15-submission-lifecycle.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

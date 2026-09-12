@@ -23,7 +23,7 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 11 and 13–14 are implemented and
+This is an active early-stage project. Phases 0 through 11 and 13–15 are implemented and
 validated locally; Phase 12 pilot readiness remains in progress. HTTPS proxy behavior plus a backup and restore drill were validated on
 2026-09-12. SALAAM is not yet presented as a production deployment for a school: capacity
 testing on school hardware and WLAN and the operational rollout still need
@@ -46,6 +46,7 @@ environment-specific validation.
 | 12 — Pilot readiness and operational hardening | Scheduled backup automation, retention, restore checklist, rollback guidance, and pilot acceptance criteria | [Phase 12](docs/phases/12-pilot-readiness.md) |
 | 13 — Academic operations | Administrator CSV student import with preview and atomic enrollment, plus bounded recurring sessions with per-session roster snapshots and QR defaults | [Phase 13](docs/phases/13-academic-operations.md) |
 | 14 — Academic lifecycle | Profile editing, guarded role reassignment, class transfers with history, and reversible academic archive states | [Phase 14](docs/phases/14-academic-lifecycle.md) |
+| 15 — Submission lifecycle | Returned assignment work, numbered resubmissions, current-revision grading, and student-specific deadline exceptions | [Phase 15](docs/phases/15-submission-lifecycle.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

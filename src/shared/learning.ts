@@ -8,7 +8,7 @@ export interface CourseModule { id: string; title: string; position: number; pub
 export interface Lesson { id: string; moduleId: string; title: string; content: string; position: number; published: boolean; archived: boolean; completed: boolean }
 export interface Material { id: string; lessonId: string; title: string; kind: "text" | "link" | "file"; content: string; file: StoredFile | null; archived: boolean }
 export interface Grade { id: string; score: number; feedback: string; createdAt: string }
-export interface Submission { id: string; activityId: string; studentId: string; studentName: string; content: string; file: StoredFile | null; submittedAt: string; grade: Grade | null }
+export interface Submission { id: string; activityId: string; studentId: string; studentName: string; content: string; file: StoredFile | null; submittedAt: string; revision: number; status: "submitted" | "returned"; returnReason?: string | null; grade: Grade | null }
 export interface Activity { id: string; lessonId: string; kind: "assignment"; title: string; instructions: string; dueAt: string | null; published: boolean; archived: boolean; submission: Submission | null }
 export interface Progress { studentId: string; studentName: string; lessons: number; completed: number; activities: number; submitted: number; graded: number }
 export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; challenges: Challenge[]; progress: Progress | null }
