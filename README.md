@@ -62,6 +62,7 @@ environment-specific validation.
 | 28 — Attendance roster adjustments | Version-checked session and future-series roster changes with preserved attendance history | [Phase 28](docs/phases/28-attendance-roster-adjustments.md) |
 | 29 — QR attendance breakdown | Manager QR scan status and derived per-session breakdown | [Phase 29](docs/phases/29-qr-attendance-breakdown.md) |
 | 30 — QR check-in import | Verified offline scan import with issued-code validation and idempotent batches | [Phase 30](docs/phases/30-qr-checkin-import.md) |
+| 31 — Student-visible leaderboard | Current-class student ranking with server-enforced scope | [Phase 31](docs/phases/31-student-leaderboard.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

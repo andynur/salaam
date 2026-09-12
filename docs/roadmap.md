@@ -38,6 +38,7 @@ Coding agents follow skill `deliver-phase`.
 | 28 | Attendance roster adjustments | Delivered — [record](phases/28-attendance-roster-adjustments.md) |
 | 29 | QR attendance breakdown | Delivered — [record](phases/29-qr-attendance-breakdown.md) |
 | 30 | QR check-in import | Delivered — [record](phases/30-qr-checkin-import.md) |
+| 31 | Student-visible leaderboard | Delivered — [record](phases/31-student-leaderboard.md) |
 
 ## Delivered
 
@@ -167,7 +168,7 @@ Boundaries section has the details.
   sync; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
-  penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;
+  penalties, and manual grants; streaks, seasons, and resets;
   badge artwork beyond built-in icons; recurring check-in windows; geofencing, device binding, proctoring,
   and biometric identification. Multi-instance realtime delivery remains unsupported.
 - **Phase 6:** bulk import and recurring meetings are delivered in Phase 13. Roster adjustments

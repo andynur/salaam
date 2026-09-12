@@ -93,7 +93,7 @@ function Leaderboard({ actor, onExpired }: { actor: Actor; onExpired: () => void
           <td>{row.className}</td>
           <td>{row.total} XP</td>
           <td>{row.badges}</td>
-          <td><Button className="button-secondary button-small" onClick={() => setStudent(row)}>Lihat</Button></td>
+          <td>{actor.permissions.includes("learning.manage") && <Button className="button-secondary button-small" onClick={() => setStudent(row)}>Lihat</Button>}</td>
         </tr>)}</tbody>
       </table></div>
       <Pager offset={offset} next={data.nextOffset} change={setOffset} /></>}
@@ -170,7 +170,7 @@ export function Growth({ actor, timezone, onExpired }: { actor: Actor; timezone:
   const can = (permission: string) => actor.permissions.includes(permission);
   const tabs = [
     ...(can("learning.participate") ? [{ id: "me", label: "Pertumbuhan saya" }] : []),
-    ...(can("learning.manage") ? [{ id: "leaderboard", label: "Peringkat santri" }] : []),
+    ...(can("learning.manage") || can("learning.participate") ? [{ id: "leaderboard", label: "Peringkat kelas" }] : []),
     ...(can("academic.manage") ? [{ id: "rules", label: "Aturan & lencana" }] : []),
   ];
   const [tab, setTab] = useState(tabs[0]?.id ?? "me");

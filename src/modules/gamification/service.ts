@@ -57,18 +57,30 @@ export async function growthSummary(db: SQL, actor: Actor, studentId: string | n
   });
 }
 
-// Teachers compare their own classes; students never see a ranking of their peers.
+// Teachers compare their own classes. Students see only the current active class they belong
+// to; arbitrary class filters from a student client are ignored.
 export async function leaderboard(db: SQL, actor: Actor, classId: string | null, pattern: string, offset: number) {
-  requirePermission(actor, "learning.manage");
-  return db<LeaderboardRow[]>`SELECT u.id AS "studentId", u.display_name AS "studentName", cl.name AS "className",
+  const manager = can(actor, "learning.manage");
+  if (manager) requirePermission(actor, "learning.manage");
+  else requirePermission(actor, "learning.participate");
+  let scopedClassId = classId;
+  if (!manager) {
+    const [membership] = await db<{ classId: string }[]>`SELECT cm.class_id AS "classId" FROM class_members cm JOIN classes c ON c.id = cm.class_id
+      JOIN academic_years y ON y.id = c.academic_year_id WHERE cm.student_id = ${actor.id} AND c.archived_at IS NULL
+      AND y.archived_at IS NULL AND y.starts_on <= CURRENT_DATE AND y.ends_on >= CURRENT_DATE
+      ORDER BY y.starts_on DESC, c.id LIMIT 1`;
+    scopedClassId = membership?.classId ?? null;
+  }
+  const rows = await db<Omit<LeaderboardRow, "level">[]>`SELECT u.id AS "studentId", u.display_name AS "studentName", cl.name AS "className",
       COALESCE((SELECT sum(x.points)::int FROM xp_entries x WHERE x.student_id = u.id), 0) AS total,
       (SELECT count(*)::int FROM badge_awards ba WHERE ba.student_id = u.id) AS badges
     FROM class_members cm JOIN users u ON u.id = cm.student_id JOIN classes cl ON cl.id = cm.class_id
     WHERE u.is_active AND u.display_name ILIKE ${pattern}
-      AND (${classId}::uuid IS NULL OR cl.id = ${classId}::uuid)
-      AND (${can(actor, "learning.manage.all")} OR EXISTS (SELECT 1 FROM courses c JOIN teaching_assignments ta ON ta.course_id = c.id
+      AND (${manager || scopedClassId !== null} AND (${scopedClassId}::uuid IS NULL OR cl.id = ${scopedClassId}::uuid))
+      AND (${!manager || can(actor, "learning.manage.all")} OR EXISTS (SELECT 1 FROM courses c JOIN teaching_assignments ta ON ta.course_id = c.id
         WHERE c.class_id = cl.id AND ta.teacher_id = ${actor.id}))
     ORDER BY total DESC, u.display_name, u.id LIMIT 51 OFFSET ${offset}`;
+  return rows.map(row => ({ ...row, level: levelFor(row.total).level }));
 }
 
 export async function listRules(db: SQL, actor: Actor) {

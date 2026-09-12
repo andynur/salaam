@@ -53,6 +53,7 @@ workflow.
 | 28 — Attendance roster adjustments | [phases/28-attendance-roster-adjustments.md](phases/28-attendance-roster-adjustments.md) |
 | 29 — QR attendance breakdown | [phases/29-qr-attendance-breakdown.md](phases/29-qr-attendance-breakdown.md) |
 | 30 — QR check-in import | [phases/30-qr-checkin-import.md](phases/30-qr-checkin-import.md) |
+| 31 — Student-visible leaderboard | [phases/31-student-leaderboard.md](phases/31-student-leaderboard.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

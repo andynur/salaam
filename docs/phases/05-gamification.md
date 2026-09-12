@@ -42,11 +42,12 @@ recorded here for review before production use.
 - **Individual XP entries are not audited**; the ledger is itself the record. Badge awards
   are audited as system actions, and rule and catalogue changes are audited with their
   actor.
-- **Students never see a ranking of their peers.** The leaderboard needs `learning.manage`
-  and is limited to the classes the teacher actually teaches. This keeps comparison between
-  santri a teaching tool rather than a public scoreboard.
+- **Students see only their current active class ranking.** The API derives the class from
+  the student's current academic membership and ignores arbitrary class filters. Teachers
+  retain their scoped management view and peer drill-in.
 - **No new capabilities.** Reading growth uses `learning.view` with the same scope rules as
-  the rest of learning; the leaderboard uses `learning.manage`; rules and the badge
+  the rest of learning; the leaderboard uses `learning.participate` for students and
+  `learning.manage` for teachers; rules and the badge
   catalogue use `academic.manage`.
 - **Badge icons come from the existing icon set** (`src/web/components/icons.tsx`), checked
   by a database constraint. No image upload is introduced.

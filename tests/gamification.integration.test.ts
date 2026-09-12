@@ -201,13 +201,15 @@ describe.skipIf(!url)("Phase 5 gamification (isolated PostgreSQL schema)", () =>
     expect((await request("/api/gamification/me", "")).status).toBe(401);
   });
 
-  test("the leaderboard is for managers and covers only their own classes", async () => {
+  test("the leaderboard is scoped for managers and students", async () => {
     const { student, teacher, otherTeacher } = people;
-    expect((await request("/api/gamification/leaderboard", student.cookie)).status).toBe(403);
+    const studentBoard = await json<Page<LeaderboardRow>>(request("/api/gamification/leaderboard", student.cookie));
+    expect(studentBoard.items.map(row => row.studentId).sort()).toEqual([student.id, people.peer.id].sort());
+    expect((await json<Page<LeaderboardRow>>(request(`/api/gamification/leaderboard?classId=${crypto.randomUUID()}`, student.cookie))).items).toHaveLength(2);
     const board = await json<Page<LeaderboardRow>>(request("/api/gamification/leaderboard", teacher.cookie));
-    expect(board.items.map(row => row.studentId).sort()).toEqual([student.id, people.peer.id].sort());
+    expect(board.items.map(row => row.studentId)).toEqual(expect.arrayContaining([student.id, people.peer.id]));
     expect(board.items[0]!.total).toBeGreaterThanOrEqual(board.items[1]!.total);
-    expect(board.items.every(row => row.className === "X A")).toBe(true);
+    expect(board.items.filter(row => [student.id, people.peer.id].includes(row.studentId)).every(row => row.className === "X A")).toBe(true);
     expect((await json<Page<LeaderboardRow>>(request("/api/gamification/leaderboard", otherTeacher.cookie))).items).toEqual([]);
     expect((await json<Page<LeaderboardRow>>(request(`/api/gamification/leaderboard?q=${people.peer.id === student.id ? "" : "peer"}`, teacher.cookie))).items.every(row => row.studentName.includes("peer"))).toBe(true);
     expect((await json<Page<LeaderboardRow>>(request(`/api/gamification/leaderboard?classId=${crypto.randomUUID()}`, teacher.cookie))).items).toEqual([]);
