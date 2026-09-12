@@ -24,7 +24,7 @@ Coding agents follow skill `deliver-phase`.
 | 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
 | 15 | Submission lifecycle | In progress — [record](phases/15-submission-lifecycle.md) |
 | 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
-| 17 | Assessment rubrics | In progress — [record](phases/17-assessment-rubrics.md) |
+| 17 | Assessment rubrics | Delivered — [record](phases/17-assessment-rubrics.md) |
 
 ## Delivered
 

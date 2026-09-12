@@ -21,5 +21,6 @@ proctoring, question import/export, pools/statistics, and live monitoring remain
 
 ## Validation
 
-Unit, PostgreSQL integration, migration rollback, typecheck, and build checks pass. Browser smoke
-for the rubric authoring form remains before phase close-out.
+- Unit, PostgreSQL integration, migration rollback, typecheck, and build checks pass.
+- Browser smoke passed at 1440, 820, and 390 px for rubric authoring; no horizontal overflow or
+  unexpected alerts appeared.

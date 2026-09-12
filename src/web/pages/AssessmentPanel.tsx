@@ -112,7 +112,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
             const written = question.type === "short_answer" || question.type === "essay";
             return <div className="picker-row" key={question.id}><label className="submission-confirm"><input type="checkbox" checked={Boolean(item)} onChange={() => toggle(question.id)} /><span><small className="text-muted">{typeLabels[question.type]}</small><br />{question.prompt}</span></label>
               {item && <label className="picker-points"><span>Poin</span><input className="input" type="number" min={0.01} max={1000} step="0.01" value={item.points} onChange={event => setPicked(items => items.map(entry => entry.questionId === question.id ? { ...entry, points: Number(event.target.value) } : entry))} /></label>}
-              {written && item && value?.id && <Button className="button-secondary button-small" onClick={() => setRubricFor(rubricFor === question.id ? "" : question.id)}>Rubric</Button>}
+              {written && item && value?.id && <Button type="button" className="button-secondary button-small" onClick={() => setRubricFor(rubricFor === question.id ? "" : question.id)}>Rubric</Button>}
               {rubricFor === question.id && value?.id && <RubricEditor courseId={courseId} activityId={value.id} questionId={question.id} onExpired={onExpired} />}</div>;
           })}
         {bank.data && <Pager offset={offset} next={bank.data.nextOffset} change={setOffset} />}
@@ -141,7 +141,7 @@ function RubricEditor({ courseId, activityId, questionId, onExpired }: { courseI
       <Field name="rubricTitle" label="Judul rubric" value={title} />
       {criteria.map((criterion, index) => <div className="picker-row" key={criterion.id}><Field name={`label-${criterion.id}`} label={`Kriteria ${index + 1}`} value={criterion.label} /><Field name={`description-${criterion.id}`} label="Deskripsi" value={criterion.description} /><Field name={`points-${criterion.id}`} label="Poin" type="number" min={0.01} max={1000} step="0.01" value={criterion.maxPoints} /></div>)}
     </MutationForm>
-    <Button className="button-secondary button-small" onClick={() => setCriteria(items => [...items, { id: `criterion-${items.length + 1}`, label: "", description: "", maxPoints: 1 }])}>Tambah kriteria</Button>
+    <Button type="button" className="button-secondary button-small" onClick={() => setCriteria(items => [...items, { id: `criterion-${items.length + 1}`, label: "", description: "", maxPoints: 1 }])}>Tambah kriteria</Button>
   </div>;
 }
 
