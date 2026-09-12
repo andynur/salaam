@@ -154,6 +154,8 @@ export function QuestionBank({ courseId, onExpired }: Pick<Common, "courseId" | 
   const [archived, setArchived] = useState(false);
   const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState<Question | "new" | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importKey] = useState(() => crypto.randomUUID());
   const [error, setError] = useState("");
   const params = new URLSearchParams({ q, offset: String(offset), ...(archived ? { archived: "1" } : {}) });
   const { data, error: loadError, retry } = useData<Page<Question>>(`${learningApi}/${courseId}/questions?${params}`, onExpired, revision);
@@ -164,7 +166,8 @@ export function QuestionBank({ courseId, onExpired }: Pick<Common, "courseId" | 
   }
   return <>
     {editor && <QuestionEditor key={editor === "new" ? "new" : editor.id} courseId={courseId} value={editor === "new" ? undefined : editor} close={() => setEditor(null)} saved={() => { setEditor(null); setRevision(value => value + 1); }} onExpired={onExpired} />}
-    <Card><div className="card-heading"><h2>Bank soal</h2><div className="learning-actions"><label className="submission-confirm"><input type="checkbox" checked={archived} onChange={event => { setArchived(event.target.checked); setOffset(0); }} /> Tampilkan arsip</label><Search change={value => { setQ(value); setOffset(0); }} /><Button className="button-small" onClick={() => setEditor("new")}>Tambah soal</Button></div></div>
+    {importing && <QuestionImportForm courseId={courseId} requestKey={importKey} onExpired={onExpired} saved={() => { setImporting(false); setRevision(value => value + 1); }} />}
+    <Card><div className="card-heading"><h2>Bank soal</h2><div className="learning-actions"><label className="submission-confirm"><input type="checkbox" checked={archived} onChange={event => { setArchived(event.target.checked); setOffset(0); }} /> Tampilkan arsip</label><Search change={value => { setQ(value); setOffset(0); }} /><a className="button button-secondary button-small" href={`${learningApi}/${courseId}/questions/export${archived ? "?archived=1" : ""}`}>Export CSV</a><Button className="button-secondary button-small" onClick={() => setImporting(value => !value)}>{importing ? "Tutup import" : "Import CSV"}</Button><Button className="button-small" onClick={() => setEditor("new")}>Tambah soal</Button></div></div>
       {error && <ErrorState message={error} />}
       {loadError ? <ErrorState message={loadError} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada soal" description={q ? "Tidak ada soal yang sesuai pencarian." : "Tambahkan soal pilihan ganda atau benar/salah untuk dipakai di quiz dan ujian."} />
         : <div className="question-list">{data.items.map(question => <article className="question-item" key={question.id}>
@@ -177,6 +180,15 @@ export function QuestionBank({ courseId, onExpired }: Pick<Common, "courseId" | 
       {data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}
     </Card>
   </>;
+}
+
+function QuestionImportForm({ courseId, requestKey, onExpired, saved }: { courseId: string; requestKey: string; onExpired: () => void; saved: () => void }) {
+  return <Card className="admin-form-card"><div className="learning-row"><h2>Import bank soal</h2><span className="learning-muted">Maksimal 100 soal</span></div>
+    <p className="learning-muted">Header wajib: type,prompt,options,correct,explanation. Pisahkan opsi dan kunci dengan tanda |. Gunakan tanda kutip CSV untuk koma atau baris baru.</p>
+    <MutationForm path={`${learningApi}/${courseId}/questions/import`} label="Import soal" onExpired={onExpired} saved={saved} body={form => ({ requestKey, csv: form.get("csv") })}>
+      <Field name="csv" label="CSV soal" area max={512 * 1024} />
+    </MutationForm>
+  </Card>;
 }
 
 function QuestionEditor({ courseId, value, close, saved, onExpired }: { courseId: string; value?: undefined |Question; close: () => void; saved: () => void; onExpired: () => void }) {

@@ -126,6 +126,23 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     expect((await db`SELECT * FROM audit_logs WHERE event = 'assessment.question.created'`).length).toBeGreaterThanOrEqual(4);
   });
 
+  test("question CSV import is atomic, idempotent and exportable", async () => {
+    const f = await course();
+    const requestKey = crypto.randomUUID();
+    const csv = "type,prompt,options,correct,explanation\r\n\"single_choice\",\"Apa, tag paragraf?\",\"div|p\",b,\"Gunakan p\"\r\n\"true_false\",HTML adalah markup,\"\",a,\"Benar\"\r\n";
+    const path_ = path(f.courseId, "questions/import");
+    const imported = await json<{ importId: string; questionIds: string[] }>(request(path_, teacher, { requestKey, csv }));
+    expect(imported.questionIds).toHaveLength(2);
+    expect(await json<unknown>(request(path_, teacher, { requestKey, csv }))).toEqual(imported);
+    expect((await request(path_, teacher, { requestKey, csv: `${csv} ` })).status).toBe(409);
+    const exported = await request(path(f.courseId, "questions/export"), teacher);
+    expect(exported.status).toBe(200);
+    expect(exported.headers.get("content-type")).toContain("text/csv");
+    expect(await exported.text()).toContain('"Apa, tag paragraf?"');
+    expect((await db`SELECT count(*)::int AS count FROM questions WHERE id = ANY(string_to_array(${imported.questionIds.join(",")}, ',')::uuid[])`)[0]!.count).toBe(2);
+    expect((await db`SELECT count(*)::int AS count FROM audit_logs WHERE event = 'assessment.questions.imported' AND resource_id = ${imported.importId}`)[0]!.count).toBe(1);
+  });
+
   test("quiz attempts snapshot questions, autosave forward-only, submit idempotently and score automatically", async () => {
     const f = await course();
     const draft = (await json<{ id: string }>(post(f.courseId, "assessments", { lessonId: f.lessonId, kind: "quiz", title: "Empty", instructions: "x" }), 201)).id;

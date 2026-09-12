@@ -4,7 +4,7 @@ import { HttpError } from "../../core/errors";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
 import { archivedInput } from "../learning/input";
-import { questionInput } from "./input";
+import { questionImportInput, questionInput } from "./input";
 import type { Question } from "../../shared/assessment";
 
 // Answer keys are only ever returned to course managers.
@@ -52,5 +52,42 @@ export async function archiveQuestion(db: SQL, actor: Actor, courseId: string, i
     if (!rows.length) notFound();
     await recordAudit(tx, actor.id, `assessment.question.${archived ? "archived" : "restored"}`, "questions", rows[0]!.id, requestId);
     return rows[0]!;
+  });
+}
+
+function csvCell(value: string) { return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value; }
+export async function exportQuestions(db: SQL, actor: Actor, courseId: string, includeArchived: boolean) {
+  return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
+    await courseAccess(tx, actor, courseId, "manage");
+    const rows = await tx<{ type: string; prompt: string; options: { text: string }[]; correct: string[]; explanation: string }[]>`SELECT type, prompt, options, correct, explanation FROM questions
+      WHERE course_id = ${courseId} AND (${includeArchived} OR archived_at IS NULL) ORDER BY created_at, id`;
+    return ["type,prompt,options,correct,explanation", ...rows.map(row => [row.type, row.prompt, row.options.map(option => option.text).join("|"), row.correct.join("|"), row.explanation].map(csvCell).join(","))].join("\r\n") + "\r\n";
+  });
+}
+
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+export async function importQuestions(db: SQL, actor: Actor, courseId: string, body: Record<string, unknown>, requestId: string) {
+  const input = questionImportInput(body);
+  const hash = await sha256(input.csv);
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const existing = (await tx<{ id: string; payloadSha256: string; questionIds: string[] }[]>`SELECT id, payload_sha256 AS "payloadSha256", question_ids AS "questionIds" FROM question_imports WHERE course_id = ${courseId} AND request_key = ${input.requestKey} FOR UPDATE`)[0];
+    if (existing) {
+      if (existing.payloadSha256 !== hash) throw new HttpError(409, "IMPORT_CHANGED", "Request key sudah digunakan untuk CSV yang berbeda.");
+      return { importId: existing.id, questionIds: existing.questionIds };
+    }
+    const questionIds: string[] = [];
+    for (const question of input.questions) {
+      const row = (await tx<{ id: string }[]>`INSERT INTO questions (course_id, type, prompt, options, correct, explanation, created_by)
+        VALUES (${courseId}, ${question.type}, ${question.prompt}, ${JSON.stringify(question.options)}::text::jsonb, ${JSON.stringify(question.correct)}::text::jsonb, ${question.explanation}, ${actor.id}) RETURNING id`)[0]!;
+      questionIds.push(row.id);
+    }
+    const imported = (await tx<{ id: string }[]>`INSERT INTO question_imports (course_id, request_key, payload_sha256, question_ids, created_by)
+      VALUES (${courseId}, ${input.requestKey}, ${hash}, ${JSON.stringify(questionIds)}::text::jsonb, ${actor.id}) RETURNING id`)[0]!;
+    await recordAudit(tx, actor.id, "assessment.questions.imported", "question_imports", imported.id, requestId);
+    return { importId: imported.id, questionIds };
   });
 }

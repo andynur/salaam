@@ -31,6 +31,42 @@ export function questionInput(body: Record<string, unknown>) {
   return { type: type as QuestionType, prompt, options, correct, explanation: explanation.trim() };
 }
 
+function csvRows(csv: string) {
+  const rows: string[][] = [];
+  let row: string[] = [], field = "", quoted = false;
+  for (let index = 0; index < csv.length; index++) {
+    const char = csv[index]!;
+    if (quoted) {
+      if (char === '"' && csv[index + 1] === '"') { field += '"'; index++; }
+      else if (char === '"') quoted = false;
+      else field += char;
+    } else if (char === '"' && field.length === 0) quoted = true;
+    else if (char === ",") { row.push(field); field = ""; }
+    else if (char === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (char !== "\r") field += char;
+  }
+  if (quoted) invalid("CSV memiliki tanda kutip yang tidak berpasangan.");
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(values => values.some(value => value.trim()));
+}
+export function questionImportInput(body: Record<string, unknown>) {
+  const requestKey = idField(body, "requestKey");
+  const csv = body.csv;
+  if (typeof csv !== "string" || !csv.trim()) invalid("CSV soal wajib diisi.");
+  if (csv.length > 512 * 1024) invalid("CSV maksimal 512 KiB.");
+  const rows = csvRows(csv);
+  if (!rows.length) invalid("CSV soal tidak memiliki data.");
+  const header = rows.shift()!.map(value => value.trim().toLowerCase());
+  if (header.join(",") !== "type,prompt,options,correct,explanation") invalid("Header CSV harus: type,prompt,options,correct,explanation.");
+  if (!rows.length || rows.length > 100) invalid("Import harus berisi 1–100 soal.");
+  const questions = rows.map((values, index) => {
+    if (values.length !== 5) invalid(`Baris ${index + 2}: jumlah kolom harus 5.`);
+    const [type, prompt, options, correct, explanation] = values;
+    return questionInput({ type, prompt, options: options ? options.split("|") : undefined, correct: correct ? correct.split("|") : [], explanation: explanation ?? "" });
+  });
+  return { requestKey, csv, questions };
+}
+
 function timestamp(body: Record<string, unknown>, key: string, label: string): string | null {
   const value = body[key];
   if (value === null || value === undefined || value === "") return null;

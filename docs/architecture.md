@@ -78,6 +78,7 @@ measured operational requirement exists.
 | `0016_survey_questionnaires` | Survey/questionnaire definitions, questions, and immutable student responses |
 | `0017_assessment_marking` | Assessment marking policy and snapshotted scoring mode per attempt question |
 | `0018_assessment_accommodations` | Auditable per-student time extensions for timed assessments |
+| `0019_question_imports` | Idempotent, hashed question-bank import batches |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |

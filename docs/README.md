@@ -42,6 +42,8 @@ workflow.
 | 17 — Assessment rubrics | [phases/17-assessment-rubrics.md](phases/17-assessment-rubrics.md) |
 | 18 — Surveys and questionnaires | [phases/18-surveys-questionnaires.md](phases/18-surveys-questionnaires.md) |
 | 19 — Assessment marking | [phases/19-assessment-marking.md](phases/19-assessment-marking.md) |
+| 20 — Assessment accommodations | [phases/20-assessment-accommodations.md](phases/20-assessment-accommodations.md) |
+| 21 — Question bank import and export | [phases/21-question-import-export.md](phases/21-question-import-export.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

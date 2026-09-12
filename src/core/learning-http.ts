@@ -7,7 +7,7 @@ import { fileResponse } from "./storage/files";
 import { maxUploadBytes } from "../shared/learning";
 import { archiveContent, completeLesson, courseDetail, courseProgress, listCourses, materialFile, publishContent, saveContent } from "../modules/learning/service";
 import { grantDeadlineException, gradeHistory, gradeSubmission, listSubmissions, returnSubmission, saveActivity, submissionFile, submitActivity } from "../modules/activities/service";
-import { archiveQuestion, listQuestions, saveQuestion } from "../modules/assessments/questions";
+import { archiveQuestion, exportQuestions, importQuestions, listQuestions, saveQuestion } from "../modules/assessments/questions";
 import { listRubrics, saveAssessment, saveRubric, setAssessmentItems } from "../modules/assessments/service";
 import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modules/assessments/attempts";
 import { adjustmentHistory, adjustScore, gradeWrittenAnswer, listAttempts } from "../modules/assessments/grading";
@@ -35,6 +35,7 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
         if (parts.length === 2) return Response.json(await courseDetail(db, actor, courseId));
         if (parts.length === 3 && resource === "progress") return Response.json(page(await courseProgress(db, actor, courseId, pattern, offset), offset));
         if (parts.length === 3 && resource === "questions") return Response.json(page(await listQuestions(db, actor, courseId, pattern, offset, url.searchParams.get("archived") === "1"), offset));
+        if (parts.length === 4 && resource === "questions" && item === "export") return new Response(await exportQuestions(db, actor, courseId, url.searchParams.get("archived") === "1"), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=questions.csv" } });
         if (parts.length === 4 && resource === "attempts") return Response.json(await attemptDetail(db, actor, courseId, idField({ id: item }, "id"), requestId));
         if (parts.length === 5) {
           const id = idField({ id: item }, "id");
@@ -48,7 +49,7 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
         }
       } else if (request.method === "POST" || request.method === "PATCH") {
         const method = request.method;
-        const id = item ? idField({ id: item }, "id") : undefined;
+        const id = item && !(resource === "questions" && (item === "import" || item === "export")) ? idField({ id: item }, "id") : undefined;
         const contentSave = (method === "POST" && parts.length === 3) || (method === "PATCH" && parts.length === 4 && id !== undefined);
         const submit = method === "POST" && parts.length === 5 && resource === "activities" && action === "submit";
         const itemAction = method === "POST" && parts.length === 5 && id !== undefined;
@@ -56,7 +57,7 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
         const multipart = request.headers.get("content-type")?.split(";")[0]?.trim() === "multipart/form-data";
         const { body, file } = multipart && ((contentSave && resource === "materials") || submit)
           ? await multipartInput(request, maxLearningUploadRequestBytes)
-          : { body: await jsonObject(request, 65536), file: null };
+          : { body: await jsonObject(request, resource === "questions" && item === "import" ? 1024 * 1024 : 65536), file: null };
         let result: unknown;
         let created = false;
         if (method === "POST" && parts.length === 3 && resource === "publish") {
@@ -67,6 +68,8 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await archiveContent(db, actor, courseId, resource, id, body, requestId);
         } else if (itemAction && action === "archive" && resource === "questions") {
           result = await archiveQuestion(db, actor, courseId, id, body, requestId);
+        } else if (method === "POST" && parts.length === 4 && resource === "questions" && item === "import") {
+          result = await importQuestions(db, actor, courseId, body, requestId);
         } else if (itemAction && resource === "lessons" && action === "complete") {
           result = await completeLesson(db, actor, courseId, id, requestId);
         } else if (submit && id) {

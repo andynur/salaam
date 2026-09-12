@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, rubricInput, settingsInput, surveyQuestionsInput } from "../src/modules/assessments/input";
+import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionImportInput, questionInput, rubricInput, settingsInput, surveyQuestionsInput } from "../src/modules/assessments/input";
 
 test("questions support choice and written answers with valid answer keys", () => {
   expect(questionInput({ type: "single_choice", prompt: " 2 + 2? ", options: ["3", " 4 "], correct: ["b"] })).toEqual({
@@ -20,6 +20,13 @@ test("questions support choice and written answers with valid answer keys", () =
   ]) expect(() => questionInput(body)).toThrow();
   expect(questionInput({ type: "essay", prompt: "Jelaskan alasanmu" }).options).toEqual([]);
   expect(questionInput({ type: "short_answer", prompt: "Sebutkan ibu kota" }).correct).toEqual([]);
+});
+test("question CSV import requires a bounded, valid and retry-safe shape", () => {
+  const requestKey = crypto.randomUUID();
+  const result = questionImportInput({ requestKey, csv: "type,prompt,options,correct,explanation\n\"single_choice\",\"Koma, aman?\",\"Ya|Tidak\",a,\"Gunakan koma\"\n" });
+  expect(result.questions[0]).toMatchObject({ type: "single_choice", prompt: "Koma, aman?", options: [{ id: "a", text: "Ya" }, { id: "b", text: "Tidak" }] });
+  for (const csv of ["", "type,prompt,options,correct,explanation\ninvalid", "type,prompt,options,correct,explanation\n"] ) expect(() => questionImportInput({ requestKey, csv })).toThrow();
+  expect(() => questionImportInput({ requestKey: "bad", csv: result.csv })).toThrow();
 });
 test("quiz and exam settings enforce windows, limits and exam integrity rules", () => {
   expect(assessmentKindInput({ kind: "exam" })).toBe("exam");
