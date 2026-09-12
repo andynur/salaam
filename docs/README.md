@@ -34,6 +34,8 @@ workflow.
 | 9 — Reporting | [phases/09-reporting.md](phases/09-reporting.md) |
 | 10 — Advanced IT learning boundary | [phases/10-advanced-it-learning.md](phases/10-advanced-it-learning.md) |
 | 11 — Advanced attendance operations | [phases/11-advanced-attendance.md](phases/11-advanced-attendance.md) |
+| 12 — Pilot readiness and operational hardening | [phases/12-pilot-readiness.md](phases/12-pilot-readiness.md) |
+| 13 — Academic operations | [phases/13-academic-operations.md](phases/13-academic-operations.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

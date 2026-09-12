@@ -126,6 +126,20 @@ describe.skipIf(!url)("Phase 6 attendance (isolated PostgreSQL schema)", () => {
     expect((await handle(new Request(`${config.baseUrl}${f.path}`, { method: "PATCH", headers: { cookie: people.teacher.cookie, "Content-Type": "application/json" }, body: '{}' }))).status).toBe(403);
   });
 
+  test("recurring series materializes bounded roster snapshots and opens configured QR", async () => {
+    const f = await workspace();
+    const body = { title: "Kajian mingguan", startsAt: "2026-09-12T07:00:00.000Z", endsAt: "2026-09-12T08:00:00.000Z", intervalDays: 7, occurrenceCount: 3, note: "Seri", qrRotateSeconds: 45, qrLateAfterMinutes: 15, requestKey: crypto.randomUUID() };
+    const created = await json<{ id: string; created: number }>(request(`${base(f.courseId)}/series`, people.teacher.cookie, body), 201);
+    expect(created.created).toBe(3);
+    expect((await db`SELECT count(*)::int AS count FROM classroom_sessions WHERE series_id = ${created.id}`)[0].count).toBe(3);
+    const sessions = await db<{ id: string }[]>`SELECT id FROM classroom_sessions WHERE series_id = ${created.id} ORDER BY occurrence_index`;
+    expect((await db`SELECT count(*)::int AS count FROM classroom_roster WHERE session_id = ${sessions[0]!.id}`)[0].count).toBe(2);
+    await json(action(`${base(f.courseId)}/${sessions[0]!.id}`, { action: "open", version: 1 }));
+    expect((await db`SELECT rotate_seconds, late_after FROM attendance_checkin_windows WHERE session_id = ${sessions[0]!.id}`)[0]).toMatchObject({ rotate_seconds: 45 });
+    expect((await detail(`${base(f.courseId)}/${sessions[0]!.id}`)).checkin.window.status).toBe("open");
+    expect(await json<{ id: string; created: number }>(request(`${base(f.courseId)}/series`, people.teacher.cookie, body), 201)).toEqual({ id: created.id, created: 0 });
+  });
+
   test("lifecycle, append-only corrections, exact retries and closed-session reports", async () => {
     const f = await meeting();
     const row = `${f.path}/attendance/${people.student.id}`;

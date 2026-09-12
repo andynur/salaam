@@ -45,7 +45,7 @@ const server = Bun.serve({
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/calendar": index, "/notifications": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index, "/reports": index, "/attendance": index, "/attendance/courses/:id": index, "/attendance/courses/:id/sessions/:sessionId": index },
+  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/calendar": index, "/notifications": index, "/admin/users": index, "/admin/import": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index, "/reports": index, "/attendance": index, "/attendance/courses/:id": index, "/attendance/courses/:id/sessions/:sessionId": index },
   websocket: realtime.websocket,
   fetch(request, server) { if (new URL(request.url).pathname === "/api/attendance/live") return realtime.upgrade(request, server); return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {

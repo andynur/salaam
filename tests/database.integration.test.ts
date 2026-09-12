@@ -93,6 +93,11 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
   });
   // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
   test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
+    expect(await rollback(db)).toBe("0011_roster_meeting_series.sql");
+    for (const table of ["classroom_meeting_series"]) {
+      expect((await db`SELECT to_regclass(${table}) AS relation`)[0].relation).toBeNull();
+    }
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_name = 'classroom_sessions' AND column_name = 'series_id'`).length).toBe(0);
     expect(await rollback(db)).toBe("0010_calendar_notifications.sql");
     for (const table of ["academic_events", "notifications", "notification_preferences", "calendar_sources", "calendar_audience"]) {
       expect((await db`SELECT to_regclass(${table}) AS relation`)[0].relation).toBeNull();

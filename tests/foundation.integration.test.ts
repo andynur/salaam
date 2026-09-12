@@ -156,6 +156,19 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect(stored.password_hash).toStartWith("$argon2id$");
     expect(await Bun.password.verify(next, stored.password_hash)).toBe(true);
   });
+  test("student import previews row errors and commits accounts plus enrollment atomically", async () => {
+    const classId = (await db`SELECT id FROM classes WHERE name = 'X A' LIMIT 1`)[0].id as string;
+    const rows = [{ name: "Import One", email: "import-one@example.test", identifier: "NIS-IMPORT-1", password }, { name: "Bad", email: "not-email", identifier: "", password: "short" }];
+    const preview = await request("/api/admin/imports/students", adminCookie, { mode: "preview", classId, rows });
+    expect(preview.status).toBe(200);
+    expect((await preview.json()).rows[1].errors.length).toBeGreaterThan(0);
+    expect((await post("imports/students", { mode: "commit", classId, rows })).status).toBe(400);
+    expect((await db`SELECT * FROM users WHERE email = 'import-one@example.test'`).length).toBe(0);
+    const valid = [{ name: "Import One", email: "import-one@example.test", identifier: "NIS-IMPORT-1", password }];
+    expect((await post("imports/students", { mode: "commit", classId, rows: valid })).status).toBe(200);
+    expect(await (await post("imports/students", { mode: "commit", classId, rows: valid })).json()).toMatchObject({ created: 0, skipped: 1 });
+    expect((await db`SELECT count(*)::int AS count FROM class_members m JOIN users u ON u.id = m.student_id WHERE u.email = 'import-one@example.test'`)[0].count).toBe(1);
+  });
   test("duplicate profiles roll back user, role and audit; concurrent enrollment has a single winner", async () => {
     const base = { name: "Concurrent Student", email: "concurrent@example.test", role: "student", identifier: "NIS-C", password };
     const studentId = await create("users", base);

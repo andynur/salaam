@@ -27,6 +27,7 @@ export function navigationFor(actor: Actor) {
   ];
   const admin: NavItem[] = ([
     ["/admin/users", "Akun & profil", "users", "admin.users.manage"],
+    ["/admin/import", "Import santri", "users", "admin.users.manage"],
     ["/admin/academic", "Akademik", "academic", "academic.manage"],
     ["/admin/audit", "Audit log", "history", "audit.view"],
   ] as const).filter(([, , , permission]) => can(permission)).map(([href, label, icon]) => ({ href, label, icon, active: exact(href) }));

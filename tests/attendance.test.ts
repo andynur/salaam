@@ -1,9 +1,13 @@
 import { expect, test } from "bun:test";
-import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, operationInput } from "../src/modules/attendance/input";
+import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, meetingSeriesInput, operationInput } from "../src/modules/attendance/input";
 const meeting = { title: "Pertemuan", startsAt: "2026-09-12T07:00:00.000Z", endsAt: "2026-09-12T08:00:00.000Z", requestKey: crypto.randomUUID() };
 test("meeting input bounds timestamps, duration, notes and retry identifiers", () => {
   expect(meetingInput(meeting).note).toBe("");
   for (const patch of [{ title: " " }, { title: "x".repeat(151) }, { startsAt: null }, { endsAt: meeting.startsAt }, { endsAt: "2026-09-14T08:00:00.000Z" }, { startsAt: "2026-02-30T07:00:00Z" }, { requestKey: "bad" }, { note: "x".repeat(2001) }]) expect(() => meetingInput({ ...meeting, ...patch })).toThrow();
+});
+test("meeting series input bounds occurrences and QR defaults", () => {
+  expect(meetingSeriesInput({ ...meeting, intervalDays: 7, occurrenceCount: 8, qrRotateSeconds: 30 })).toMatchObject({ intervalDays: 7, occurrenceCount: 8, qrRotateSeconds: 30, qrLateAfterMinutes: null });
+  for (const patch of [{ intervalDays: 0 }, { intervalDays: 366 }, { occurrenceCount: 0 }, { occurrenceCount: 53 }, { qrRotateSeconds: 14 }, { qrLateAfterMinutes: 1441 }]) expect(() => meetingSeriesInput({ ...meeting, intervalDays: 7, occurrenceCount: 8, qrRotateSeconds: 30, ...patch })).toThrow();
 });
 test("attendance input requires an explicit predecessor and known status", () => {
   expect(attendanceInput({ status: "late", previousId: null })).toEqual({ status: "late", previousId: null, note: "" });

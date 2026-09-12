@@ -20,6 +20,7 @@ Coding agents follow skill `deliver-phase`.
 | 10 | Advanced IT learning boundary | Delivered — [record](phases/10-advanced-it-learning.md) |
 | 11 | Advanced attendance operations | Delivered — [record](phases/11-advanced-attendance.md) |
 | 12 | Pilot readiness and operational hardening | In progress — [record](phases/12-pilot-readiness.md) |
+| 13 | Academic operations | Delivered — [record](phases/13-academic-operations.md) |
 
 ## Delivered
 
@@ -129,8 +130,8 @@ Boundaries section has the details.
   badge artwork beyond built-in icons; recurring meetings, bulk import, roster adjustments
   after creation, and recurring check-in windows; geofencing, device binding, proctoring,
   and biometric identification. Multi-instance realtime delivery remains unsupported.
-- **Phase 6:** recurring meetings, bulk import, and roster adjustments after creation. Exports and
-  cross-course reports are delivered in Phase 9.
+- **Phase 6:** roster adjustments after session creation. Bulk import and recurring meetings are
+  delivered in Phase 13. Exports and cross-course reports are delivered in Phase 9.
 - **Phase 7:** bulk check-in import and a QR-specific breakdown. Cross-course attendance
   reporting and exports are delivered in Phase 9.
 - **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder

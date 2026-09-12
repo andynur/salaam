@@ -6,7 +6,7 @@ import { api, ApiError } from "./lib/api";
 import { ErrorState, LoadingState } from "./components/ui";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
-import { Foundation, AcademicFoundation } from "./pages/Foundation";
+import { Foundation, AcademicFoundation, StudentImport } from "./pages/Foundation";
 import { Learning } from "./pages/Learning";
 import { Projects } from "./pages/Projects";
 import { Attendance } from "./pages/Attendance";
@@ -41,11 +41,11 @@ function App() {
   if (!session) return error ? <div className="standalone-error"><ErrorState message={error} retry={() => void loadSession()} /></div> : <Login onLogin={loadSession} />;
   const path = location.pathname;
   const adminPage = path.startsWith("/admin/");
-  const permission = path === "/admin/users" ? "admin.users.manage" : path === "/admin/audit" ? "audit.view" : "academic.manage";
+  const permission = path === "/admin/users" || path === "/admin/import" ? "admin.users.manage" : path === "/admin/audit" ? "audit.view" : "academic.manage";
   const content = path === "/calendar" ? <Calendar actor={session.actor} onExpired={expired} /> : path === "/notifications" ? <Notifications onExpired={expired} /> : path.startsWith("/attendance") ? <Attendance timezone={session.timezone} onExpired={expired} /> : path.startsWith("/learning") ? <Learning timezone={session.timezone} onExpired={expired} />
     : path.startsWith("/projects") ? <Projects actor={session.actor} timezone={session.timezone} onExpired={expired} />
     : path.startsWith("/gamification") ? <Growth actor={session.actor} timezone={session.timezone} onExpired={expired} />
-    : path.startsWith("/reports") ? <Reports actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
+    : path.startsWith("/reports") ? <Reports actor={session.actor} timezone={session.timezone} onExpired={expired} /> : adminPage ? !session.actor.permissions.includes(permission) ? <ErrorState message="Anda tidak memiliki akses ke halaman ini." /> : path === "/admin/academic" ? <AcademicFoundation timezone={session.timezone} onExpired={expired} /> : path === "/admin/import" ? <StudentImport onExpired={expired} /> : <Foundation resource={path === "/admin/users" ? "users" : "audit"} timezone={session.timezone} onExpired={expired} /> : <Dashboard actor={session.actor} timezone={session.timezone} onExpired={expired} />;
   return <Shell actor={session.actor} onLogout={() => void logout()} onExpired={expired} pending={loggingOut}>{error && <ErrorState message={error} />}{content}</Shell>;
 }
 

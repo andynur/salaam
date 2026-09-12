@@ -3,7 +3,7 @@ import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { attendanceReport, changeMeeting, createMeeting, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, sessionHistory } from "../modules/attendance/service";
+import { attendanceReport, changeMeeting, createMeeting, createMeetingSeries, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, sessionHistory } from "../modules/attendance/service";
 import { changeCheckinWindow, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
 export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
@@ -12,7 +12,8 @@ export function createAttendanceHandler(db: SQL, changed: (courseId: string, ses
     const match = /^\/api\/attendance\/courses\/([^/]+)\/(sessions|report)(?:\/([^/]+)(?:\/attendance\/([^/]+)|\/(checkin)(\/codes)?|\/(history|bulk-attendance))?)?$/.exec(url.pathname);
     if (!match) throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
     const courseId = idField({ id: match[1] }, "id").toLowerCase();
-    const sessionId = match[3] ? idField({ id: match[3] }, "id").toLowerCase() : null;
+    const seriesRoute = match[3] === "series" && !match[4] && !match[5];
+    const sessionId = match[3] && !seriesRoute ? idField({ id: match[3] }, "id").toLowerCase() : null;
     try {
       if (request.method === "GET" && sessionId && match[7] === "history") {
         const { offset } = listInput(url);
@@ -38,6 +39,11 @@ export function createAttendanceHandler(db: SQL, changed: (courseId: string, ses
         throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
       }
       if (match[2] === "sessions") {
+        if (request.method === "POST" && seriesRoute) {
+          const result = await createMeetingSeries(db, actor, courseId, await jsonObject(request, 16384), requestId);
+          changed(courseId, result.id);
+          return Response.json(result, { status: 201 });
+        }
         if (request.method === "POST" && !sessionId) {
           const result = await createMeeting(db, actor, courseId, await jsonObject(request, 16384), requestId);
           changed(courseId, result.id);

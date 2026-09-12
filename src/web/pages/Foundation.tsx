@@ -157,3 +157,43 @@ export function AcademicFoundation({ timezone, onExpired }: { timezone: string; 
   const tabs = <nav className="tabs" aria-label="Administrasi akademik">{Object.entries(definitions).filter(([key]) => key !== "users" && key !== "audit").map(([key, definition]) => <button key={key} className={resource === key ? "tab-active" : ""} aria-current={resource === key ? "page" : undefined} onClick={() => setResource(key as FoundationResource)}>{definition.title}</button>)}</nav>;
   return <Foundation key={resource} resource={resource} title="Akademik" tabs={tabs} timezone={timezone} onExpired={onExpired} />;
 }
+
+type ImportPreview = { mode: "preview"; rows: { row: number; email: string; identifier: string; errors: string[]; action: string }[] };
+function parseCsv(value: string) {
+  const lines: string[][] = [];
+  let row: string[] = []; let cell = ""; let quoted = false;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i]!;
+    if (char === '"') { if (quoted && value[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
+    else if (char === "," && !quoted) { row.push(cell.trim()); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) { if (char === "\r" && value[i + 1] === "\n") i++; row.push(cell.trim()); if (row.some(Boolean)) lines.push(row); row = []; cell = ""; }
+    else cell += char;
+  }
+  if (cell || row.length) { row.push(cell.trim()); if (row.some(Boolean)) lines.push(row); }
+  if (!lines.length || lines[0]!.map(header => header.toLowerCase()).join(",") !== "nama,email,identifier,password") throw new Error("Header harus: nama,email,identifier,password");
+  return lines.slice(1).map(columns => ({ name: columns[0] ?? "", email: columns[1] ?? "", identifier: columns[2] ?? "", password: columns[3] ?? "" }));
+}
+export function StudentImport({ onExpired }: { onExpired: () => void }) {
+  const [csv, setCsv] = useState("nama,email,identifier,password\n");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>, mode: "preview" | "commit") {
+    event.preventDefault(); setError(""); setMessage(""); setPending(true);
+    try {
+      const form = new FormData(event.currentTarget);
+      const rows = parseCsv(csv);
+      const result = await api<ImportPreview & { created?: number; enrolled?: number; skipped?: number }>("/api/admin/imports/students", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, classId: form.get("classId"), rows }) });
+      if (mode === "preview") setPreview(result);
+      else { setMessage(`${result.created} akun dibuat, ${result.enrolled} enrollment diproses, ${result.skipped} baris sudah ada.`); setPreview(null); }
+    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setError(cause instanceof Error ? cause.message : "Import tidak dapat diproses."); }
+    finally { setPending(false); }
+  }
+  const hasErrors = preview?.rows.some(row => row.errors.length) ?? false;
+  return <div className="lesson-workspace"><PageHeader breadcrumbs={[{ label: "Administrasi" }]} title="Import santri" description="Validasi CSV terlebih dahulu, lalu simpan akun dan enrollment secara atomik." />
+    <Card className="admin-form-card"><form onSubmit={event => void submit(event, "preview")}><fieldset disabled={pending} className="admin-fields"><div className="admin-field"><label htmlFor="import-class">Kelas tujuan</label><Choice field={classField} onExpired={onExpired} /></div><div className="admin-field"><label htmlFor="student-csv">CSV santri</label><textarea className="input" id="student-csv" rows={12} value={csv} onChange={event => setCsv(event.target.value)} spellCheck={false} aria-describedby="student-csv-help" /></div><p id="student-csv-help" className="card-hint">Format wajib: nama,email,identifier,password. Maksimal 500 baris. Kata sandi awal harus 12–128 karakter.</p><div className="form-actions"><Button type="submit">{pending ? "Memeriksa…" : "Preview validasi"}</Button></div></fieldset></form></Card>
+    {error && <ErrorState message={error} />}{message && <p className="success-state" role="status">{message}</p>}
+    {preview && <Card><div className="card-heading"><h2>Hasil validasi</h2><span>{preview.rows.length} baris</span></div><div className="table-scroll"><table className="data-table"><thead><tr><th>Baris</th><th>Email</th><th>Identifier</th><th>Hasil</th></tr></thead><tbody>{preview.rows.map(row => <tr key={row.row}><td>{row.row}</td><td>{row.email || "—"}</td><td>{row.identifier || "—"}</td><td>{row.errors.length ? row.errors.join(" ") : row.action === "skip" ? "Sudah terdaftar" : row.action === "enroll" ? "Tambahkan ke kelas" : "Akan dibuat"}</td></tr>)}</tbody></table></div>{!hasErrors && <form onSubmit={event => void submit(event, "commit")}><input type="hidden" name="classId" value={(document.querySelector("#classId") as HTMLSelectElement | null)?.value ?? ""} /><div className="form-actions"><Button type="submit" disabled={pending}>Simpan import</Button></div></form>}</Card>}
+  </div>;
+}

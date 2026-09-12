@@ -103,6 +103,13 @@ errors.
 - **Attendance bulk marking** is manager-only, limited to 500 roster rows per request, and
   requires the latest predecessor for every row. The session lock and transaction boundary
   prevent partial writes; private session and attendance notes remain hidden from students.
+- **Student import** is administrator-only, limited to 500 rows, and requires a server preview
+  before an atomic commit. Initial passwords are accepted only over same-origin HTTPS in
+  production and are never written to audit metadata. Existing matching student accounts are
+  reused; import never changes attendance history.
+- **Recurring meetings** are limited to 52 materialized sessions and 365 days between starts.
+  Each occurrence gets its own roster snapshot and normal session authorization. QR defaults are
+  copied into the generated session's window only when a teacher opens that session.
 
 ## Backups and recovery
 

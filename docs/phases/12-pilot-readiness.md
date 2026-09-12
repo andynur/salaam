@@ -54,3 +54,13 @@ expansion, multi-instance realtime delivery, and an online-code runner remain de
 The backup command is locally typechecked and smoke-tested for argument/configuration safety.
 School hardware/WLAN load testing and a scheduled production backup job remain environment
 validation work and must be recorded in `docs/operations.md` before Phase 12 is closed.
+
+## Follow-up increment
+
+The next delivered increment adds the first deferred academic operations that do not require a
+new external service: administrator-only CSV student import with server-side preview, row-level
+validation, atomic account/enrollment writes, and idempotent retries; plus bounded recurring
+meeting templates that materialize roster-snapshotted sessions. A recurring series can configure
+QR rotation and late thresholds; its QR window opens automatically when the generated session is
+opened. Attendance XP, external providers, coding execution, and multi-instance realtime remain
+deferred.

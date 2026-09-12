@@ -23,8 +23,8 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 11 are implemented and validated
-locally, and HTTPS proxy behavior plus a backup and restore drill were validated on
+This is an active early-stage project. Phases 0 through 11 and Phase 13 are implemented and
+validated locally; Phase 12 pilot readiness remains in progress. HTTPS proxy behavior plus a backup and restore drill were validated on
 2026-09-12. SALAAM is not yet presented as a production deployment for a school: capacity
 testing on school hardware and WLAN and the operational rollout still need
 environment-specific validation.
@@ -43,6 +43,8 @@ environment-specific validation.
 | 9 — Reporting | Cross-course operational overview, per-course rows, attendance and learning-progress summaries per santri, filtered audit view, and CSV exports behind `reports.view` | [Phase 9](docs/phases/09-reporting.md) |
 | 10 — Advanced IT learning boundary | Typed external-runner contract, bounded execution policy, no-network requirement, and fail-closed configuration; no student code runs in SALAAM | [Phase 10](docs/phases/10-advanced-it-learning.md) |
 | 11 — Advanced attendance operations | Bulk marking for open sessions and manager-only session history with scoped access and audit coverage | [Phase 11](docs/phases/11-advanced-attendance.md) |
+| 12 — Pilot readiness and operational hardening | Scheduled backup automation, retention, restore checklist, rollback guidance, and pilot acceptance criteria | [Phase 12](docs/phases/12-pilot-readiness.md) |
+| 13 — Academic operations | Administrator CSV student import with preview and atomic enrollment, plus bounded recurring sessions with per-session roster snapshots and QR defaults | [Phase 13](docs/phases/13-academic-operations.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

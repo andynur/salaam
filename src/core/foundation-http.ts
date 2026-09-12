@@ -7,12 +7,19 @@ import { createUser, listUsers, resetPassword } from "../modules/users/service";
 import { createAcademic, listAcademic } from "../modules/academic/service";
 import { listAudit } from "./audit/repository";
 import { academicResources, type AcademicResource, type RecordPage, type RecordRow } from "../shared/foundation";
+import { importStudents } from "../modules/academic/import";
 
 export function createFoundationHandler(db: SQL) {
   let activeCreates = 0;
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     const url = new URL(request.url);
     const resource = url.pathname.slice("/api/admin/".length);
+    if (resource === "imports/students") {
+      requirePermission(actor, "admin.users.manage");
+      if (request.method !== "POST") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+      try { return Response.json(await importStudents(db, actor.id, await jsonObject(request, 256 * 1024), requestId)); }
+      catch (error) { databaseInputError(error); }
+    }
     const recovery = /^users\/([^/]+)\/password$/.exec(resource);
     if (recovery) {
       requirePermission(actor, "admin.users.manage");

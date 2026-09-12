@@ -223,6 +223,14 @@ Load testing on school hardware and WLAN is still open, and each phase record li
 load-testing caveats. The HTTPS proxy behavior and a restore drill were validated locally on
 2026-09-12; both sections above record what that covered and what it did not.
 
+## Academic operations
+
+Use `/admin/import` for administrator-controlled student CSV import. The required header is
+`nama,email,identifier,password`; preview must show zero row errors before the atomic save. A
+recurring attendance series materializes real sessions immediately, so review the generated
+session list before opening the first session. Every generated session keeps its own roster
+snapshot; later class membership changes do not rewrite existing attendance rosters.
+
 ## Classroom realtime
 
 The same Bun process handles `/api/attendance/live`. Configure the reverse proxy to pass

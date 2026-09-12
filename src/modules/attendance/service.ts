@@ -4,7 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
-import { attendanceInput, bulkAttendanceInput, meetingInput, operationInput } from "./input";
+import { attendanceInput, bulkAttendanceInput, meetingInput, meetingSeriesInput, operationInput } from "./input";
 import { checkinState } from "./checkin";
 import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, SessionEvent } from "../../shared/attendance";
 export const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
@@ -41,6 +41,30 @@ export async function createMeeting(db: SQL, actor: Actor, courseId: string, bod
     for (const student of roster) await tx`INSERT INTO classroom_roster (session_id, student_id, student_name, identifier) VALUES (${row.id}, ${student.id}, ${student.display_name}, ${student.identifier})`;
     await recordAudit(tx, actor.id, "classroom.session.created", "classroom_sessions", row.id, requestId);
     return { id: row.id as string };
+  });
+}
+export async function createMeetingSeries(db: SQL, actor: Actor, courseId: string, body: Record<string, unknown>, requestId: string) {
+  requirePermission(actor, "learning.manage");
+  const input = meetingSeriesInput(body);
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const payload = JSON.stringify({ courseId, ...input });
+    const [existing] = await tx`SELECT id, creation_payload = ${payload}::text::jsonb AS same FROM classroom_meeting_series WHERE created_by = ${actor.id} AND request_key = ${input.requestKey}`;
+    if (existing) { if (!existing.same) throw conflict(); return { id: existing.id as string, created: 0 }; }
+    const roster = await tx`SELECT u.id, u.display_name, (SELECT p.identifier FROM user_profiles p JOIN roles r ON r.id = p.role_id WHERE p.user_id = u.id AND r.key = 'student') AS identifier
+      FROM class_members m JOIN users u ON u.id = m.student_id JOIN courses c ON c.class_id = m.class_id
+      WHERE c.id = ${courseId} AND u.is_active ORDER BY u.id LIMIT 501`;
+    if (roster.length > 500) throw new HttpError(400, "ROSTER_LIMIT", "Satu sesi maksimal 500 santri.");
+    const [series] = await tx`INSERT INTO classroom_meeting_series (course_id, title, starts_at, ends_at, interval_days, occurrence_count, note, qr_rotate_seconds, qr_late_after_minutes, created_by, request_key, creation_payload)
+      VALUES (${courseId}, ${input.title}, ${input.startsAt}, ${input.endsAt}, ${input.intervalDays}, ${input.occurrenceCount}, ${input.note}, ${input.qrRotateSeconds}, ${input.qrLateAfterMinutes}, ${actor.id}, ${input.requestKey}, ${payload}::text::jsonb) RETURNING id`;
+    for (let index = 1; index <= input.occurrenceCount; index++) {
+      const [row] = await tx`INSERT INTO classroom_sessions (course_id, title, starts_at, ends_at, note, created_by, request_key, creation_payload, series_id, occurrence_index)
+        VALUES (${courseId}, ${input.title}, ${input.startsAt}::timestamptz + make_interval(days => ${(index - 1) * input.intervalDays}), ${input.endsAt}::timestamptz + make_interval(days => ${(index - 1) * input.intervalDays}), ${input.note}, ${actor.id}, ${crypto.randomUUID()}, ${payload}::text::jsonb, ${series!.id}, ${index}) RETURNING id`;
+      for (const student of roster) await tx`INSERT INTO classroom_roster (session_id, student_id, student_name, identifier) VALUES (${row!.id}, ${student.id}, ${student.display_name}, ${student.identifier})`;
+      await recordAudit(tx, actor.id, "classroom.session.created_from_series", "classroom_sessions", row!.id, requestId);
+    }
+    await recordAudit(tx, actor.id, "classroom.session_series.created", "classroom_meeting_series", series!.id, requestId);
+    return { id: series!.id as string, created: input.occurrenceCount };
   });
 }
 export async function listMeetings(db: SQL, actor: Actor, courseId: string, pattern: string, offset: number) {
@@ -154,6 +178,12 @@ export async function changeMeeting(db: SQL, actor: Actor, courseId: string, ses
     const status = input.action === "open" || input.action === "reopen" ? "open" : input.action === "close" ? "closed" : input.action === "cancel" ? "cancelled" : session.status;
     await tx`UPDATE classroom_sessions SET status = ${status}, note = ${input.action === "note" ? input.note : session.note}, reason = ${input.reason}, version = version + 1,
       last_operation = ${operation}::text::jsonb, updated_at = clock_timestamp() WHERE id = ${sessionId}`;
+    if (input.action === "open") await tx`INSERT INTO attendance_checkin_windows (session_id, status, rotate_seconds, late_after, opened_by)
+      SELECT ${sessionId}, 'open', COALESCE(series.qr_rotate_seconds, 30),
+        CASE WHEN series.qr_late_after_minutes IS NULL THEN NULL ELSE session.starts_at + make_interval(mins => series.qr_late_after_minutes) END,
+        ${actor.id}
+      FROM classroom_sessions session LEFT JOIN classroom_meeting_series series ON series.id = session.series_id
+      WHERE session.id = ${sessionId} ON CONFLICT (session_id) DO UPDATE SET status = 'open', updated_at = clock_timestamp()`;
     await tx`INSERT INTO classroom_session_events (session_id, actor_id, version, action, reason, note) VALUES (${sessionId}, ${actor.id}, ${session.version + 1}, ${input.action}, ${input.reason}, ${input.action === "note" ? input.note : session.note})`;
     const event = { open: "opened", close: "closed", reopen: "reopened", cancel: "cancelled", note: "note_updated" }[input.action];
     await recordAudit(tx, actor.id, `classroom.session.${event}`, "classroom_sessions", sessionId, requestId);

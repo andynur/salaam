@@ -12,6 +12,20 @@ export function meetingInput(body: Record<string, unknown>) {
   if (!startsAt || !endsAt || Date.parse(endsAt) <= Date.parse(startsAt) || Date.parse(endsAt) - Date.parse(startsAt) > 86400000) invalid("Durasi sesi harus lebih dari 0 dan maksimal 24 jam.");
   return { title: textField(body, "title", 150), startsAt, endsAt, requestKey: idField(body, "requestKey"), note: noteInput(body) };
 }
+export function meetingSeriesInput(body: Record<string, unknown>) {
+  const meeting = meetingInput(body);
+  const integer = (key: string, min: number, max: number, label: string) => {
+    const value = body[key];
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max) invalid(`${label} harus ${min}–${max}.`);
+    return value;
+  };
+  const intervalDays = integer("intervalDays", 1, 365, "Interval hari");
+  const occurrenceCount = integer("occurrenceCount", 1, 52, "Jumlah sesi");
+  const qrRotateSeconds = integer("qrRotateSeconds", 15, 300, "Rotasi kode QR");
+  const late = body.qrLateAfterMinutes;
+  if (late !== null && late !== undefined && (typeof late !== "number" || !Number.isSafeInteger(late) || late < 0 || late > 1440)) invalid("Batas terlambat harus 0–1440 menit atau kosong.");
+  return { ...meeting, intervalDays, occurrenceCount, qrRotateSeconds, qrLateAfterMinutes: late === null || late === undefined ? null : late as number };
+}
 export function attendanceInput(body: Record<string, unknown>) {
   if (typeof body.status !== "string" || !Object.hasOwn(attendanceLabels, body.status)) invalid("Pilih status kehadiran yang valid.");
   return { status: body.status as AttendanceStatus, note: noteInput(body), previousId: body.previousId === null ? null : idField(body, "previousId") };

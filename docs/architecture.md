@@ -19,7 +19,7 @@ measured operational requirement exists.
 | `src/modules/activities` | Assignments, submissions, grading |
 | `src/modules/assessments` | Question bank, quiz and exam settings, attempts, scoring, adjustments |
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
-| `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
+| `src/modules/attendance` | Meetings, recurring series, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
 | `src/modules/reporting` | Cross-course report queries, filter parsing, CSV encoding |
 | `src/modules/coding` | External execution contract, policy limits, and fail-closed runner adapter |
@@ -78,6 +78,7 @@ measured operational requirement exists.
 | `0007_attendance` | `classroom_sessions`, `classroom_roster`, `attendance_records`, `classroom_session_events` |
 | `0008_qr_attendance` | `attendance_checkin_windows`, `attendance_checkin_codes`, `attendance_checkins` |
 | `0009_reporting` | No table: the `reports.view` capability and report-query indexes |
+| `0011_roster_meeting_series` | `classroom_meeting_series` and recurring-session fields on `classroom_sessions` |
 
 - **Academic:** a course joins a class, a term, and a subject within one academic year;
   composite foreign keys keep classes and terms in the same year. Teachers link to courses
@@ -248,7 +249,10 @@ Manager-only session history reads those append-only events in 50-row pages. Bul
 marks up to 500 selected roster entries in one transaction: the session is locked `FOR UPDATE`,
 every predecessor is checked, and any stale row rolls the whole batch back. Identical retries
 skip rows whose latest status and note already match, while a successful batch emits
-`classroom.attendance.bulk_recorded`.
+`classroom.attendance.bulk_recorded`. Recurring templates materialize bounded real sessions in
+one transaction; every occurrence receives an independent roster snapshot and can be operated
+through the normal session lifecycle. Opening a generated occurrence creates its QR window from
+the series defaults.
 Course reports exclude cancelled sessions. Attendance percentages count present/late over
 closed sessions, while unrecorded and status counts include other noncancelled sessions.
 Dashboard tasks link managers to open sessions and students to nonexpired scheduled/open
