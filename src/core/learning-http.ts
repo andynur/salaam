@@ -13,6 +13,7 @@ import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modul
 import { adjustmentHistory, adjustScore, gradeWrittenAnswer, listAttempts } from "../modules/assessments/grading";
 import { saveChallenge } from "../modules/projects/challenges";
 import { createProject } from "../modules/projects/service";
+import { respondSurvey, saveSurvey, setSurveyQuestions } from "../modules/assessments/surveys";
 
 // Room for multipart boundaries and text fields around one maximum-size file.
 export const maxLearningUploadRequestBytes = maxUploadBytes + 256 * 1024;
@@ -80,6 +81,10 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await setAssessmentItems(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "rubric") {
           result = await saveRubric(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "surveys" && action === "questions") {
+          result = await setSurveyQuestions(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "surveys" && action === "respond") {
+          result = await respondSurvey(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "attempts") {
           const started = await startAttempt(db, actor, courseId, id, requestId);
           return Response.json(started, { status: started.resumed ? 200 : 201 });
@@ -102,6 +107,7 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           else if (resource === "questions") result = await saveQuestion(db, actor, courseId, body, requestId, id);
           else if (resource === "assessments") result = await saveAssessment(db, actor, courseId, body, requestId, id);
           else if (resource === "challenges") result = await saveChallenge(db, actor, courseId, body, requestId, id);
+          else if (resource === "surveys") result = await saveSurvey(db, actor, courseId, body, requestId, id);
           else throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
         } else throw new HttpError(404, "NOT_FOUND", "Operasi tidak ditemukan.");
         return Response.json(result, { status: created ? 201 : 200 });

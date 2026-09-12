@@ -9,6 +9,7 @@ import { Field, MutationForm, Pager, Search, Status, chosenFile, deviceTimezone,
 import { LessonAssessments, QuestionBank } from "./AssessmentPanel";
 import { AttemptRunner } from "./AttemptRunner";
 import { LessonChallenges } from "./ChallengePanel";
+import { LessonSurveys } from "./SurveyPanel";
 
 type Common = { timezone: string; onExpired: () => void };
 const accept = Object.keys(uploadTypes).map(extension => `.${extension}`).join(",");
@@ -74,6 +75,7 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
     ...data.activities.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: "Tugas", title: item.title })),
     ...data.assessments.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: item.kind === "exam" ? "Ujian" : "Quiz", title: item.title })),
     ...data.challenges.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: "Challenge", title: item.title })),
+    ...data.surveys.filter(item => item.archived).map(item => ({ path: `activities/${item.id}`, label: item.kind === "questionnaire" ? "Kuesioner" : "Survey", title: item.title })),
   ];
   const lesson = lessons.find(item => item.id === selectedLesson) ?? lessons[0];
   const publishButton = (path: string, published: boolean, label: string) => <Button className="button-secondary button-small" disabled={pending} onClick={() => void mutate(path ? `${path}/publish` : "publish", { published: !published }, published ? "Konten dikembalikan ke draft." : "Konten dipublikasikan. Santri dapat membukanya jika course, modul, dan lesson juga terbit.")} aria-label={`${published ? "Jadikan draft" : "Publikasikan"} ${label}`}>{published ? "Jadikan draft" : "Publikasikan"}</Button>;
@@ -112,6 +114,7 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
           </Card>
           <LessonAssessments courseId={courseId} lessonId={lesson.id} assessments={data.assessments} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
           <LessonChallenges courseId={courseId} lessonId={lesson.id} challenges={data.challenges} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
+          <LessonSurveys courseId={courseId} lessonId={lesson.id} surveys={data.surveys} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} onExpired={onExpired} />
         </>}</div>
       </div>}
       {course.canManage && archived.length > 0 && <Card className="lesson-card archive-card"><h2>Konten diarsipkan</h2><p className="learning-muted">Santri tidak melihat konten ini. Lesson, materi, tugas, quiz, dan challenge di dalam modul yang diarsipkan ikut tersembunyi sampai modulnya dipulihkan.</p>

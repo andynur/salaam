@@ -1,5 +1,6 @@
 export type QuestionType = "single_choice" | "multiple_choice" | "true_false" | "short_answer" | "essay";
 export type AssessmentKind = "quiz" | "exam";
+export type SurveyKind = "survey" | "questionnaire";
 export type ResultsVisibility = "after_submit" | "after_close" | "score_only" | "hidden";
 export interface QuestionOption { id: string; text: string }
 export interface Question { id: string; type: QuestionType; prompt: string; options: QuestionOption[]; correct: string[]; explanation: string; archived: boolean; usage: number; createdAt: string }
@@ -11,6 +12,8 @@ export interface Assessment {
   id: string; lessonId: string; kind: AssessmentKind; title: string; instructions: string; published: boolean; archived: boolean;
   settings: AssessmentSettings; questionCount: number; maxScore: number; locked: boolean; items: AssessmentItem[] | null; attempts: AttemptSummary[];
 }
+export interface SurveyQuestion { id: string; prompt: string; type: "single_choice" | "multiple_choice" | "short_answer"; options: QuestionOption[]; required: boolean; position: number }
+export interface Survey { id: string; lessonId: string; kind: SurveyKind; title: string; instructions: string; published: boolean; archived: boolean; locked: boolean; questions: SurveyQuestion[]; responded: boolean; response: Record<string, string | string[]> | null }
 export interface ManualQuestionGrade { id: string; score: number; feedback: string; createdAt: string }
 export interface RubricCriterion { id: string; label: string; description: string; maxPoints: number }
 export interface AssessmentRubric { id: string; questionId: string; title: string; criteria: RubricCriterion[] }

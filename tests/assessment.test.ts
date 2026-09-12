@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, rubricInput, settingsInput } from "../src/modules/assessments/input";
+import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, rubricInput, settingsInput, surveyQuestionsInput } from "../src/modules/assessments/input";
 
 test("questions support choice and written answers with valid answer keys", () => {
   expect(questionInput({ type: "single_choice", prompt: " 2 + 2? ", options: ["3", " 4 "], correct: ["b"] })).toEqual({
@@ -53,4 +53,9 @@ test("assessment items, autosaved answers and score adjustments are strictly bou
   }
   expect(adjustmentInput({ score: 7.5, reason: " Salah kunci soal 3 " })).toEqual({ score: 7.5, reason: "Salah kunci soal 3" });
   for (const body of [{ score: -1, reason: "x" }, { score: 1.001, reason: "x" }, { score: 5, reason: " " }]) expect(() => adjustmentInput(body)).toThrow();
+});
+test("survey questions normalize options and reject duplicates", () => {
+  expect(surveyQuestionsInput({ questions: [{ prompt: "Alasan?", type: "short_answer", required: true }] })[0]?.options).toEqual([]);
+  expect(surveyQuestionsInput({ questions: [{ prompt: "Pilihan", type: "single_choice", options: ["Ya", "Tidak"] }] })[0]?.options[1]?.id).toBe("b");
+  expect(() => surveyQuestionsInput({ questions: [{ prompt: "Pilihan", type: "single_choice", options: ["Ya", "ya"] }] })).toThrow();
 });

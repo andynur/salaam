@@ -22,9 +22,10 @@ Coding agents follow skill `deliver-phase`.
 | 12 | Pilot readiness and operational hardening | In progress — [record](phases/12-pilot-readiness.md) |
 | 13 | Academic operations | Delivered — [record](phases/13-academic-operations.md) |
 | 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
-| 15 | Submission lifecycle | In progress — [record](phases/15-submission-lifecycle.md) |
+| 15 | Submission lifecycle | Delivered — [record](phases/15-submission-lifecycle.md) |
 | 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
 | 17 | Assessment rubrics | Delivered — [record](phases/17-assessment-rubrics.md) |
+| 18 | Surveys and questionnaires | In progress — [record](phases/18-surveys-questionnaires.md) |
 
 ## Delivered
 
@@ -49,7 +50,7 @@ grading, and student progress on the shared Activity Engine.
 
 Question banks, quizzes and exams, attempts, timers, randomization, autosave, reconnect
 recovery, automatic scoring, idempotent final submission, and written-answer manual grading
-(Phase 16). Rubrics and surveys remain deferred.
+(Phase 16). Rubrics (Phase 17) and surveys/questionnaires (Phase 18) extend the engine.
 
 ### Phase 4 — Project learning
 
@@ -147,8 +148,7 @@ Boundaries section has the details.
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
   scanning and inline previews; rich text or Markdown.
-- **Phase 3:** surveys and questionnaires; partial credit and negative marking; time extensions
-  and accommodations;
+- **Phase 3:** partial credit and negative marking; time extensions and accommodations;
   proctoring; question import, export, pools, and statistics; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and

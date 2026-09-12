@@ -1,4 +1,4 @@
-import type { Assessment } from "./assessment";
+import type { Assessment, Survey } from "./assessment";
 import type { Challenge } from "./project";
 
 export interface Page<T> { items: T[]; nextOffset: number | null }
@@ -11,7 +11,7 @@ export interface Grade { id: string; score: number; feedback: string; createdAt:
 export interface Submission { id: string; activityId: string; studentId: string; studentName: string; content: string; file: StoredFile | null; submittedAt: string; revision: number; status: "submitted" | "returned"; returnReason?: string | null; grade: Grade | null }
 export interface Activity { id: string; lessonId: string; kind: "assignment"; title: string; instructions: string; dueAt: string | null; published: boolean; archived: boolean; submission: Submission | null }
 export interface Progress { studentId: string; studentName: string; lessons: number; completed: number; activities: number; submitted: number; graded: number }
-export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; challenges: Challenge[]; progress: Progress | null }
+export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; surveys: Survey[]; challenges: Challenge[]; progress: Progress | null }
 // `projectId` is set for a student's challenge task when their project already exists.
 export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading" | "challenge" | "review" | "attendance"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number; projectId?: string | null }
 

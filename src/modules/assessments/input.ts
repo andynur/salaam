@@ -120,3 +120,32 @@ export function rubricInput(body: Record<string, unknown>) {
   if (new Set(criteria.map(item => item.id)).size !== criteria.length) invalid("ID kriteria rubric harus unik.");
   return { title, criteria };
 }
+export function surveyKindInput(body: Record<string, unknown>) {
+  if (body.kind !== "survey" && body.kind !== "questionnaire") invalid("Pilih jenis survey atau questionnaire.");
+  return body.kind as "survey" | "questionnaire";
+}
+export function surveyQuestionsInput(body: Record<string, unknown>) {
+  const raw = body.questions;
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 100) invalid("Survey membutuhkan 1–100 pertanyaan.");
+  return raw.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) invalid(`Pertanyaan ${index + 1} tidak valid.`);
+    const row = item as Record<string, unknown>;
+    const prompt = textField(row, "prompt", 5000);
+    const type = row.type;
+    if (type !== "single_choice" && type !== "multiple_choice" && type !== "short_answer") invalid("Jenis pertanyaan survey tidak valid.");
+    const required = row.required ?? true;
+    if (typeof required !== "boolean") invalid("Status wajib pertanyaan tidak valid.");
+    const options = type === "short_answer" ? [] : row.options;
+    if (type !== "short_answer") {
+      if (!Array.isArray(options) || options.length < 2 || options.length > 10 || options.some(option => typeof option !== "string" || !option.trim() || option.trim().length > 1000)) invalid("Pertanyaan pilihan membutuhkan 2–10 opsi.");
+      if (new Set((options as string[]).map(option => option.trim().toLowerCase())).size !== options.length) invalid("Setiap opsi survey harus berbeda.");
+    }
+    const optionValues = options as string[];
+    return { prompt, type, options: optionValues.map((option, optionIndex) => ({ id: String.fromCharCode(97 + optionIndex), text: option.trim() })), required, position: index };
+  });
+}
+export function surveyAnswersInput(body: Record<string, unknown>) {
+  const answers = body.answers;
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) invalid("Jawaban survey tidak valid.");
+  return answers as Record<string, unknown>;
+}

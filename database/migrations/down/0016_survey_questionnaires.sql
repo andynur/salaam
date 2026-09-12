@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS survey_responses CASCADE;
+DROP TABLE IF EXISTS survey_questions CASCADE;
+DROP TABLE IF EXISTS survey_settings CASCADE;

@@ -279,6 +279,26 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     expect((await json<CourseDetail>(request(path(f.courseId), student))).assessments).toEqual([]);
   });
 
+  test("surveys validate, publish, count as submitted and accept one immutable response", async () => {
+    const f = await course();
+    const survey = (await json<{ id: string }>(post(f.courseId, "surveys", { lessonId: f.lessonId, kind: "survey", title: "Refleksi", instructions: "Jawab jujur." }), 201)).id;
+    await json(post(f.courseId, `surveys/${survey}/questions`, { questions: [
+      { prompt: "Apa yang paling membantu?", type: "short_answer", required: true },
+      { prompt: "Pilih manfaat", type: "multiple_choice", options: ["Materi", "Diskusi"], required: false },
+    ] }));
+    expect((await post(f.courseId, `activities/${survey}/publish`, { published: true })).status).toBe(200);
+    const view = await json<CourseDetail>(request(path(f.courseId), student));
+    const item = view.surveys.find(value => value.id === survey)!;
+    expect(item.questions).toHaveLength(2);
+    expect((await post(f.courseId, `surveys/${survey}/respond`, { answers: {} }, student)).status).toBe(400);
+    const answers = { [item.questions[0]!.id]: "Diskusi", [item.questions[1]!.id]: ["a"] };
+    expect(await json<{ id: string }>(post(f.courseId, `surveys/${survey}/respond`, { answers }, student))).toHaveProperty("id");
+    expect(await json<{ id: string }>(post(f.courseId, `surveys/${survey}/respond`, { answers }, student))).toHaveProperty("id");
+    expect((await post(f.courseId, `surveys/${survey}/respond`, { answers: { ...answers, [item.questions[0]!.id]: "Lain" } }, student)).status).toBe(409);
+    expect((await json<CourseDetail>(request(path(f.courseId), student))).surveys.find(value => value.id === survey)?.responded).toBe(true);
+    expect((await post(f.courseId, `surveys/${survey}/respond`, { answers }, outsider)).status).toBe(404);
+  });
+
   test("125 students start, answer and submit one exam concurrently", async () => {
     const loadClass = await academic("classes", { yearId, name: `Load ${crypto.randomUUID().slice(0, 8)}` });
     const f = await course(loadClass);

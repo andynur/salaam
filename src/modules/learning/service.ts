@@ -12,6 +12,7 @@ import { archivedInput, materialInput, positionInput, publishedInput } from "./i
 import { listActivities } from "../activities/service";
 import { listAssessments } from "../assessments/service";
 import { listChallenges } from "../projects/challenges";
+import { listSurveys } from "../assessments/surveys";
 
 export async function listCourses(db: SQL, actor: Actor, pattern: string, offset: number) {
   requirePermission(actor, "learning.view");
@@ -41,8 +42,9 @@ export async function progressRows(db: SQL, courseId: string, studentId: string 
       (SELECT count(*)::int FROM visible_activities) AS activities,
       (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id)
         OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)
-        OR EXISTS (SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id
-          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.first_submitted_at IS NOT NULL)) AS submitted,
+      OR EXISTS (SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id
+          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.first_submitted_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM survey_responses sr WHERE sr.activity_id = a.id AND sr.student_id = u.id)) AS submitted,
       (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id
           AND EXISTS (SELECT 1 FROM submission_grades g WHERE g.submission_id = s.id))
         OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)
@@ -75,8 +77,9 @@ export async function courseDetail(db: SQL, actor: Actor, courseId: string): Pro
     const activities = await listActivities(tx, actor, courseId, drafts);
     const assessments = await listAssessments(tx, actor, courseId, drafts);
     const challenges = await listChallenges(tx, actor, courseId, drafts);
+    const surveys = await listSurveys(tx, actor, courseId, drafts);
     const progress = access.canParticipate ? (await progressRows(tx, courseId, actor.id))[0] ?? null : null;
-    return { ...access, modules, lessons, materials, activities, assessments, challenges, progress };
+    return { ...access, modules, lessons, materials, activities, assessments, surveys, challenges, progress };
   });
 }
 
@@ -148,9 +151,10 @@ export async function publishContent(db: SQL, actor: Actor, courseId: string, re
       case "modules": rows = await tx`UPDATE course_modules SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
       case "lessons": rows = await tx`UPDATE lessons SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
       case "activities":
-        if (published && (await tx`SELECT 1 FROM activities a WHERE a.id = ${id} AND a.course_id = ${courseId} AND a.kind IN ('quiz', 'exam')
-            AND NOT EXISTS (SELECT 1 FROM assessment_questions aq WHERE aq.activity_id = a.id)`).length) {
-          throw new HttpError(409, "NO_QUESTIONS", "Tambahkan soal sebelum mempublikasikan penilaian.");
+        if (published && (await tx`SELECT 1 FROM activities a WHERE a.id = ${id} AND a.course_id = ${courseId} AND (
+            (a.kind IN ('quiz', 'exam') AND NOT EXISTS (SELECT 1 FROM assessment_questions aq WHERE aq.activity_id = a.id)) OR
+            (a.kind IN ('survey', 'questionnaire') AND NOT EXISTS (SELECT 1 FROM survey_questions sq WHERE sq.activity_id = a.id)))`).length) {
+          throw new HttpError(409, "NO_QUESTIONS", "Tambahkan pertanyaan sebelum mempublikasikan aktivitas.");
         }
         rows = await tx`UPDATE activities SET published = ${published} WHERE id = ${id} AND course_id = ${courseId} RETURNING id`; break;
     }
