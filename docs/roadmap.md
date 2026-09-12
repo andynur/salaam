@@ -32,7 +32,7 @@ Coding agents follow skill `deliver-phase`.
 | 22 | Assessment question pools | Delivered — [record](phases/22-assessment-question-pools.md) |
 | 23 | Question statistics | Delivered — [record](phases/23-question-statistics.md) |
 | 24 | Project task metadata | Delivered — [record](phases/24-project-task-metadata.md) |
-| 25 | Project task comments | In progress — [record](phases/25-project-task-comments.md) |
+| 25 | Project task comments | Delivered — [record](phases/25-project-task-comments.md) |
 
 ## Delivered
 
