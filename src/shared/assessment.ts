@@ -12,7 +12,10 @@ export interface Assessment {
   settings: AssessmentSettings; questionCount: number; maxScore: number; locked: boolean; items: AssessmentItem[] | null; attempts: AttemptSummary[];
 }
 export interface ManualQuestionGrade { id: string; score: number; feedback: string; createdAt: string }
-export interface AttemptQuestion { questionId: string; position: number; type: QuestionType; prompt: string; options: QuestionOption[]; points: number; selected: string[]; answerText: string | null; revision: number; correct: string[] | null; explanation: string | null; awarded: number | null; manualGrade: ManualQuestionGrade | null }
+export interface RubricCriterion { id: string; label: string; description: string; maxPoints: number }
+export interface AssessmentRubric { id: string; questionId: string; title: string; criteria: RubricCriterion[] }
+export interface ManualQuestionGrade { id: string; score: number; feedback: string; createdAt: string; breakdown: { criterionId: string; score: number }[] }
+export interface AttemptQuestion { questionId: string; position: number; type: QuestionType; prompt: string; options: QuestionOption[]; points: number; selected: string[]; answerText: string | null; revision: number; correct: string[] | null; explanation: string | null; awarded: number | null; rubric: AssessmentRubric | null; manualGrade: ManualQuestionGrade | null }
 export interface AttemptDetail extends AttemptSummary { activityId: string; studentId: string; studentName: string; serverNow: string; resultsVisible: boolean; scoreVisible: boolean; canAnswer: boolean; questions: AttemptQuestion[] }
 export interface AttemptRow extends AttemptSummary { studentId: string; studentName: string }
 export interface ScoreAdjustment { id: string; score: number; reason: string; graderName: string; createdAt: string }

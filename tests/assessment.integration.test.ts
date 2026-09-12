@@ -173,6 +173,7 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
       { type: "short_answer", prompt: "Sebutkan satu tag semantik." },
       { type: "essay", prompt: "Jelaskan manfaat HTML semantik." },
     ], [2, 5]);
+    await json(post(f.courseId, `assessments/${q.id}/rubric`, { questionId: q.questionIds[1], title: "Kualitas jawaban", criteria: [{ id: "content", label: "Isi", description: "Ketepatan isi", maxPoints: 3 }, { id: "clarity", label: "Kejelasan", description: "Kejelasan penjelasan", maxPoints: 2 }] }));
     const attempt = await json<{ id: string }>(start(f.courseId, q.id), 201);
     const [short, essay] = q.questionIds;
     expect((await writtenAnswer(f.courseId, attempt.id, short!, "<main>", 1)).status).toBe(200);
@@ -183,11 +184,12 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     await json(post(f.courseId, `attempts/${attempt.id}/submit`, {}, student));
     const before = await detail(f.courseId, attempt.id);
     expect(before.score).toBe(0);
-    const grade = await json<{ id: string }>(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", previousGradeId: null }));
+    const firstBreakdown = [{ criterionId: "content", score: 3 }, { criterionId: "clarity", score: 1.5 }];
+    const grade = await json<{ id: string }>(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", breakdown: firstBreakdown, previousGradeId: null }));
     expect((await json<AttemptDetail>(request(path(f.courseId, `attempts/${attempt.id}`), student))).score).toBe(4.5);
-    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", previousGradeId: null })).status).toBe(200);
-    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", previousGradeId: null })).status).toBe(409);
-    await json(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", previousGradeId: grade.id }));
+    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", breakdown: firstBreakdown, previousGradeId: null })).status).toBe(200);
+    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", breakdown: [{ criterionId: "content", score: 3 }, { criterionId: "clarity", score: 2 }], previousGradeId: null })).status).toBe(409);
+    await json(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", breakdown: [{ criterionId: "content", score: 3 }, { criterionId: "clarity", score: 2 }], previousGradeId: grade.id }));
     expect((await detail(f.courseId, attempt.id, student)).questions.find(question => question.questionId === essay)).toMatchObject({ awarded: 5, manualGrade: { score: 5, feedback: "Revisi." } });
   });
 

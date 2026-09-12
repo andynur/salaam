@@ -1,10 +1,10 @@
 import type { SQL } from "bun";
 import type { Actor } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
-import { idField, textField } from "../../core/validation";
+import { idField, invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, lessonAccess, notFound } from "../learning/access";
-import { assessmentKindInput, itemsInput, settingsInput } from "./input";
+import { assessmentKindInput, itemsInput, rubricInput, settingsInput } from "./input";
 import type { Assessment } from "../../shared/assessment";
 
 async function lockedByAttempts(db: SQL, activityId: string) {
@@ -68,6 +68,34 @@ export async function setAssessmentItems(db: SQL, actor: Actor, courseId: string
       FROM jsonb_to_recordset(${JSON.stringify(items)}::text::jsonb) AS item("questionId" uuid, position integer, points numeric)`;
     await recordAudit(tx, actor.id, "assessment.items.updated", "activities", activityId, requestId);
     return { id: activityId, questionCount: items.length };
+  });
+}
+
+export async function saveRubric(db: SQL, actor: Actor, courseId: string, activityId: string, body: Record<string, unknown>, requestId: string) {
+  const questionId = idField(body, "questionId");
+  const input = rubricInput(body);
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    if ((await tx`SELECT 1 FROM attempts WHERE activity_id = ${activityId} LIMIT 1`).length) throw new HttpError(409, "ASSESSMENT_LOCKED", "Rubric terkunci setelah penilaian dikerjakan.");
+    const question = (await tx<{ type: string; points: number }[]>`SELECT q.type, aq.points::float8 AS points FROM assessment_questions aq JOIN questions q ON q.id = aq.question_id
+      JOIN activities a ON a.id = aq.activity_id WHERE aq.activity_id = ${activityId} AND aq.question_id = ${questionId} AND a.course_id = ${courseId}`)[0];
+    if (!question) notFound();
+    if (question.type !== "short_answer" && question.type !== "essay") throw new HttpError(409, "NOT_WRITTEN", "Rubric hanya tersedia untuk jawaban tertulis.");
+    const total = input.criteria.reduce((sum, criterion) => sum + criterion.maxPoints, 0);
+    if (total <= 0 || total > question.points) invalid(`Total poin rubric harus antara 0 dan ${question.points}.`);
+    const [row] = await tx`INSERT INTO assessment_rubrics (course_id, activity_id, question_id, title, criteria, created_by)
+      VALUES (${courseId}, ${activityId}, ${questionId}, ${input.title}, ${JSON.stringify(input.criteria)}::text::jsonb, ${actor.id})
+      ON CONFLICT (activity_id, question_id) DO UPDATE SET title = EXCLUDED.title, criteria = EXCLUDED.criteria, updated_at = clock_timestamp()
+      RETURNING id, question_id AS "questionId", title, criteria`;
+    await recordAudit(tx, actor.id, "assessment.rubric.saved", "activities", activityId, requestId);
+    return row!;
+  });
+}
+
+export async function listRubrics(db: SQL, actor: Actor, courseId: string, activityId: string) {
+  return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
+    await courseAccess(tx, actor, courseId, "manage");
+    return tx`SELECT id, question_id AS "questionId", title, criteria FROM assessment_rubrics WHERE course_id = ${courseId} AND activity_id = ${activityId}`;
   });
 }
 

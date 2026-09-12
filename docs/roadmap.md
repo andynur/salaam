@@ -24,6 +24,7 @@ Coding agents follow skill `deliver-phase`.
 | 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
 | 15 | Submission lifecycle | In progress — [record](phases/15-submission-lifecycle.md) |
 | 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
+| 17 | Assessment rubrics | In progress — [record](phases/17-assessment-rubrics.md) |
 
 ## Delivered
 
@@ -124,6 +125,11 @@ Quiz and exam question banks accept short-answer and essay questions. Answers ar
 separately from choice selections, and teachers manually grade each written answer with
 append-only corrections.
 
+### Phase 17 — Assessment rubrics
+
+Written assessment questions can carry bounded criteria. Teachers grade each criterion and the
+system stores the breakdown with the append-only manual grade history.
+
 ## Planned
 
 ### Phase 12 and later
@@ -141,8 +147,8 @@ Boundaries section has the details.
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
   scanning and inline previews; rich text or Markdown.
-- **Phase 3:** rubrics; surveys and questionnaires; partial credit and negative marking; time
-  extensions and accommodations;
+- **Phase 3:** surveys and questionnaires; partial credit and negative marking; time extensions
+  and accommodations;
   proctoring; question import, export, pools, and statistics; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and

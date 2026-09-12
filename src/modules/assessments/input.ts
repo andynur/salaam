@@ -1,5 +1,5 @@
 import { idField, invalid, textField } from "../../core/validation";
-import type { AssessmentKind, AssessmentSettings, QuestionOption, QuestionType, ResultsVisibility } from "../../shared/assessment";
+import type { AssessmentKind, AssessmentSettings, QuestionOption, QuestionType, ResultsVisibility, RubricCriterion } from "../../shared/assessment";
 
 const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 const twoDecimals = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) <= 0.000001;
@@ -92,5 +92,31 @@ export function adjustmentInput(body: Record<string, unknown>) {
 export function manualGradeInput(body: Record<string, unknown>) {
   const score = body.score;
   if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || !twoDecimals(score)) invalid("Nilai harus 0 atau lebih, maksimal dua desimal.");
-  return { score, feedback: textField(body, "feedback", 5000) };
+  const raw = body.breakdown ?? [];
+  if (!Array.isArray(raw) || raw.length > 10 || raw.some(item => !item || typeof item !== "object" || Array.isArray(item))) invalid("Breakdown rubric tidak valid.");
+  const breakdown = raw.map(item => {
+    const row = item as Record<string, unknown>;
+    const criterionId = textField(row, "criterionId", 50);
+    const criterionScore = row.score;
+    if (typeof criterionScore !== "number" || !Number.isFinite(criterionScore) || criterionScore < 0 || !twoDecimals(criterionScore)) invalid("Nilai kriteria rubric tidak valid.");
+    return { criterionId, score: criterionScore };
+  });
+  return { score, feedback: textField(body, "feedback", 5000), breakdown };
+}
+export function rubricInput(body: Record<string, unknown>) {
+  const title = textField(body, "title", 150);
+  const raw = body.criteria;
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 10) invalid("Rubric membutuhkan 1–10 kriteria.");
+  const criteria = raw.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) invalid(`Kriteria ${index + 1} tidak valid.`);
+    const row = item as Record<string, unknown>;
+    const id = textField(row, "id", 50).toLowerCase();
+    const label = textField(row, "label", 150);
+    const description = textField(row, "description", 1000);
+    const maxPoints = row.maxPoints;
+    if (typeof maxPoints !== "number" || !Number.isFinite(maxPoints) || maxPoints <= 0 || maxPoints > 1000 || !twoDecimals(maxPoints)) invalid(`Kriteria ${index + 1}: poin tidak valid.`);
+    return { id, label, description, maxPoints } satisfies RubricCriterion;
+  });
+  if (new Set(criteria.map(item => item.id)).size !== criteria.length) invalid("ID kriteria rubric harus unik.");
+  return { title, criteria };
 }

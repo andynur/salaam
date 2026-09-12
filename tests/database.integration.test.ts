@@ -93,6 +93,9 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
   });
   // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
   test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
+    expect(await rollback(db)).toBe("0015_assessment_rubrics.sql");
+    expect((await db`SELECT to_regclass('assessment_rubrics') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'attempt_question_grades' AND column_name = 'breakdown'`).length).toBe(0);
     expect(await rollback(db)).toBe("0014_assessment_written_answers.sql");
     expect((await db`SELECT to_regclass('attempt_question_grades') AS relation`)[0].relation).toBeNull();
     expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'attempt_answers' AND column_name = 'answer_text'`).length).toBe(0);
@@ -118,7 +121,7 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
 
     const allNames = (await readMigrations("database/migrations")).map(migration => migration.name);
     const result = await reset(db);
-    expect(result.rolledBack).toEqual(allNames.slice(0, -5).reverse());
+    expect(result.rolledBack).toEqual(allNames.slice(0, -6).reverse());
     expect(result.applied).toEqual(allNames);
     expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).not.toBeNull();
     expect((await db`SELECT * FROM users`).length).toBe(0);

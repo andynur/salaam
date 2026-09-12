@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, settingsInput } from "../src/modules/assessments/input";
+import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, rubricInput, settingsInput } from "../src/modules/assessments/input";
 
 test("questions support choice and written answers with valid answer keys", () => {
   expect(questionInput({ type: "single_choice", prompt: " 2 + 2? ", options: ["3", " 4 "], correct: ["b"] })).toEqual({
@@ -45,7 +45,9 @@ test("assessment items, autosaved answers and score adjustments are strictly bou
   expect(answerInput({ questionId, selected: ["c", "a", "c"], revision: 3 })).toEqual({ questionId, selected: ["a", "c"], answerText: null, revision: 3 });
   expect(answerInput({ questionId, selected: [], revision: 1 }).selected).toEqual([]);
   expect(answerInput({ questionId, answerText: " Jawaban tertulis ", revision: 2 })).toMatchObject({ answerText: "Jawaban tertulis" });
-  expect(manualGradeInput({ score: 4.5, feedback: "Argumen cukup kuat." })).toEqual({ score: 4.5, feedback: "Argumen cukup kuat." });
+  expect(manualGradeInput({ score: 4.5, feedback: "Argumen cukup kuat." })).toEqual({ score: 4.5, feedback: "Argumen cukup kuat.", breakdown: [] });
+  expect(rubricInput({ title: "Kualitas", criteria: [{ id: "isi", label: "Isi", description: "Akurat", maxPoints: 2 }] }).criteria[0]?.id).toBe("isi");
+  expect(() => rubricInput({ title: "Kualitas", criteria: [{ id: "isi", label: "Isi", description: "Akurat", maxPoints: 0 }] })).toThrow();
   for (const body of [{ questionId, selected: ["z"], revision: 1 }, { questionId, selected: "a", revision: 1 }, { questionId, selected: ["a"], revision: 0 }, { questionId, selected: ["a"], revision: 1.5 }]) {
     expect(() => answerInput(body)).toThrow();
   }

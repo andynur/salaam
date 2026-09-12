@@ -8,7 +8,7 @@ import { maxUploadBytes } from "../shared/learning";
 import { archiveContent, completeLesson, courseDetail, courseProgress, listCourses, materialFile, publishContent, saveContent } from "../modules/learning/service";
 import { grantDeadlineException, gradeHistory, gradeSubmission, listSubmissions, returnSubmission, saveActivity, submissionFile, submitActivity } from "../modules/activities/service";
 import { archiveQuestion, listQuestions, saveQuestion } from "../modules/assessments/questions";
-import { saveAssessment, setAssessmentItems } from "../modules/assessments/service";
+import { listRubrics, saveAssessment, saveRubric, setAssessmentItems } from "../modules/assessments/service";
 import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modules/assessments/attempts";
 import { adjustmentHistory, adjustScore, gradeWrittenAnswer, listAttempts } from "../modules/assessments/grading";
 import { saveChallenge } from "../modules/projects/challenges";
@@ -41,6 +41,7 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           if (resource === "materials" && action === "file") return fileResponse(storageRoot, await materialFile(db, actor, courseId, id));
           if (resource === "submissions" && action === "file") return fileResponse(storageRoot, await submissionFile(db, actor, courseId, id));
           if (resource === "assessments" && action === "attempts") return Response.json(page(await listAttempts(db, actor, courseId, id, pattern, offset, requestId), offset));
+          if (resource === "assessments" && action === "rubrics") return Response.json(await listRubrics(db, actor, courseId, id));
           if (resource === "attempts" && action === "adjustments") return Response.json(page(await adjustmentHistory(db, actor, courseId, id, offset), offset));
         }
       } else if (request.method === "POST" || request.method === "PATCH") {
@@ -77,6 +78,8 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await grantDeadlineException(db, actor, courseId, id, studentId, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "items") {
           result = await setAssessmentItems(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "assessments" && action === "rubric") {
+          result = await saveRubric(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "attempts") {
           const started = await startAttempt(db, actor, courseId, id, requestId);
           return Response.json(started, { status: started.resumed ? 200 : 201 });

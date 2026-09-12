@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { Assessment, AssessmentKind, AttemptRow, Question, QuestionType, ResultsVisibility, ScoreAdjustment } from "../../shared/assessment";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { Assessment, AssessmentKind, AssessmentRubric, AttemptRow, Question, QuestionType, ResultsVisibility, RubricCriterion, ScoreAdjustment } from "../../shared/assessment";
 import type { Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState } from "../components/ui";
@@ -63,6 +63,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
   const [q, setQ] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [rubricFor, setRubricFor] = useState("");
   const saving = useRef(false);
   const bank = useData<Page<Question>>(`${learningApi}/${courseId}/questions?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired);
   const locked = Boolean(value?.locked);
@@ -108,8 +109,11 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
         {bank.error ? <ErrorState message={bank.error} retry={bank.retry} /> : !bank.data ? <LoadingState /> : !bank.data.items.length ? <p className="learning-muted">Belum ada soal. Tambahkan soal di tab Bank soal.</p>
           : bank.data.items.map(question => {
             const item = picked.find(entry => entry.questionId === question.id);
+            const written = question.type === "short_answer" || question.type === "essay";
             return <div className="picker-row" key={question.id}><label className="submission-confirm"><input type="checkbox" checked={Boolean(item)} onChange={() => toggle(question.id)} /><span><small className="text-muted">{typeLabels[question.type]}</small><br />{question.prompt}</span></label>
-              {item && <label className="picker-points"><span>Poin</span><input className="input" type="number" min={0.01} max={1000} step="0.01" value={item.points} onChange={event => setPicked(items => items.map(entry => entry.questionId === question.id ? { ...entry, points: Number(event.target.value) } : entry))} /></label>}</div>;
+              {item && <label className="picker-points"><span>Poin</span><input className="input" type="number" min={0.01} max={1000} step="0.01" value={item.points} onChange={event => setPicked(items => items.map(entry => entry.questionId === question.id ? { ...entry, points: Number(event.target.value) } : entry))} /></label>}
+              {written && item && value?.id && <Button className="button-secondary button-small" onClick={() => setRubricFor(rubricFor === question.id ? "" : question.id)}>Rubric</Button>}
+              {rubricFor === question.id && value?.id && <RubricEditor courseId={courseId} activityId={value.id} questionId={question.id} onExpired={onExpired} />}</div>;
           })}
         {bank.data && <Pager offset={offset} next={bank.data.nextOffset} change={setOffset} />}
       </div>
@@ -117,6 +121,28 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
     </fieldset>{error && <ErrorState message={error} />}</form>
     <p className="learning-muted">Publikasikan setelah soal dipilih. Pilihan ganda banyak jawaban dinilai benar hanya jika semua pilihan tepat. Sisa waktu dihitung oleh server ({timezone}).</p>
   </Card>;
+}
+
+function RubricEditor({ courseId, activityId, questionId, onExpired }: { courseId: string; activityId: string; questionId: string; onExpired: () => void }) {
+  const { data, error, retry } = useData<AssessmentRubric[]>(`${learningApi}/${courseId}/assessments/${activityId}/rubrics`, onExpired);
+  const [title, setTitle] = useState("");
+  const [criteria, setCriteria] = useState<RubricCriterion[]>([{ id: "criterion-1", label: "", description: "", maxPoints: 1 }]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (loaded || !data) return;
+    const existing = data.find(item => item.questionId === questionId);
+    if (existing) { setTitle(existing.title); setCriteria(existing.criteria); }
+    setLoaded(true);
+  }, [data, loaded, questionId]);
+  if (error) return <ErrorState message={error} retry={retry} />;
+  if (!data) return <LoadingState />;
+  return <div className="rubric-editor field-wide"><strong>{data.some(item => item.questionId === questionId) ? "Edit rubric" : "Buat rubric"}</strong>
+    <MutationForm path={`${learningApi}/${courseId}/assessments/${activityId}/rubric`} label="Simpan rubric" onExpired={onExpired} saved={() => setLoaded(false)} body={form => ({ questionId, title: form.get("rubricTitle"), criteria: criteria.map(criterion => ({ ...criterion, label: form.get(`label-${criterion.id}`), description: form.get(`description-${criterion.id}`), maxPoints: Number(form.get(`points-${criterion.id}`)) })) })}>
+      <Field name="rubricTitle" label="Judul rubric" value={title} />
+      {criteria.map((criterion, index) => <div className="picker-row" key={criterion.id}><Field name={`label-${criterion.id}`} label={`Kriteria ${index + 1}`} value={criterion.label} /><Field name={`description-${criterion.id}`} label="Deskripsi" value={criterion.description} /><Field name={`points-${criterion.id}`} label="Poin" type="number" min={0.01} max={1000} step="0.01" value={criterion.maxPoints} /></div>)}
+    </MutationForm>
+    <Button className="button-secondary button-small" onClick={() => setCriteria(items => [...items, { id: `criterion-${items.length + 1}`, label: "", description: "", maxPoints: 1 }])}>Tambah kriteria</Button>
+  </div>;
 }
 
 export function QuestionBank({ courseId, onExpired }: Pick<Common, "courseId" | "onExpired">) {

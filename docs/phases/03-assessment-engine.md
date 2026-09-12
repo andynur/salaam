@@ -182,8 +182,8 @@ database, browser profile, and generated credentials were removed after validati
 
 Phase 3 does not include:
 
-- essay or short-answer questions, manual per-question grading, or rubrics (deferred by
-  the question-type scope decision)
+- essay or short-answer questions and manual per-question grading (delivered in Phase 16),
+  plus rubrics (delivered in Phase 17)
 - surveys and questionnaires
 - partial credit for multiple choice, negative marking, or question weighting beyond
   points

@@ -115,7 +115,8 @@ export async function attemptDetail(db: SQL, actor: Actor, courseId: string, att
     const scoreVisible = resultsVisible || (submitted && row.visibility === "score_only");
     const questions = await tx<AttemptQuestion[]>`SELECT q.question_id AS "questionId", q.position, q.type, q.prompt, q.options, q.points::float8 AS points,
         q.correct, q.explanation, COALESCE(ans.selected, '[]'::jsonb) AS selected, ans.answer_text AS "answerText", COALESCE(ans.revision, 0) AS revision, ans.awarded::float8 AS awarded,
-        (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text) FROM attempt_question_grades g WHERE g.attempt_id = q.attempt_id AND g.question_id = q.question_id ORDER BY g.created_at DESC, g.id DESC LIMIT 1) AS "manualGrade"
+        (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text, 'breakdown', g.breakdown) FROM attempt_question_grades g WHERE g.attempt_id = q.attempt_id AND g.question_id = q.question_id ORDER BY g.created_at DESC, g.id DESC LIMIT 1) AS "manualGrade",
+        (SELECT json_build_object('id', r.id, 'questionId', r.question_id, 'title', r.title, 'criteria', r.criteria) FROM assessment_rubrics r JOIN attempts t ON t.activity_id = r.activity_id WHERE t.id = q.attempt_id AND r.question_id = q.question_id) AS rubric
       FROM attempt_questions q LEFT JOIN attempt_answers ans ON ans.attempt_id = q.attempt_id AND ans.question_id = q.question_id
       WHERE q.attempt_id = ${attemptId} ORDER BY q.position`;
     const { autoScore, adjustedScore, visibility, closed, visible, ...summary } = row;

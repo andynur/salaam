@@ -39,6 +39,7 @@ workflow.
 | 14 — Academic lifecycle | [phases/14-academic-lifecycle.md](phases/14-academic-lifecycle.md) |
 | 15 — Submission lifecycle | [phases/15-submission-lifecycle.md](phases/15-submission-lifecycle.md) |
 | 16 — Written assessment grading | [phases/16-written-assessment-grading.md](phases/16-written-assessment-grading.md) |
+| 17 — Assessment rubrics | [phases/17-assessment-rubrics.md](phases/17-assessment-rubrics.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

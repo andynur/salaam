@@ -56,7 +56,7 @@ export async function adjustmentHistory(db: SQL, actor: Actor, courseId: string,
 }
 
 export async function gradeWrittenAnswer(db: SQL, actor: Actor, courseId: string, attemptId: string, questionId: string, body: Record<string, unknown>, requestId: string) {
-  const { score, feedback } = manualGradeInput(body);
+  const { score, feedback, breakdown } = manualGradeInput(body);
   const previousGradeId = body.previousGradeId === null ? null : idField(body, "previousGradeId");
   return db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "manage", true);
@@ -68,10 +68,17 @@ export async function gradeWrittenAnswer(db: SQL, actor: Actor, courseId: string
     if (!answer.submitted) throw new HttpError(409, "ATTEMPT_OPEN", "Jawaban hanya dapat dinilai setelah attempt selesai.");
     if (answer.type !== "short_answer" && answer.type !== "essay") throw new HttpError(409, "NOT_WRITTEN", "Soal pilihan tidak memerlukan penilaian manual.");
     if (score > answer.points) invalid(`Nilai maksimal ${answer.points}.`);
+    const rubric = (await tx<{ criteria: { id: string; maxPoints: number }[] }[]>`SELECT criteria FROM assessment_rubrics WHERE activity_id = (SELECT activity_id FROM attempts WHERE id = ${attemptId}) AND question_id = ${questionId}`)[0];
+    if (rubric) {
+      const valid = new Map(rubric.criteria.map(criterion => [criterion.id, Number(criterion.maxPoints)]));
+      if (breakdown.length !== valid.size || breakdown.some(item => !valid.has(item.criterionId) || item.score > valid.get(item.criterionId)!)) invalid("Breakdown rubric harus mencakup setiap kriteria dan tidak melebihi poin maksimal.");
+      const total = breakdown.reduce((sum, item) => sum + item.score, 0);
+      if (Math.abs(total - score) > 0.000001) invalid("Jumlah poin rubric harus sama dengan nilai akhir.");
+    } else if (breakdown.length) invalid("Soal ini belum memiliki rubric.");
     const latest = (await tx<{ id: string; score: number; feedback: string }[]>`SELECT id, score::float8 AS score, feedback FROM attempt_question_grades WHERE attempt_id = ${attemptId} AND question_id = ${questionId} ORDER BY created_at DESC, id DESC LIMIT 1`)[0];
     if (latest && latest.score === score && latest.feedback === feedback) return { id: latest.id };
     if ((latest?.id ?? null) !== previousGradeId) throw new HttpError(409, "GRADE_CHANGED", "Nilai sudah diperbarui. Muat ulang sebelum menilai kembali.");
-    const [grade] = await tx`INSERT INTO attempt_question_grades (attempt_id, question_id, grader_id, score, feedback) VALUES (${attemptId}, ${questionId}, ${actor.id}, ${score}, ${feedback}) RETURNING id`;
+    const [grade] = await tx`INSERT INTO attempt_question_grades (attempt_id, question_id, grader_id, score, feedback, breakdown) VALUES (${attemptId}, ${questionId}, ${actor.id}, ${score}, ${feedback}, ${JSON.stringify(breakdown)}::text::jsonb) RETURNING id`;
     await tx`UPDATE attempt_answers SET awarded = ${score} WHERE attempt_id = ${attemptId} AND question_id = ${questionId}`;
     await tx`UPDATE attempts SET score = (SELECT COALESCE(sum(awarded), 0) FROM attempt_answers WHERE attempt_id = ${attemptId}) WHERE id = ${attemptId}`;
     await recordAudit(tx, actor.id, "assessment.answer.graded", "attempts", attemptId, requestId);
