@@ -2,8 +2,8 @@ import type { SQL } from "bun";
 import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
-import { databaseInputError, jsonObject, listInput } from "./validation";
-import { createUser, listUsers } from "../modules/users/service";
+import { databaseInputError, idField, jsonObject, listInput } from "./validation";
+import { createUser, listUsers, resetPassword } from "../modules/users/service";
 import { createAcademic, listAcademic } from "../modules/academic/service";
 import { listAudit } from "./audit/repository";
 import { academicResources, type AcademicResource, type RecordPage, type RecordRow } from "../shared/foundation";
@@ -13,6 +13,14 @@ export function createFoundationHandler(db: SQL) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     const url = new URL(request.url);
     const resource = url.pathname.slice("/api/admin/".length);
+    const recovery = /^users\/([^/]+)\/password$/.exec(resource);
+    if (recovery) {
+      requirePermission(actor, "admin.users.manage");
+      if (request.method !== "POST") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+      const userId = idField({ id: recovery[1] }, "id").toLowerCase();
+      try { return Response.json(await resetPassword(db, userId, await jsonObject(request), actor.id, requestId)); }
+      catch (error) { databaseInputError(error); }
+    }
     const academic = academicResources.includes(resource as AcademicResource);
     if (resource !== "users" && resource !== "audit" && !academic) throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
     requirePermission(actor, resource === "users" ? "admin.users.manage" : resource === "audit" ? "audit.view" : "academic.manage");

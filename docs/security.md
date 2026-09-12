@@ -1,8 +1,9 @@
 # Security and reliability
 
 The security model as implemented, plus the requirements for features not built yet.
-Local validation does not replace an HTTPS proxy review, load testing, backup and restore
-drills, or school approval of privacy and retention policies.
+The HTTPS proxy behavior and a backup and restore drill were validated locally on
+2026-09-12 (see [operations](operations.md)); load testing on school hardware and school
+approval of privacy and retention policies are still open.
 
 ## Identity and sessions
 
@@ -16,6 +17,13 @@ drills, or school approval of privacy and retention policies.
 - Login allows 10 attempts per socket IP per 15 minutes and at most two concurrent password
   checks. Behind a proxy every client shares one address, so configure per-client
   throttling at the proxy; forwarded IP headers are not trusted.
+- An administrator with `admin.users.manage` recovers a locked-out account by setting a new
+  password (`POST /api/admin/users/:id/password`, 12–128 characters). The new hash and the
+  deletion of **every** session of that account happen in one transaction, so a stolen or
+  shared session cannot outlive the reset, and the change is audited as
+  `user.password_reset`. Self-recovery, email links, and one-time tokens do not exist:
+  recovery is an in-person administrative act, and the new password is handed over
+  privately. An administrator who resets their own account is signed out by the same rule.
 - No default account ships. The first administrator comes from `db:bootstrap-admin`, which
   is serialized and refuses when an administrator exists, or from the development-only
   `db:seed`.

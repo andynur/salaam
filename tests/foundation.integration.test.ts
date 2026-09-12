@@ -124,6 +124,38 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect((await post("users", {})).status).toBe(403);
     await db`INSERT INTO role_permissions SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.key = 'admin' AND p.key = 'admin.users.manage'`;
   });
+  test("administrator recovery resets the password, revokes every session and is audited", async () => {
+    const recoveredId = await create("users", { name: "Lupa Sandi", email: "recovery@example.test", role: "student", identifier: "NIS-R", password });
+    const cookie = await login("recovery@example.test");
+    expect((await request("/api/auth/me", cookie)).status).toBe(200);
+    const next = `${password}-baru`;
+    const path = `/api/admin/users/${recoveredId}/password`;
+    expect((await request(path, cookie, { password: next })).status).toBe(403);
+    expect((await request(path, adminCookie, { password: next }, "https://evil.example")).status).toBe(403);
+    expect((await request(path, adminCookie, { password: "short" })).status).toBe(400);
+    expect((await request(`/api/admin/users/not-uuid/password`, adminCookie, { password: next })).status).toBe(400);
+    expect((await request(`/api/admin/users/${crypto.randomUUID()}/password`, adminCookie, { password: next })).status).toBe(404);
+    expect((await request(path)).status).toBe(405);
+    expect((await db`SELECT * FROM audit_logs WHERE event = 'user.password_reset'`).length).toBe(0);
+    const response = await request(path, adminCookie, { password: next });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: recoveredId, sessionsRevoked: 1 });
+    expect((await request("/api/auth/me", cookie)).status).toBe(401);
+    expect((await request("/api/auth/login", "", { email: "recovery@example.test", password })).status).toBe(401);
+    const restored = await request("/api/auth/login", "", { email: "recovery@example.test", password: next });
+    expect(restored.status).toBe(200);
+    const recoveredCookie = restored.headers.get("set-cookie")!.split(";")[0]!;
+    expect((await request("/api/auth/logout", recoveredCookie, {})).status).toBe(204);
+    expect(await (await request(path, adminCookie, { password: next })).json()).toEqual({ id: recoveredId, sessionsRevoked: 0 });
+    const audit = await db`SELECT * FROM audit_logs WHERE event = 'user.password_reset' ORDER BY created_at`;
+    expect(audit.length).toBe(2);
+    expect(audit[0].actor_id).toBe(adminId);
+    expect(audit[0].resource_type).toBe("user");
+    expect(audit[0].resource_id).toBe(recoveredId);
+    const stored = (await db`SELECT password_hash FROM users WHERE id = ${recoveredId}`)[0];
+    expect(stored.password_hash).toStartWith("$argon2id$");
+    expect(await Bun.password.verify(next, stored.password_hash)).toBe(true);
+  });
   test("duplicate profiles roll back user, role and audit; concurrent enrollment has a single winner", async () => {
     const base = { name: "Concurrent Student", email: "concurrent@example.test", role: "student", identifier: "NIS-C", password };
     const studentId = await create("users", base);

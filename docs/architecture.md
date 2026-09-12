@@ -51,8 +51,10 @@ measured operational requirement exists.
 - Users hold roles (`admin`, `teacher`, `student`), and roles grant capabilities through
   `role_permissions`. Code checks capabilities, never role names. The `Actor` carries `id`,
   `displayName`, `roles`, and `permissions`.
-- Capabilities: `dashboard:view` (all roles); `admin.users.manage`, `academic.manage`, and
-  `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
+- Capabilities: `dashboard:view` (all roles); `admin.users.manage` (admin; it also covers
+  account recovery through `POST /api/admin/users/:id/password`, which rewrites the hash,
+  deletes every session of that account and audits `user.password_reset` in one
+  transaction), `academic.manage`, and `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
   `learning.manage.all` (admin); `learning.participate` (student).
 - Course scope comes from `courseAccess`. *Manage* needs `learning.manage` plus a teaching
   assignment or `learning.manage.all`. *Participate* needs enrollment in the course's class

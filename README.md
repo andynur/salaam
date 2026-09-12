@@ -23,15 +23,16 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 6 are implemented and validated
-locally. SALAAM is not yet presented as a production deployment for a school: HTTPS proxy
-configuration, backup and restore drills, capacity testing, and operational rollout still
-need environment-specific validation.
+This is an active early-stage project. Phases 0 through 7 are implemented and validated
+locally, and HTTPS proxy behavior plus a backup and restore drill were validated on
+2026-09-12. SALAAM is not yet presented as a production deployment for a school: capacity
+testing on school hardware and WLAN and the operational rollout still need
+environment-specific validation.
 
 | Phase | Delivered | Record |
 | --- | --- | --- |
 | 0 — Foundation | Bun and PostgreSQL skeleton, migration runner, secure sessions, permissions, health checks, application shell | [Phase 0](docs/phases/00-foundation.md) |
-| 1 — Identity & academic foundation | Account provisioning with role profiles, first-admin bootstrap, academic years, terms, classes, enrollment, subjects, courses, teacher assignments, audit log | [Phase 1](docs/phases/01-identity-academic.md) |
+| 1 — Identity & academic foundation | Account provisioning with role profiles, first-admin bootstrap, academic years, terms, classes, enrollment, subjects, courses, teacher assignments, account recovery, audit log | [Phase 1](docs/phases/01-identity-academic.md) |
 | 2 — Learning core | Modules, lessons, text/link/file materials, layered publishing, archiving, assignments with attachments, grading with corrections, progress, dashboard tasks | [Phase 2](docs/phases/02-learning-core.md) |
 | 3 — Assessment engine | Question bank, quizzes and exams, server-timed attempts, per-student shuffling, offline-safe autosave, idempotent submission, automatic scoring, audited score adjustments | [Phase 3](docs/phases/03-assessment-engine.md) |
 | 4 — Project learning | Challenges, teacher-formed teams, Kanban boards with conflict-checked moves, reviews with revisions and scores, showcase, student portfolio | [Phase 4](docs/phases/04-project-learning.md) |

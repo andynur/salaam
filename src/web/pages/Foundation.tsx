@@ -61,8 +61,11 @@ function Choice({ field, onExpired }: { field: Field; onExpired: () => void }) {
 export function Foundation({ resource, timezone, onExpired, title, tabs }: { resource: FoundationResource; timezone: string; onExpired: () => void; title?: string; tabs?: ReactNode }) {
   const definition = definitions[resource];
   const [creating, setCreating] = useState(false);
+  const [recovery, setRecovery] = useState<RecordRow | null>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const recoveryPanel = useRef<HTMLDivElement>(null);
   useEffect(() => { if (creating) panel.current?.querySelector<HTMLElement>("input, select")?.focus(); }, [creating]);
+  useEffect(() => { if (recovery) recoveryPanel.current?.querySelector<HTMLElement>("input")?.focus(); }, [recovery]);
   const [page, setPage] = useState<RecordPage | null>(null);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
@@ -98,13 +101,31 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
       else setSaveError(cause instanceof Error ? cause.message : "Data tidak dapat disimpan.");
     } finally { saving.current = false; setPending(false); }
   }
+  // Account recovery. The reset ends every session of that account, including the
+  // administrator's own when they reset themselves, which surfaces as an expired session.
+  async function submitRecovery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving.current || !recovery) return;
+    saving.current = true; setPending(true); setSaveError(""); setSuccess("");
+    const password = new FormData(event.currentTarget).get("password");
+    try {
+      const result = await api<{ sessionsRevoked: number }>(`/api/admin/users/${recovery.id}/password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
+      setSuccess(`Kata sandi ${recovery.name ?? "akun"} diperbarui. ${result.sessionsRevoked} sesi aktif diakhiri.`);
+      setRecovery(null);
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) onExpired();
+      else setSaveError(cause instanceof Error ? cause.message : "Kata sandi tidak dapat diperbarui.");
+    } finally { saving.current = false; setPending(false); }
+  }
   function display(row: RecordRow, key: string) {
     const value = row[key];
     if (key === "createdAt" && typeof value === "string") return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
     return typeof value === "boolean" ? <span className={`badge ${value ? "badge-success" : "badge-draft"}`}>{value ? "Ya" : "Tidak"}</span> : value ?? "—";
   }
   const canCreate = definition.fields.length > 0;
-  function toggleCreate(open: boolean) { setCreating(open); setSuccess(""); setSaveError(""); }
+  const recoverable = resource === "users";
+  function toggleCreate(open: boolean) { setCreating(open); setRecovery(null); setSuccess(""); setSaveError(""); }
+  function openRecovery(row: RecordRow) { setCreating(false); setSuccess(""); setSaveError(""); setRecovery(row); }
   return <>
     <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title={title ?? definition.title} description={definition.description}
       actions={canCreate && <Button aria-expanded={creating} aria-controls="create-panel" className={creating ? "button-secondary" : ""} onClick={() => toggleCreate(!creating)}><Icon name={creating ? "close" : "plus"} />{creating ? "Tutup formulir" : definition.action}</Button>} />
@@ -114,10 +135,19 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
         {definition.fields.map(field => <div className="admin-field" key={field.key}><label htmlFor={field.key}>{field.label}</label>{field.source ? <Choice field={field} onExpired={onExpired} /> : field.type === "role" ? <select className="input" id={field.key} name={field.key} required defaultValue="student"><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select> : <input className="input" id={field.key} name={field.key} type={field.type ?? "text"} required maxLength={field.max} minLength={field.type === "password" ? 12 : undefined} autoComplete={field.type === "password" ? "new-password" : "off"} {...(field.type === "date" ? { min: "1900-01-01", max: "2200-12-31" } : {})} />}</div>)}
         <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : definition.action}</Button></div>
       </fieldset></form>
-      {saveError && <ErrorState message={saveError} />}{success && <p className="success-state" role="status">{success}</p>}
+      {saveError && <ErrorState message={saveError} />}
     </Card></div>}
+    {recoverable && recovery && <div id="recovery-panel" ref={recoveryPanel}><Card className="admin-form-card"><h2>Atur ulang kata sandi</h2>
+      <p>Akun <strong>{recovery.name ?? recovery.email}</strong> ({recovery.email}). Semua sesi aktif akun ini langsung diakhiri, dan kata sandi baru harus disampaikan secara pribadi.</p>
+      <form onSubmit={event => void submitRecovery(event)}><fieldset disabled={pending} className="admin-fields">
+        <div className="admin-field"><label htmlFor="recovery-password">Kata sandi baru (12–128 karakter)</label><input className="input" id="recovery-password" name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" /></div>
+        <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : "Atur ulang kata sandi"}</Button><Button type="button" className="button-secondary" disabled={pending} onClick={() => setRecovery(null)}>Batal</Button></div>
+      </fieldset></form>
+      {saveError && <ErrorState message={saveError} />}
+    </Card></div>}
+    {success && <p className="success-state" role="status">{success}</p>}
     <Card><div className="card-heading"><h2>Daftar {definition.title.toLowerCase()}</h2><form className="table-search" onSubmit={event => { event.preventDefault(); setSearch(q); setOffset(0); }}><input className="input" type="search" aria-label="Cari data" placeholder="Cari data…" maxLength={100} value={q} onChange={event => setQ(event.target.value)} /><Button className="button-secondary button-small" type="submit">Cari</Button></form></div>
-      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}</tr>)}</tbody></table></div>}
+      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}{recoverable && <th scope="col">Aksi</th>}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}{recoverable && <td className="table-action"><Button className="button-secondary button-small" aria-expanded={recovery?.id === row.id} aria-controls="recovery-panel" onClick={() => openRecovery(row)}><Icon name="key" />Atur ulang sandi</Button></td>}</tr>)}</tbody></table></div>}
       <div className="table-pagination"><span>{page ? `${page.items.length ? offset + 1 : 0}–${offset + page.items.length} ditampilkan` : "Memuat…"}</span><div><Button className="button-secondary button-small" disabled={!page || offset === 0} onClick={() => setOffset(offset - 50)}>Sebelumnya</Button><Button className="button-secondary button-small" disabled={!page || page.nextOffset === null} onClick={() => setOffset(page!.nextOffset!)}>Berikutnya</Button></div></div>
     </Card>
   </>;

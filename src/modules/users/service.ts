@@ -3,6 +3,7 @@ import type { RecordRow } from "../../shared/foundation";
 import { hashPassword } from "../../core/auth/password";
 import { recordAudit } from "../../core/audit/repository";
 import { invalid, textField } from "../../core/validation";
+import { HttpError } from "../../core/errors";
 
 export async function listUsers(db: SQL, pattern: string, offset: number, role: string) {
   return db<RecordRow[]>`SELECT u.id, u.display_name AS name, u.email, u.is_active AS "isActive",
@@ -13,6 +14,11 @@ export async function listUsers(db: SQL, pattern: string, offset: number, role: 
       AND (${role} = '' OR (r.key = ${role} AND u.is_active = true))
     GROUP BY u.id ORDER BY u.created_at DESC, u.id DESC LIMIT 51 OFFSET ${offset}`;
 }
+function passwordField(body: Record<string, unknown>): string {
+  const password = body.password;
+  if (typeof password !== "string" || password.length < 12 || password.length > 128) invalid("Kata sandi harus 12–128 karakter.");
+  return password;
+}
 async function userInput(body: Record<string, unknown>) {
   const name = textField(body, "name");
   const email = textField(body, "email", 254).toLowerCase();
@@ -20,9 +26,7 @@ async function userInput(body: Record<string, unknown>) {
   const role = textField(body, "role", 20);
   if (!["student", "teacher", "admin"].includes(role)) invalid("Role tidak valid.");
   const identifier = textField(body, "identifier", 50);
-  const password = body.password;
-  if (typeof password !== "string" || password.length < 12 || password.length > 128) invalid("Kata sandi harus 12–128 karakter.");
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(passwordField(body));
   return { name, email, role, identifier, passwordHash };
 }
 async function insertUser(tx: SQL, input: Awaited<ReturnType<typeof userInput>>, actorId: string | null, requestId: string) {
@@ -47,5 +51,18 @@ export async function bootstrapAdmin(db: SQL, body: Record<string, unknown>) {
     const existing = await tx`SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.key = 'admin' LIMIT 1`;
     if (existing.length) invalid("Admin sudah tersedia. Buat akun berikutnya melalui halaman administrasi.");
     return insertUser(tx, input, null, crypto.randomUUID());
+  });
+}
+// Account recovery: an administrator sets a new password and every existing session of that
+// account is revoked in the same transaction, so a stolen or shared session cannot survive it.
+export async function resetPassword(db: SQL, userId: string, body: Record<string, unknown>, actorId: string, requestId: string) {
+  const passwordHash = await hashPassword(passwordField(body));
+  return db.begin(async tx => {
+    const [user] = await tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    if (!user) throw new HttpError(404, "NOT_FOUND", "Akun tidak ditemukan.");
+    await tx`UPDATE users SET password_hash = ${passwordHash} WHERE id = ${userId}`;
+    const revoked = await tx`DELETE FROM sessions WHERE user_id = ${userId} RETURNING user_id`;
+    await recordAudit(tx, actorId, "user.password_reset", "user", userId, requestId);
+    return { id: userId, sessionsRevoked: revoked.length };
   });
 }

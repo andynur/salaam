@@ -40,6 +40,10 @@ Lists accept `q` and `offset`, return at most 50 rows, and use the
 `{ items, nextOffset }` response shape. Server-side permissions and same-origin checks
 apply to every mutation.
 
+`POST /api/admin/users/:id/password` was added on 2026-09-12 for account recovery: it takes
+`{ password }` (12–128 characters), needs `admin.users.manage`, and returns
+`{ id, sessionsRevoked }`.
+
 ## Verified behavior
 
 - PostgreSQL integration: account/password/profile provisioning, duplicate rollback,
@@ -88,8 +92,14 @@ This is local validation, not deployment to the school production environment.
 QA databases and generated credentials are removed after validation. The local app
 schema has Phase 1 migrations; no QA users or academic records were added to it.
 
-Phase 1 offers creation and listing. Profile editing, role reassignment, account
-recovery, class transfers, and academic archive/status workflows are not included.
-Course modules, lessons, publishing, materials, and progress belong to Phase 2.
-School HTTPS/proxy validation, backup/restore drills, and load testing remain
-operational rollout work described in the foundation validation and deployment docs.
+Phase 1 offers creation and listing. Profile editing, role reassignment, class transfers,
+and academic archive/status workflows are not included. Course modules, lessons,
+publishing, materials, and progress belong to Phase 2. Load testing on school hardware
+remains operational rollout work described in the deployment docs.
+
+Account recovery was delivered later, on 2026-09-12, outside a roadmap phase: an
+administrator sets a new password from the account row, which rewrites the hash, deletes
+every session of that account in the same transaction, and audits `user.password_reset`.
+Self-service recovery, email links, and one-time tokens remain out of scope. HTTPS proxy
+behavior and a backup and restore drill were validated on the same day; see
+[operations](../operations.md).

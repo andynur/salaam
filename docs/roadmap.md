@@ -31,8 +31,8 @@ tests.
 ### Phase 1 — Core identity and academic foundation
 
 Role-linked profiles, first-admin bootstrap, academic years, terms, classes, student
-enrollment, subjects, courses, teacher assignments, audit records, and the responsive
-administration UI.
+enrollment, subjects, courses, teacher assignments, audit records, administrator-driven
+account recovery, and the responsive administration UI.
 
 ### Phase 2 — Learning core
 
@@ -100,8 +100,9 @@ privacy and security review.
 Items explicitly left out so far. Consider them when scoping later phases; each record's
 Boundaries section has the details.
 
-- **Phase 1:** profile editing, role reassignment, account recovery, class transfers, and
-  academic archive states.
+- **Phase 1:** profile editing, role reassignment, class transfers, and academic archive
+  states. Account recovery is delivered: an administrator resets a password and every
+  session of that account ends with it.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons;
   resubmission, returned work, late exceptions, and deadline extensions; malware scanning
   and inline previews; rich text or Markdown.
@@ -122,5 +123,5 @@ Boundaries section has the details.
   biometric identification; recurring check-in windows and bulk check-in import;
   notifications when a window opens (Phase 8); cross-course QR reporting and exports
   (Phase 9).
-- **Operations:** HTTPS proxy validation, backup and restore drills, and load testing on
-  school hardware.
+- **Operations:** load testing on school hardware. HTTPS proxy behavior and a backup and
+  restore drill were validated on 2026-09-12; [operations](operations.md) records both.

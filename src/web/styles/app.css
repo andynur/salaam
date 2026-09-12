@@ -316,6 +316,7 @@
   .data-table th { background: var(--color-surface); border-bottom: 2px solid var(--color-border); color: var(--color-subtle); font-size: 12px; font-weight: 600; white-space: nowrap; }
   .data-table td { border-bottom: 1px solid var(--color-border); }
   .data-table th, .data-table td { max-width: 260px; min-width: 130px; padding: 10px 16px; overflow-wrap: anywhere; }
+  .data-table td.table-action { min-width: 0; white-space: nowrap; }
   .data-table tbody tr:hover { background: var(--color-background); }
   .data-table tbody tr:last-child td { border-bottom: 0; }
   .table-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--color-border); color: var(--color-muted); font-size: 13px; }

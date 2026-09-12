@@ -2,7 +2,7 @@
 
 SALAAM (repository and package `salaam`) is the Learning & Growth Platform for
 HSI Boarding School. It is a modular monolith: one Bun process serves the API and a React
-SPA, and PostgreSQL is the source of truth. Phases 0–6 are delivered; `docs/roadmap.md`
+SPA, and PostgreSQL is the source of truth. Phases 0–7 are delivered; `docs/roadmap.md`
 lists what comes next.
 
 ## Commands

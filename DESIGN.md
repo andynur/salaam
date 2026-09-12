@@ -201,6 +201,9 @@ adding a near-duplicate.
   16px `h2`) and `.card-footer-link` (full-width footer link) frame a card.
 - **Tables**: `.table-scroll` > `.data-table` (+ `.table-search`, `.table-pagination`).
   2px header rule, row hover. This is the only tabular data pattern — reuse verbatim.
+  A row-level control goes in a trailing `td.table-action` cell (no wrap, no minimum
+  width) under an `Aksi` header, and opens a panel above the table rather than editing
+  in place.
 - **Tabs**: `nav.tabs` of buttons + `.tab-active` (+ `aria-current`) — Jira underline
   tabs, scroll horizontally inside the bar on narrow screens. Place directly under
   `PageHeader`.
