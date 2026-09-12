@@ -202,16 +202,28 @@ function AttemptTable({ courseId, assessment, timezone, onExpired }: Common & { 
   const [q, setQ] = useState("");
   const [revision, setRevision] = useState(0);
   const [adjusting, setAdjusting] = useState("");
+  const [accommodating, setAccommodating] = useState("");
   const { data, error, retry } = useData<Page<AttemptRow>>(`${learningApi}/${courseId}/assessments/${assessment.id}/attempts?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired, revision);
   return <div className="submission-review"><div className="learning-row"><h4>Hasil santri · {assessment.title}</h4><Search change={value => { setQ(value); setOffset(0); }} /></div>
     {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada percobaan" description="Percobaan santri akan tampil setelah mereka mulai mengerjakan." />
       : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Hasil ${assessment.title}`}><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Percobaan</th><th scope="col">Status</th><th scope="col">Nilai</th><th scope="col">Aksi</th></tr></thead><tbody>
         {data.items.map(attempt => <tr key={attempt.id}><td>{attempt.studentName}</td><td>{attempt.number}</td><td>{attempt.submittedAt ? `${attempt.submissionReason === "expired" ? "Waktu habis" : "Dikumpulkan"} · ${formatDateTime(attempt.submittedAt, timezone)}` : "Sedang mengerjakan"}</td><td>{attempt.score === null ? "—" : `${attempt.score} / ${attempt.maxScore}${attempt.adjusted ? " (dikoreksi)" : ""}`}</td>
-          <td><div className="learning-actions"><a className="material-link" href={`/learning/courses/${courseId}/attempts/${attempt.id}`}>Lihat</a>{attempt.submittedAt && <Button className="button-secondary button-small" aria-expanded={adjusting === attempt.id} onClick={() => setAdjusting(adjusting === attempt.id ? "" : attempt.id)}>Koreksi nilai</Button>}</div></td></tr>)}
+          <td><div className="learning-actions"><a className="material-link" href={`/learning/courses/${courseId}/attempts/${attempt.id}`}>Lihat</a>{!attempt.submittedAt && <Button className="button-secondary button-small" aria-expanded={accommodating === attempt.id} onClick={() => setAccommodating(accommodating === attempt.id ? "" : attempt.id)}>Tambah waktu</Button>}{attempt.submittedAt && <Button className="button-secondary button-small" aria-expanded={adjusting === attempt.id} onClick={() => setAdjusting(adjusting === attempt.id ? "" : attempt.id)}>Koreksi nilai</Button>}</div></td></tr>)}
       </tbody></table></div>}
     {adjusting && data?.items.some(item => item.id === adjusting) && <AdjustForm courseId={courseId} attempt={data.items.find(item => item.id === adjusting)!} timezone={timezone} onExpired={onExpired} saved={() => { setAdjusting(""); setRevision(value => value + 1); }} />}
+    {accommodating && data?.items.some(item => item.id === accommodating) && <AccommodationForm courseId={courseId} assessmentId={assessment.id} attempt={data.items.find(item => item.id === accommodating)!} onExpired={onExpired} saved={() => { setAccommodating(""); setRevision(value => value + 1); }} />}
     {data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}
   </div>;
+}
+
+function AccommodationForm({ courseId, assessmentId, attempt, onExpired, saved }: Omit<Common, "timezone"> & { assessmentId: string; attempt: AttemptRow; saved: () => void }) {
+  return <section className="submission-card"><h4>Tambahan waktu · {attempt.studentName} · percobaan {attempt.number}</h4>
+    <p className="learning-muted">Maksimal 120 menit. Deadline attempt aktif dihitung ulang dari waktu mulai dan tambahan ini tidak menggandakan waktu saat disimpan ulang.</p>
+    <MutationForm path={`${learningApi}/${courseId}/assessments/${assessmentId}/accommodation`} label="Simpan tambahan waktu" onExpired={onExpired} saved={saved} body={form => ({ studentId: attempt.studentId, extraMinutes: Number(form.get("extraMinutes")), reason: form.get("reason") })}>
+      <Field name="extraMinutes" type="number" min={1} max={120} step="1" label="Tambahan waktu (menit)" />
+      <Field name="reason" label="Alasan" area max={1000} />
+    </MutationForm>
+  </section>;
 }
 
 function AdjustForm({ courseId, attempt, timezone, onExpired, saved }: Common & { attempt: AttemptRow; saved: () => void }) {

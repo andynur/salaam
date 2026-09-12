@@ -24,6 +24,7 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
   let classId: string;
   let teacher: string;
   let student: string;
+  let studentId: string;
   let peer: string;
   let outsider: string;
   let otherTeacher: string;
@@ -90,6 +91,7 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     handle = createHttpHandler(config, createAuthService(db, config), async () => {}, { foundation: createFoundationHandler(db), learning: createLearningHandler(db, ".test-artifacts/unused"), dashboard: async () => ({}) });
     ({ id: teacherId, cookie: teacher } = await user("teacher", "teacher"));
     const studentUser = await user("student", "student");
+    studentId = studentUser.id;
     student = studentUser.cookie;
     const peerUser = await user("peer", "student");
     peer = peerUser.cookie;
@@ -220,6 +222,23 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     await db`UPDATE assessment_settings SET closes_at = clock_timestamp() - interval '1 second' WHERE activity_id = ${exam}`;
     expect(await detail(f.courseId, attempt.id)).toMatchObject({ score: 5, resultsVisible: true });
     expect((await start(f.courseId, exam, peer)).status).toBe(409);
+  });
+
+  test("teacher accommodations extend a timed attempt once before it starts", async () => {
+    const f = await course();
+    const q = await assessment(f.courseId, f.lessonId, { timeLimitMinutes: 10, closesAt: iso(3600000) }, [questionBodies[0]!], [1]);
+    const grant = (extraMinutes: number, reason: string) => post(f.courseId, `assessments/${q.id}/accommodation`, { studentId, extraMinutes, reason });
+    expect((await grant(15, "Dukungan belajar")).status).toBe(200);
+    expect(await json<unknown>(grant(15, "Dukungan belajar"))).toEqual(expect.objectContaining({ id: expect.any(String) }));
+    expect((await grant(20, "Stale change")).status).toBe(409);
+    const attempt = await json<{ id: string }>(start(f.courseId, q.id), 201);
+    const before = await detail(f.courseId, attempt.id);
+    const beforeWindow = new Date(before.deadlineAt!).getTime() - new Date(before.startedAt).getTime();
+    expect(beforeWindow).toBeGreaterThan(24 * 60000);
+    expect(beforeWindow).toBeLessThanOrEqual(25 * 60000);
+    expect((await grant(30, "Tidak boleh mengganti tanpa reload")).status).toBe(409);
+    expect((await db`SELECT extra_minutes FROM assessment_accommodations WHERE activity_id = ${q.id} AND student_id = ${studentId}`)[0]).toEqual({ extra_minutes: 15 });
+    expect((await db`SELECT count(*)::int AS count FROM audit_logs WHERE event = 'assessment.accommodation.granted' AND resource_id = ${q.id}`)[0]!.count).toBe(1);
   });
 
   test("concurrent starts and out-of-order autosaves never duplicate attempts or regress answers", async () => {

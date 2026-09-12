@@ -14,6 +14,7 @@ import { adjustmentHistory, adjustScore, gradeWrittenAnswer, listAttempts } from
 import { saveChallenge } from "../modules/projects/challenges";
 import { createProject } from "../modules/projects/service";
 import { respondSurvey, saveSurvey, setSurveyQuestions } from "../modules/assessments/surveys";
+import { accommodationStudentId, grantAssessmentAccommodation } from "../modules/assessments/accommodations";
 
 // Room for multipart boundaries and text fields around one maximum-size file.
 export const maxLearningUploadRequestBytes = maxUploadBytes + 256 * 1024;
@@ -81,6 +82,8 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await setAssessmentItems(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "assessments" && action === "rubric") {
           result = await saveRubric(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "assessments" && action === "accommodation") {
+          result = await grantAssessmentAccommodation(db, actor, courseId, id, accommodationStudentId(body), body, requestId);
         } else if (itemAction && resource === "surveys" && action === "questions") {
           result = await setSurveyQuestions(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "surveys" && action === "respond") {

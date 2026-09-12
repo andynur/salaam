@@ -51,12 +51,13 @@ export async function finalizeExpired(db: SQL, scope: { attemptId?: string; acti
   });
 }
 
-type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; scoringMode: string };
+type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; extraMinutes: number; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; scoringMode: string };
 export async function startAttempt(db: SQL, actor: Actor, courseId: string, activityId: string, requestId: string) {
   return db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "participate", "share");
     const settings = (await tx<Settings[]>`SELECT s.time_limit_minutes AS "timeLimitMinutes", s.closes_at AS "closesAt", s.max_attempts AS "maxAttempts", s.scoring_mode AS "scoringMode",
         s.shuffle_questions AS "shuffleQuestions", s.shuffle_options AS "shuffleOptions", (s.opens_at IS NULL OR s.opens_at <= clock_timestamp()) AS opened
+        , COALESCE((SELECT ac.extra_minutes FROM assessment_accommodations ac WHERE ac.activity_id = a.id AND ac.student_id = ${actor.id}), 0) AS "extraMinutes"
       FROM activities a JOIN assessment_settings s ON s.activity_id = a.id JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
       WHERE a.id = ${activityId} AND a.course_id = ${courseId} AND a.published AND l.published AND m.published
         AND a.archived_at IS NULL AND l.archived_at IS NULL AND m.archived_at IS NULL`)[0];
@@ -84,7 +85,8 @@ export async function startAttempt(db: SQL, actor: Actor, courseId: string, acti
     // One clock reading fixes the start, the window check, and the deadline together.
     const created = await tx<{ id: string }[]>`INSERT INTO attempts (activity_id, student_id, number, started_at, deadline_at, max_score)
       SELECT ${activityId}, ${actor.id}, ${used + 1}, now.at,
-        LEAST(now.at + ${settings.timeLimitMinutes}::integer * interval '1 minute', ${settings.closesAt}::timestamptz), ${maxScore}
+        LEAST(now.at + (${settings.timeLimitMinutes} + ${settings.extraMinutes})::integer * interval '1 minute',
+          COALESCE(${settings.closesAt}::timestamptz + ${settings.extraMinutes}::integer * interval '1 minute', now.at + (${settings.timeLimitMinutes} + ${settings.extraMinutes})::integer * interval '1 minute')), ${maxScore}
       FROM (SELECT clock_timestamp() AS at) now WHERE ${settings.closesAt}::timestamptz IS NULL OR ${settings.closesAt}::timestamptz > now.at
       RETURNING id`;
     if (!created[0]) throw new HttpError(409, "CLOSED", "Penilaian sudah ditutup.");

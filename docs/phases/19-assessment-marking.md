@@ -26,5 +26,5 @@ and legacy all-or-nothing compatibility. Typecheck and production build are requ
 
 ## Out of scope
 
-Per-question custom penalty rates, weighted question pools, accommodations, time extensions,
-proctoring, and statistical analytics remain deferred.
+Per-question custom penalty rates, weighted question pools, proctoring, and statistical
+analytics remain deferred. Time extensions and accommodations are delivered in Phase 20.

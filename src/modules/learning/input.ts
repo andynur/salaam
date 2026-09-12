@@ -64,6 +64,11 @@ export function deadlineExceptionInput(body: Record<string, unknown>) {
   if (!dueAt) invalid("Tenggat baru wajib diisi.");
   return { dueAt, reason: textField(body, "reason", 500) };
 }
+export function assessmentAccommodationInput(body: Record<string, unknown>) {
+  const extraMinutes = body.extraMinutes;
+  if (typeof extraMinutes !== "number" || !Number.isInteger(extraMinutes) || extraMinutes < 1 || extraMinutes > 120) invalid("Tambahan waktu harus berupa bilangan bulat 1–120 menit.");
+  return { extraMinutes, reason: textField(body, "reason", 1000) };
+}
 export function gradeInput(body: Record<string, unknown>) {
   const score = body.score;
   if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > 100 || Math.abs(score * 100 - Math.round(score * 100)) > 0.000001) invalid("Nilai harus 0–100, maksimal dua desimal.");
