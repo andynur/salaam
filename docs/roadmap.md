@@ -33,7 +33,7 @@ Coding agents follow skill `deliver-phase`.
 | 23 | Question statistics | Delivered — [record](phases/23-question-statistics.md) |
 | 24 | Project task metadata | Delivered — [record](phases/24-project-task-metadata.md) |
 | 25 | Project task comments | Delivered — [record](phases/25-project-task-comments.md) |
-| 26 | Project file deliverables | In progress — [record](phases/26-project-file-deliverables.md) |
+| 26 | Project file deliverables | Delivered — [record](phases/26-project-file-deliverables.md) |
 
 ## Delivered
 
