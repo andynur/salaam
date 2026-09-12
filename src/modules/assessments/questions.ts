@@ -12,7 +12,16 @@ export async function listQuestions(db: SQL, actor: Actor, courseId: string, pat
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     await courseAccess(tx, actor, courseId, "manage");
     return tx<Question[]>`SELECT q.id, q.type, q.prompt, q.options, q.correct, q.explanation, q.archived_at IS NOT NULL AS archived,
-      (SELECT count(*)::int FROM assessment_questions aq WHERE aq.question_id = q.id) AS usage, q.created_at::text AS "createdAt"
+      (SELECT count(*)::int FROM assessment_questions aq WHERE aq.question_id = q.id) AS usage,
+      (SELECT count(*) FILTER (WHERE a.submitted_at IS NOT NULL)::int FROM attempt_questions aq JOIN attempts a ON a.id = aq.attempt_id WHERE aq.question_id = q.id) AS "attemptCount",
+      (SELECT count(*) FILTER (WHERE a.submitted_at IS NOT NULL AND aa.awarded IS NOT NULL)::int
+        FROM attempt_questions aq JOIN attempts a ON a.id = aq.attempt_id LEFT JOIN attempt_answers aa ON aa.attempt_id = aq.attempt_id AND aa.question_id = aq.question_id
+        WHERE aq.question_id = q.id) AS "responseCount",
+      (SELECT CASE WHEN q.type IN ('single_choice', 'multiple_choice', 'true_false') AND count(*) FILTER (WHERE a.submitted_at IS NOT NULL AND aa.awarded IS NOT NULL) > 0
+        THEN round(100.0 * count(*) FILTER (WHERE a.submitted_at IS NOT NULL AND aa.awarded >= aq.points) / count(*) FILTER (WHERE a.submitted_at IS NOT NULL AND aa.awarded IS NOT NULL), 2)::float8 END
+        FROM attempt_questions aq JOIN attempts a ON a.id = aq.attempt_id LEFT JOIN attempt_answers aa ON aa.attempt_id = aq.attempt_id AND aa.question_id = aq.question_id
+        WHERE aq.question_id = q.id) AS "correctRate",
+      q.created_at::text AS "createdAt"
       FROM questions q WHERE q.course_id = ${courseId} AND (${includeArchived} OR q.archived_at IS NULL) AND q.prompt ILIKE ${pattern}
       ORDER BY q.created_at DESC, q.id DESC LIMIT 51 OFFSET ${offset}`;
   });

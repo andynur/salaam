@@ -4,7 +4,7 @@ export type SurveyKind = "survey" | "questionnaire";
 export type ResultsVisibility = "after_submit" | "after_close" | "score_only" | "hidden";
 export type ScoringMode = "all_or_nothing" | "partial_credit" | "negative_marking";
 export interface QuestionOption { id: string; text: string }
-export interface Question { id: string; type: QuestionType; prompt: string; options: QuestionOption[]; correct: string[]; explanation: string; archived: boolean; usage: number; createdAt: string }
+export interface Question { id: string; type: QuestionType; prompt: string; options: QuestionOption[]; correct: string[]; explanation: string; archived: boolean; usage: number; attemptCount: number; responseCount: number; correctRate: number | null; createdAt: string }
 export interface AssessmentSettings { opensAt: string | null; closesAt: string | null; timeLimitMinutes: number | null; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; resultsVisibility: ResultsVisibility; scoringMode: ScoringMode; selectionCount: number | null }
 export interface AssessmentItem { questionId: string; position: number; points: number }
 export interface AttemptSummary { id: string; number: number; startedAt: string; deadlineAt: string | null; submittedAt: string | null; submissionReason: "student" | "expired" | null; score: number | null; maxScore: number; adjusted: boolean }

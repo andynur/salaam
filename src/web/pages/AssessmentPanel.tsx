@@ -173,7 +173,7 @@ export function QuestionBank({ courseId, onExpired }: Pick<Common, "courseId" | 
       {error && <ErrorState message={error} />}
       {loadError ? <ErrorState message={loadError} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada soal" description={q ? "Tidak ada soal yang sesuai pencarian." : "Tambahkan soal pilihan ganda atau benar/salah untuk dipakai di quiz dan ujian."} />
         : <div className="question-list">{data.items.map(question => <article className="question-item" key={question.id}>
-          <div className="learning-row"><span className="eyebrow text-muted">{typeLabels[question.type]} · dipakai {question.usage}×</span>{question.archived && <span className="badge badge-draft">Arsip</span>}</div>
+          <div className="learning-row"><span className="eyebrow text-muted">{typeLabels[question.type]} · dipakai {question.usage}× · dijawab {question.responseCount}×{question.correctRate !== null ? ` · benar ${question.correctRate}%` : ""}</span>{question.archived && <span className="badge badge-draft">Arsip</span>}</div>
           <p className="learning-prose">{question.prompt}</p>
           <ul className="option-list">{question.options.map(option => <li key={option.id} className={question.correct.includes(option.id) ? "option-correct" : ""}>{question.correct.includes(option.id) ? "✓ " : ""}{option.text}</li>)}</ul>
           {question.explanation && <p className="learning-muted">Pembahasan: {question.explanation}</p>}

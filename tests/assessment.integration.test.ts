@@ -109,7 +109,7 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     const f = await course();
     const q = await assessment(f.courseId, f.lessonId, { maxAttempts: 1 });
     const bank = await json<Page<Question>>(request(path(f.courseId, "questions"), teacher));
-    expect(bank.items.find(item => item.id === q.questionIds[1])).toMatchObject({ type: "multiple_choice", correct: ["a", "c"], usage: 1 });
+    expect(bank.items.find(item => item.id === q.questionIds[1])).toMatchObject({ type: "multiple_choice", correct: ["a", "c"], usage: 1, attemptCount: 0, responseCount: 0, correctRate: null });
     expect((await request(path(f.courseId, "questions"), student)).status).toBe(403);
     expect((await request(path(f.courseId, "questions"), otherTeacher)).status).toBe(404);
     expect((await post(f.courseId, "questions", { type: "single_choice", prompt: "Q", options: ["A"], correct: ["a"] })).status).toBe(400);
@@ -197,6 +197,8 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     const after = await json<CourseDetail>(request(path(f.courseId), student));
     expect(after.assessments.find(item => item.id === q.id)?.attempts.map(attempt => attempt.score)).toEqual([5, 0]);
     expect(after.progress).toMatchObject({ activities: 1, submitted: 1, graded: 1 });
+    const stats = await json<Page<Question>>(request(path(f.courseId, "questions"), teacher));
+    expect(stats.items.find(item => item.id === single)).toMatchObject({ attemptCount: 2, responseCount: 1, correctRate: 100 });
   });
 
   test("written answers are autosaved, hidden until submitted, and manually graded with stale-write protection", async () => {
