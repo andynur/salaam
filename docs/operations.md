@@ -89,6 +89,17 @@ santri connections, not the production proxy or school WLAN. Monitor connection 
 DB latency during the pilot; permission revalidation runs every ten seconds. Shutdown
 closes sockets before stopping the HTTP server and database pool.
 
-Back up all four attendance tables with the existing PostgreSQL backup. Rollback of
-`0007_attendance.sql` destroys session, roster, attendance, and lifecycle history. Prefer
-a forward fix after real school records exist. Attendance XP remains deferred.
+Back up all seven attendance tables with the existing PostgreSQL backup. Rollback of
+`0007_attendance.sql` destroys session, roster, attendance, and lifecycle history, and
+rollback of `0008_qr_attendance.sql` destroys check-in windows, issued code digests, and
+check-in rows — the attendance records those check-ins created survive, because they live in
+`attendance_records`. Prefer a forward fix after real school records exist. Attendance XP
+remains deferred.
+
+QR check-in needs no new environment variable, storage, or service. The classroom display
+requests a fresh code every rotation interval, so a session with a 30-second rotation adds
+about two requests a minute per open window — negligible next to the check-in burst itself,
+which local validation covers at 125 concurrent santri. Codes accumulate one row per
+rotation and stop at 2,000 per window; an abandoned display therefore cannot grow without
+bound. Camera scanning needs HTTPS or localhost, so the reverse proxy must terminate TLS
+before santri can use the camera path; the typed code works either way.

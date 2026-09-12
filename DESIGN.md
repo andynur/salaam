@@ -245,6 +245,13 @@ adding a near-duplicate.
   lifecycle forms in responsive columns. A visible live-connection status and manual
   refresh sit above each session. Editors retain their original version/predecessor
   during realtime updates so stale edits fail rather than overwrite newer records.
+- **QR check-in**: `checkin.tsx` adds one `.lesson-card` to the session screen.
+  `.checkin-display` puts the `.checkin-qr` SVG beside the large `.checkin-code`, stacking
+  and centring below 760px. `.checkin-qr-paper` and `.checkin-qr-ink` carry the QR's fills,
+  so contrast comes from tokens rather than hard-coded colours. `.checkin-scanner` holds the
+  `.checkin-video` camera preview and its close button. The camera is never the only path:
+  a typed code field sits beside it for keyboard use and unsupported browsers, and the QR
+  carries an `aria-label` spelling out the code.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title

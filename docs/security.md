@@ -84,8 +84,6 @@ errors.
 
 ## Requirements for planned features
 
-- **QR attendance** values are short-lived, opaque, validated on the server, and never
-  usable as login credentials.
 - **Coding challenges** run only behind a separate execution boundary with resource limits,
   a network policy, and review. The application process never executes student code.
 - **Biometrics and face recognition** stay outside V1.
@@ -109,6 +107,32 @@ Attendance JSON bodies are capped at 16 KiB, titles at 150 characters, notes at 
 reasons at 500, session duration at 24 hours, and rosters at 500 active students. Lists
 return 50 records per page. No new capability, dependency, file upload, or credential type
 is introduced.
+
+## QR check-in
+
+A check-in code is a proof of presence, never a credential. It authenticates nobody: the
+santri's own login session identifies them, and the server independently rechecks
+`learning.participate`, course access, roster membership, session status, and window status
+on every check-in. A code alone therefore grants no access to anything.
+
+Codes are ten characters of `crypto.getRandomValues` entropy over a 32-symbol alphabet
+(about 50 bits), short-lived, and scoped to one session. Only the SHA-256 hex digest is
+stored, so a database copy or backup cannot replay a live code; the plaintext exists only in
+the response to the manager who minted it and on the classroom display. Rotation is
+15–300 seconds, the outgoing code keeps a ten-second grace, a window issues at most 2,000
+codes, and stopping the window retires every live code at once. Check-in bodies are capped
+at 4 KiB.
+
+One check-in per santri per session is enforced by a primary key, and a check-in may only
+start an attendance chain — it can never overwrite or amend a teacher's record. Windows
+started and stopped are audited, and each check-in writes a `classroom.attendance.checked_in`
+event; minting a code is display traffic and is not audited. No new capability, dependency,
+file upload, or credential type is introduced. Camera scanning uses the browser's own
+`BarcodeDetector` and needs HTTPS or localhost; the typed code is always available instead.
+
+A santri in the room can still photograph the displayed code and pass it to an absent
+classmate inside the rotation interval. Rotation bounds that window and stopping it closes
+the window entirely, but the teacher's correction remains the authority on who attended.
 
 WebSocket upgrades require the exact application Origin, a valid login session, and access
 to the requested course/session. The process permits at most 512 connections and four per

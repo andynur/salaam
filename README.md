@@ -37,10 +37,12 @@ need environment-specific validation.
 | 4 — Project learning | Challenges, teacher-formed teams, Kanban boards with conflict-checked moves, reviews with revisions and scores, showcase, student portfolio | [Phase 4](docs/phases/04-project-learning.md) |
 | 5 — Gamification | Append-only XP ledger awarded with the event that earns it, derived levels, automatic badges, administrator-configurable reward rules, growth page and teacher leaderboard | [Phase 5](docs/phases/05-gamification.md) |
 | 6 — Attendance & classroom sessions | Session rosters, manual attendance, private notes, correction history, reports, dashboard tasks, authenticated realtime updates | [Phase 6](docs/phases/06-attendance.md) |
+| 7 — QR attendance | Rotating short-lived check-in codes stored only as digests, camera or typed santri check-in, late thresholds, teacher corrections that still win | [Phase 7](docs/phases/07-qr-attendance.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
-The next milestone is **Phase 7 — QR attendance**: short-lived check-in values validated
-on the server. See the [roadmap](docs/roadmap.md).
+The next milestone is **Phase 8 — Calendar and notifications**: academic events, deadline
+reminders, notification preferences, and delivery status. See the
+[roadmap](docs/roadmap.md).
 
 ## Architecture
 
@@ -168,7 +170,7 @@ bun run db:migrate:reset      # undo every migration, then reapply all (drops al
 ```
 
 The runner uses a PostgreSQL advisory lock, validates checksums, and applies pending files
-atomically. Add the next numbered file, such as `0007_attendance.sql`, with a matching
+atomically. Add the next numbered file, such as `0008_qr_attendance.sql`, with a matching
 down script in `database/migrations/down/`; never edit a migration that has been applied.
 Rollback and reset refuse to run when `NODE_ENV=production`; use a forward migration there.
 

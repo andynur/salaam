@@ -14,8 +14,8 @@ Coding agents follow skill `deliver-phase`.
 | 4 | Project learning | Delivered — [record](phases/04-project-learning.md) |
 | 5 | Gamification | Delivered — [record](phases/05-gamification.md) |
 | 6 | Attendance and classroom sessions | Delivered — [record](phases/06-attendance.md) |
-| 7 | QR attendance | Next |
-| 8 | Calendar and notifications | Planned |
+| 7 | QR attendance | Delivered — [record](phases/07-qr-attendance.md) |
+| 8 | Calendar and notifications | Next |
 | 9 | Reporting | Planned |
 | 10 | Advanced IT learning | Planned |
 | 11+ | Later evaluation | Backlog |
@@ -63,12 +63,15 @@ Course meeting sessions with snapshotted rosters, manual attendance and private 
 append-only corrections, session lifecycle controls, course/personal reports, dashboard
 shortcuts, and authenticated realtime status. Attendance always references a defined session.
 
-## Planned
-
 ### Phase 7 — QR attendance
 
-Short-lived QR or camera-assisted attendance validated on the server. QR values never
-become reusable authentication credentials.
+Per-session check-in windows with rotating short-lived codes, stored only as SHA-256
+digests. A santri scans the QR with the device camera or types the code; the server
+validates the code, the roster, the session, and the window, then writes the first
+attendance record for that santri. Codes are proofs of presence, never authentication
+credentials, and a teacher's correction always wins.
+
+## Planned
 
 ### Phase 8 — Calendar and notifications
 
@@ -112,8 +115,12 @@ Boundaries section has the details.
 - **Phase 5:** XP decay, penalties, and manual XP grants; streaks, seasons, and resets;
   leaderboards visible to students; badge artwork beyond the built-in icons; level-up
   notifications (Phase 8); XP for attendance (deferred pending a correction/reversal policy).
-- **Phase 6:** attendance XP; QR/camera attendance (Phase 7); recurring meetings, bulk
-  marking/import, roster adjustments after creation, history browsing, exports, and
-  cross-course reports; multi-instance realtime delivery.
+- **Phase 6:** attendance XP; recurring meetings, bulk marking/import, roster adjustments
+  after creation, history browsing, exports, and cross-course reports; multi-instance
+  realtime delivery.
+- **Phase 7:** attendance XP (still deferred); geofencing, device binding, proctoring, and
+  biometric identification; recurring check-in windows and bulk check-in import;
+  notifications when a window opens (Phase 8); cross-course QR reporting and exports
+  (Phase 9).
 - **Operations:** HTTPS proxy validation, backup and restore drills, and load testing on
   school hardware.

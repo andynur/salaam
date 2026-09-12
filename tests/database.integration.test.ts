@@ -93,16 +93,17 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
   });
   // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
   test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
-    expect(await rollback(db)).toBe("0007_attendance.sql");
-    expect((await db`SELECT to_regclass('classroom_sessions') AS relation`)[0].relation).toBeNull();
-    expect((await db`SELECT to_regclass('attendance_records') AS relation`)[0].relation).toBeNull();
-    expect((await db`SELECT to_regclass('projects') AS relation`)[0].relation).not.toBeNull();
+    expect(await rollback(db)).toBe("0008_qr_attendance.sql");
+    expect((await db`SELECT to_regclass('attendance_checkins') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT to_regclass('attendance_checkin_codes') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT to_regclass('attendance_checkin_windows') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT to_regclass('classroom_sessions') AS relation`)[0].relation).not.toBeNull();
     expect((await db`SELECT name FROM schema_migrations ORDER BY name`).map((row: { name: string }) => row.name))
-      .toEqual(["0001_identity.sql", "0002_academic_foundation.sql", "0003_learning_core.sql", "0004_assessment_engine.sql", "0005_project_learning.sql", "0006_gamification.sql"]);
+      .toEqual(["0001_identity.sql", "0002_academic_foundation.sql", "0003_learning_core.sql", "0004_assessment_engine.sql", "0005_project_learning.sql", "0006_gamification.sql", "0007_attendance.sql"]);
 
     const allNames = (await readMigrations("database/migrations")).map(migration => migration.name);
     const result = await reset(db);
-    expect(result.rolledBack).toEqual(["0006_gamification.sql", "0005_project_learning.sql", "0004_assessment_engine.sql", "0003_learning_core.sql", "0002_academic_foundation.sql", "0001_identity.sql"]);
+    expect(result.rolledBack).toEqual(["0007_attendance.sql", "0006_gamification.sql", "0005_project_learning.sql", "0004_assessment_engine.sql", "0003_learning_core.sql", "0002_academic_foundation.sql", "0001_identity.sql"]);
     expect(result.applied).toEqual(allNames);
     expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).not.toBeNull();
     expect((await db`SELECT * FROM users`).length).toBe(0);

@@ -5,11 +5,13 @@ import { HttpError } from "../../core/errors";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
 import { attendanceInput, meetingInput, operationInput } from "./input";
+import { checkinState } from "./checkin";
 import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail } from "../../shared/attendance";
-const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
+export const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
 export function page<T>(rows: T[], offset: number) { return { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null }; }
-async function sessionRow(tx: SQL, courseId: string, sessionId: string, lock = false) {
-  if (lock) await tx`SELECT id FROM classroom_sessions WHERE id = ${sessionId} AND course_id = ${courseId} FOR UPDATE`;
+export async function sessionRow(tx: SQL, courseId: string, sessionId: string, lock: boolean | "share" = false) {
+  if (lock === "share") await tx`SELECT id FROM classroom_sessions WHERE id = ${sessionId} AND course_id = ${courseId} FOR SHARE`;
+  else if (lock) await tx`SELECT id FROM classroom_sessions WHERE id = ${sessionId} AND course_id = ${courseId} FOR UPDATE`;
   const [row] = await tx<(Meeting & { lastOperation: unknown })[]>`SELECT id, course_id AS "courseId", title, starts_at::text AS "startsAt", ends_at::text AS "endsAt", status, version, note, reason, last_operation AS "lastOperation" FROM classroom_sessions WHERE id = ${sessionId} AND course_id = ${courseId}`;
   if (!row) notFound();
   return row;
@@ -73,7 +75,7 @@ export async function meetingDetail(db: SQL, actor: Actor, courseId: string, ses
       FROM classroom_roster r LEFT JOIN attendance_records a ON a.session_id = r.session_id AND a.student_id = r.student_id
         AND NOT EXISTS (SELECT 1 FROM attendance_records child WHERE child.previous_id = a.id)
       WHERE r.session_id = ${sessionId} AND (${course.canManage} OR r.student_id = ${actor.id})`;
-    return { course, session, roster: page(rows, offset), counts: counts! };
+    return { course, session, roster: page(rows, offset), counts: counts!, checkin: await checkinState(tx, actor, sessionId, course.canManage) };
   });
 }
 export async function recordAttendance(db: SQL, actor: Actor, courseId: string, sessionId: string, studentId: string, body: Record<string, unknown>, requestId: string) {

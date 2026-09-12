@@ -19,7 +19,7 @@ measured operational requirement exists.
 | `src/modules/activities` | Assignments, submissions, grading |
 | `src/modules/assessments` | Question bank, quiz and exam settings, attempts, scoring, adjustments |
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
-| `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports |
+| `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
@@ -37,7 +37,7 @@ measured operational requirement exists.
 3. For `/api/learning/`, `/api/projects`, and `/api/admin/`, non-GET requests must pass
    `requireSameOrigin`. The handler resolves the session actor and calls the router.
 4. The router checks the base capability, splits the path, parses the body (`jsonObject`
-   with a 64 KiB limit for learning and projects, 16 KiB for attendance, and 4 KiB elsewhere; `multipartInput` only
+   with a 64 KiB limit for learning and projects, 16 KiB for attendance sessions, and 4 KiB elsewhere (QR check-in included); `multipartInput` only
    for material uploads and assignment submissions), and calls a service inside
    `databaseInputError`, which turns constraint violations into 409 or 400.
 5. The service validates input with its module's `input.ts`, checks scope, and runs SQL in
@@ -71,6 +71,7 @@ measured operational requirement exists.
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
 | `0007_attendance` | `classroom_sessions`, `classroom_roster`, `attendance_records`, `classroom_session_events` |
+| `0008_qr_attendance` | `attendance_checkin_windows`, `attendance_checkin_codes`, `attendance_checkins` |
 
 - **Academic:** a course joins a class, a term, and a subject within one academic year;
   composite foreign keys keep classes and terms in the same year. Teachers link to courses
@@ -193,7 +194,29 @@ Attendance revisions form a single append-only chain per roster entry with a com
 predecessor foreign key and unique predecessor/first-record indexes. Latest means no child
 revision exists. Stale predecessors return 409; exact retries reuse the existing revision.
 Session operations use optimistic versions and retain the last operation for exact retries.
-Every attendance write advances the session version, so closing cannot race a correction.
+Every manual attendance write advances the session version, so closing cannot race a
+correction. QR check-ins deliberately do not, because a whole class would then serialize on
+one row; their safety comes from the unique first-record index and the check-in primary key.
+
+### QR check-in
+
+A session may carry one check-in window, keyed by `session_id`, that a manager starts only
+while the session is open. The window issues rotating codes: ten characters from a
+32-symbol alphabet without I, L, O or U, so the same value works as a QR payload and as
+something a santri can type. Only the SHA-256 hex digest is stored, the treatment session
+tokens get; the plaintext is returned once to the manager who mints it. Minting expires the
+outgoing code down to a ten-second grace, issues a replacement valid for
+`rotate_seconds + 10`, and stops at 2,000 codes per window. Stopping the window retires
+every live code in the same transaction.
+
+A check-in is authenticated as the santri and authorized by `learning.participate`, course
+access, and roster membership. The code is only a proof of presence, never a credential.
+It writes the first `attendance_records` row for that santri — `present`, or `late` when
+the database clock is past the window's threshold — and one `attendance_checkins` row that
+makes a repeat return the original result. A santri a teacher has already recorded cannot
+check in, and every later correction appends to the chain as usual. Window changes take the
+exclusive course and session locks; minting and check-in take shared locks so a class checks
+in concurrently while closing or cancelling still waits for in-flight check-ins.
 
 Scheduled meetings open only with a nonempty roster; open meetings close only when every
 entry is marked. Reopening a closed meeting and cancelling a scheduled/open meeting require

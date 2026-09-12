@@ -5,6 +5,7 @@ import type { LearningCourse, Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { deviceTimezone, Field, formatDateTime, fromLocalInput, MutationForm, Pager, Search, useData } from "../components/learning";
+import { CheckinManager, CheckinStudent } from "../components/checkin";
 const root = "/api/attendance/courses";
 const href = (courseId: string, sessionId?: string) => `/attendance/courses/${courseId}${sessionId ? `/sessions/${sessionId}` : ""}`;
 export function Attendance({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
@@ -86,6 +87,9 @@ function SessionView({ courseId, sessionId, timezone, onExpired }: { courseId: s
     <div className="filter-bar"><span role="status" className={`badge ${connected ? "badge-success" : "badge-draft"}`}>{connected ? "Pembaruan langsung aktif" : "Menghubungkan ulang…"}</span><Button className="button-secondary button-small" onClick={() => void load()}>Muat ulang</Button>{data && <span className="badge">{sessionLabels[data.session.status]}</span>}</div>
     {error && <ErrorState message={error} retry={() => void load()} />}{!data ? !error && <LoadingState /> : <>
       <Card><div className="card-heading"><h2>Ringkasan kehadiran</h2><span>{data.counts.total} santri</span></div><div className="filter-bar">{Object.entries(attendanceLabels).map(([key, label]) => <span className="badge" key={key}>{label}: {data.counts[key as keyof typeof attendanceLabels]}</span>)}<span className="badge badge-gold">Belum dicatat: {data.counts.unrecorded}</span></div></Card>
+      {data.course.canManage
+        ? <CheckinManager path={path} session={data.session} checkin={data.checkin} timezone={timezone} onExpired={onExpired} saved={() => void load()} />
+        : <CheckinStudent path={path} session={data.session} checkin={data.checkin} timezone={timezone} onExpired={onExpired} saved={() => void load()} />}
       {data.course.canManage && <Card className="lesson-card"><div className="card-heading"><h2>Kelola sesi</h2></div><SessionActions session={data.session} path={path} onExpired={onExpired} saved={() => void load()} />
         {data.session.reason && <p className="card-hint">Alasan terakhir: {data.session.reason}</p>}
         <p className="card-hint">Catatan privat: {data.session.note || "Belum ada catatan"}</p>

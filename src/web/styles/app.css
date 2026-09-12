@@ -226,6 +226,13 @@
 
 @layer components {
   .attendance-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+  .checkin-display { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; }
+  .checkin-qr { width: 200px; height: 200px; flex-shrink: 0; border: 1px solid var(--color-border); border-radius: 8px; }
+  .checkin-qr-paper { fill: var(--color-surface); }
+  .checkin-qr-ink { fill: var(--color-text); }
+  .checkin-code { margin: 0; font-family: monospace; font-size: 28px; font-weight: 600; letter-spacing: 4px; overflow-wrap: anywhere; }
+  .checkin-scanner { display: flex; flex-direction: column; align-items: start; gap: 12px; }
+  .checkin-video { width: min(100%, 320px); aspect-ratio: 1; max-width: 100%; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-neutral); object-fit: cover; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -575,6 +582,8 @@
 }
 @media (max-width: 760px) {
   .growth-level { align-items: stretch; flex-direction: column; }
+  .checkin-display { flex-direction: column; align-items: stretch; }
+  .checkin-qr { width: min(100%, 220px); height: auto; align-self: center; }
   .award-grid { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
   .xp-row, .rule-row { align-items: stretch; flex-direction: column; padding: 12px 16px; }
 }

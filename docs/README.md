@@ -29,6 +29,7 @@ workflow.
 | 4 — Project learning | [phases/04-project-learning.md](phases/04-project-learning.md) |
 | 5 — Gamification | [phases/05-gamification.md](phases/05-gamification.md) |
 | 6 — Attendance & classroom sessions | [phases/06-attendance.md](phases/06-attendance.md) |
+| 7 — QR attendance | [phases/07-qr-attendance.md](phases/07-qr-attendance.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).
