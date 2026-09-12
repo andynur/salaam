@@ -23,8 +23,9 @@ The teacher results table provides the action for open attempts.
 Migration `0018_assessment_accommodations.sql` has a matching down script. Unit tests cover
 bounded input. PostgreSQL integration tests cover migration rollback, pre-start deadlines,
 idempotency, stale-policy conflicts, membership boundaries, and audit records. Typecheck
-and production build are required; browser QA covers the teacher action and responsive
-assessment results table.
+and production build passed. Browser QA was attempted against a disposable database, but
+the headless Chrome harness stopped before producing DOM checks; the phase therefore
+remains In progress until the smoke run is repeatable.
 
 ## Out of scope
 
