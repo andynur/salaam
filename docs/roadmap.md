@@ -38,7 +38,9 @@ Coding agents follow skill `deliver-phase`.
 | 28 | Attendance roster adjustments | Delivered — [record](phases/28-attendance-roster-adjustments.md) |
 | 29 | QR attendance breakdown | Delivered — [record](phases/29-qr-attendance-breakdown.md) |
 | 30 | QR check-in import | Delivered — [record](phases/30-qr-checkin-import.md) |
+| 31 | Lesson documents | Delivered — [record](phases/31-lesson-documents.md) |
 | 31 | Student-visible leaderboard | Delivered — [record](phases/31-student-leaderboard.md) |
+| 32 | Club management | Delivered — [record](phases/32-club-management.md) |
 
 ## Delivered
 
@@ -161,7 +163,9 @@ Boundaries section has the details.
   session of that account ends with it. Profile editing, role reassignment, class transfers,
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
-  scanning and inline previews; rich text or Markdown.
+  scanning and inline previews. Markdown documents, cover images, autosave, and public
+  lesson pages are delivered in Phase 31; collaborative editing, revision history, document
+  comments, and document export remain deferred.
 - **Phase 3:** proctoring; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns and attachments on cards; realtime board
@@ -185,3 +189,12 @@ Boundaries section has the details.
 - **Operations:** school hardware/WLAN load testing, scheduled backup execution and alerting,
   and repeatable restore drills. Local HTTPS proxy behavior and one backup/restore drill passed
   on 2026-09-12; [operations](operations.md) records the limits of that validation.
+
+### Phase 32 — Club management
+
+A `Club` directory and workspace that orchestrate delivered modules for the school's three
+clubs — Coders Club, Builders Club, and Multimedia Club: a club profile, goals, membership
+over existing accounts, and linked courses, with tabs that read the existing learning,
+challenge, project, meeting, and gamification rows. Administrators create, archive, and
+restore clubs; mentors run the club they lead. No club-owned engine is added, and membership
+never widens course access.

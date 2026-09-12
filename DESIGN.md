@@ -265,6 +265,25 @@ adding a near-duplicate.
   table instance — the call site passes `key={kind}` — so rows fetched for the previous
   report are never rendered with another report's columns. A CSV export is a plain
   `<a className="button button-secondary button-small">`, not a fetch.
+- **Lesson documents**: `.lesson-document` (a `.lesson-card` whose cover bleeds to the
+  card edge) holds `.doc-cover`/`.doc-cover-image`/`.doc-cover-actions`, the editor
+  (`.doc-editor`, `.doc-bar` with the borderless `.doc-title` and the `.doc-status`
+  autosave line, `.doc-toolbar` of `.doc-tool` buttons, the contenteditable
+  `.doc-surface`, the `.doc-source` Markdown textarea, `.doc-hint`) and
+  `.doc-share`/`.doc-share-row`/`.doc-share-link`. `.doc-prose` is the rendered-Markdown
+  block used by the editor surface, the student's read-only view, and text materials —
+  reuse it for any Markdown body instead of `.learning-prose`, which stays the
+  pre-wrapped plain-text block.
+- **Club workspace**: `Club.tsx` reuses `.summary-grid`/`.stat-card`, `.tabs`, `.card`,
+  `.card-hint`, `.table-scroll`, `.member-list`, `.member-picker`, and the search/pager kit.
+  New here: `.club-tile` (a `.course-tile` rendered as a button for the club directory) with
+  `.club-tile-meta` for its counts, `.club-switch` (the club select in `.page-actions`), `.club-subhead` (a 14px
+  heading inside a card body), `.club-flow` of `.club-flow-step` pills (the numbered
+  Belajar → Bertumbuh strip, numbered by CSS counter so the markup stays an ordered list),
+  `.club-goals` of `.club-goal` rows with the `.club-goal-mark` numeral tile, `.club-list`
+  (hairline-free list of `.task-item` rows for challenges), and `.club-members` with
+  `.club-member-name` so a role lozenge and a remove button wrap instead of squeezing the
+  name. `.club-note` is the muted draft notice under the tabs.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title
@@ -359,6 +378,28 @@ portfolio), `src/web/pages/ProjectBoard.tsx` (one project: board + overview), an
 - Project stages follow the Jira flow in copy too: "Kirim untuk review" → guru "Setujui
   proyek" (0–100) or "Minta revisi". Locked states explain themselves with `.info-state`.
 
+## Lesson documents (Phase 31)
+
+`src/web/components/editor.tsx` holds the document pieces: `<Markdown source />` renders
+stored Markdown through `src/shared/markdown.ts`, `<DocumentEditor />` is the in-place
+editor, `<LessonCover />` the header image, and `<LessonShare />` the public link.
+
+- The editor is the page, not a form: no modal, no submit button. Typing, formatting, and
+  pasting happen on `.doc-surface`, and the body autosaves about a second after the last
+  keystroke. `.doc-status` is the only feedback — `Menyimpan…`, `Tersimpan HH.MM`, or a
+  red failure line — so don't add a save button beside it.
+- React renders the surface's HTML once and never again while it is mounted; anything that
+  re-renders the workspace must keep the editor's `key` stable, or in-flight typing is
+  lost. Autosave failures show an `ErrorState` with a retry, and a 409 stops autosaving and
+  offers a reload rather than overwriting the other editor's work.
+- A paste is converted to this document's Markdown first, so pasted content arrives
+  formatted but never carries foreign markup or styles. `Sumber Markdown` toggles a plain
+  textarea, which is also the keyboard-friendly path.
+- Toolbar buttons are `.doc-tool` labels (`B`, `H2`, `•`) with an Indonesian `aria-label`;
+  they use `onMouseDown` prevention so the caret stays in the document.
+- Everything a student sees is read-only `.doc-prose`. The share control, the cover
+  actions, and the editor render only when `course.canManage` is true.
+
 ## Calendar and notifications (Phase 8)
 
 `Calendar.tsx` reuses `PageHeader`, the mutation/field kit, agenda task rows, date filters,
@@ -371,3 +412,25 @@ checkbox labels, and `.notification-row` wraps source links, delivery status and
 controls on phones. Pending, delivered, suppressed and read states have distinct Indonesian
 labels; delivery alone never claims the notification was read. No new color token or icon
 library is needed. The navigation hides its future group when there are no unavailable pages.
+
+## Club workspace (Phase 32)
+
+`/club` opens the club directory: the course-card grid (`.course-grid` of `.club-tile`) with
+one card per club — initials tile, state lozenges (Mentor/Anggota, Draft, Arsip), tagline,
+`.club-tile-meta` counts, and a `.course-open` call to action. An administrator gets a
+`Klub baru` form and a `Tampilkan arsip` checkbox there; nobody else sees either. Choosing a
+card opens that club at `/club?club=<id>`, which carries the club switcher, a `Semua klub`
+button back to the directory, and seven tabs (Ringkasan, Pembelajaran,
+Pertemuan, Challenge, Projects, Anggota, Progres). Ringkasan carries the stat row, the
+narrative cards, the learning-flow strip, and the goal list; the other tabs are the standard
+card + table/list + search + pager shape, each with its own loading, empty, error-with-retry
+and success states.
+
+Mentor controls are additive, never a separate screen: a `Kelola klub` toggle (with
+`aria-expanded`) reveals the profile form, the goal editor (one goal per line,
+`Judul | Keterangan`), and the publish action; the Pembelajaran and Anggota tabs gain a
+linker and a candidate list below the read-only card. A student sees the same tabs without
+those panels. An administrator additionally finds the archive or restore control at the
+bottom of the manage panel; on an archived club the panel offers nothing but `Pulihkan klub`,
+and `.club-note` under the tabs explains that the club is read-only. Copy stays Indonesian,
+and the page never scrolls sideways at 390 px — wide data sits in `.table-scroll`.

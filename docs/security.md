@@ -77,6 +77,22 @@ and connections plus `data:` images, and forbids framing, plugins, and foreign f
   `Content-Security-Policy: sandbox; default-src 'none'`, `nosniff`, and `no-store`.
 - There is no malware scanning or inline preview yet.
 
+## Public lesson pages
+
+- A course manager turns sharing on for one lesson. The server issues a 22-character
+  opaque slug from `crypto.getRandomValues`; nothing else identifies the page, and the
+  slug is the only credential.
+- `/share/lessons/:slug` accepts GET only, reads no session, and is dispatched before any
+  authenticated route. It renders the lesson title, body, cover, course, class, and term —
+  never materials, activities, submissions, or any student data.
+- The page carries `Content-Security-Policy: default-src 'none'; img-src 'self';
+  style-src 'unsafe-inline'`, `robots: noindex, nofollow`, no script, and `no-store`. Links
+  inside a document are limited to absolute HTTP(S) URLs and carry
+  `rel="noopener noreferrer nofollow"`; everything else in the Markdown is escaped.
+- Stopping the share clears the slug, so the link 404s immediately; sharing again issues a
+  new slug rather than reviving the old one. Archiving the lesson also takes the page down.
+  Sharing and unsharing are audited.
+
 ## Assessment integrity
 
 The server clock fixes every attempt's deadline. A database constraint requires an exam to
@@ -203,3 +219,29 @@ application Origin. Course scope cannot be moved by editing an event; stale vers
 with 409. Reminder and QR notices contain source links, never check-in codes or credentials.
 Delivery is in-app only. Worker failures log a fixed event without source text, recipient
 information or exception payloads. No external provider receives school data.
+
+## Clubs
+
+- `club.view` opens the club workspace and `club.manage` allows mentor actions; a teacher
+  manages only clubs where they are an active mentor, while `learning.manage.all` manages
+  every club. Any other actor receives 404, so a club's existence is not revealed.
+- Creating, archiving, and restoring a club needs `club.manage` **and**
+  `learning.manage.all` together — an administrator. A mentor who manages a club cannot
+  create or archive one (403). An archived club is read-only: it disappears from every
+  member's list, its detail is 404 for them, and every manage mutation answers 409
+  `CLUB_ARCHIVED` until an administrator restores it. There is no route that deletes a club.
+- Club membership carries no capability of its own. Adding a mentor requires the account to
+  hold `learning.manage` and a member `learning.participate`, checked against
+  `role_permissions` at the time of the change; anything else is rejected with 400.
+- Every club tab re-applies the scope rule of the module it reads, so membership never
+  substitutes for course enrolment or a teaching assignment: an unenrolled member sees an
+  empty workspace, and linking a course requires the mentor to manage that course.
+- A club always keeps at least one active mentor; removing the last one returns 409.
+- Club profile, goal, membership, publication, and course-link changes are audited in the
+  same transaction as the write (`club.created`, `club.archived`, `club.restored`,
+  `club.updated`, `club.published`, `club.unpublished`,
+  `club.goals.updated`, `club.member.added`, `club.member.removed`, `club.course.linked`,
+  `club.course.unlinked`), so a failed audit rolls the change back. Club reads are not
+  audited; the underlying modules audit their own writes.
+- Club routes add no public surface: every endpoint requires a session, and non-GET
+  requests require the same origin.

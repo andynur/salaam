@@ -38,6 +38,8 @@ measured operational requirement exists.
    password checks.
 3. For `/api/learning/`, `/api/projects`, and `/api/admin/`, non-GET requests must pass
    `requireSameOrigin`. The handler resolves the session actor and calls the router.
+   `/share/` is the one public surface: GET only, no session is read, and the slug in the
+   path is the only credential.
 4. The router checks the base capability, splits the path, parses the body (`jsonObject`
    with a 64 KiB limit for learning and projects, 16 KiB for attendance sessions, and 4 KiB elsewhere (QR check-in included); `multipartInput` accepts material uploads, assignment submissions, and project deliverables), and calls a service inside
    `databaseInputError`, which turns constraint violations into 409 or 400.
@@ -57,7 +59,8 @@ measured operational requirement exists.
   deletes every session of that account and audits `user.password_reset` in one
   transaction), `academic.manage`, and `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
   `learning.manage.all` (admin); `learning.participate` (student); `reports.view` (admin,
-  teacher) for cross-course reports and their CSV exports.
+  teacher) for cross-course reports and their CSV exports; `club.view` (all roles) and
+  `club.manage` (admin, teacher) for club workspaces.
 - Course scope comes from `courseAccess`. *Manage* needs `learning.manage` plus a teaching
   assignment or `learning.manage.all`. *Participate* needs enrollment in the course's class
   and a published course. *View* accepts either. Failing scope returns 404, so the API does
@@ -84,6 +87,8 @@ measured operational requirement exists.
 | `0023_project_file_deliverables` | Optional course-scoped uploaded project deliverables |
 | `0024_attendance_roster_adjustments` | Soft removal and audit-safe roster changes for classroom sessions |
 | `0025_attendance_checkin_imports` | Idempotency records for verified offline QR scan imports |
+| `0028_club_management` | `clubs`, `club_goals`, `club_members`, `club_courses`, the `club.view`/`club.manage` capabilities, and the seeded Coders Club |
+| `0030_club_directory` | No table: seeds Builders Club and Multimedia Club with their goals |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
@@ -161,7 +166,21 @@ audited as a system event.
 as the last step of the database transaction and removes the file if the transaction fails.
 `stored_files` records course, uploader, display name, media type, size, and SHA-256.
 Downloads repeat the access checks and are served as sandboxed attachments; see
-[security](security.md#files).
+[security](security.md#files). A lesson cover image is the one exception: it is served
+`inline` after its media type is confirmed to be an image, so the document can show it.
+
+## Lesson documents
+
+A lesson is a Markdown document. `src/shared/markdown.ts` renders it and
+`src/shared/html-markdown.ts` converts HTML (a clipboard payload, or the editor surface
+read back) into that Markdown; both run in the SPA and on the server, with no dependency.
+The renderer escapes first and emits a fixed tag set, so its output is safe to insert.
+
+`src/modules/learning/documents.ts` autosaves the body under a `version` column: a save
+carries the version it started from, a stale save gets 409, and a repeat of the save that
+already landed returns the stored document. `src/core/share-http.ts` renders a shared
+document as one standalone, script-free HTML page under `/share/lessons/:slug`; see
+[security](security.md#public-lesson-pages).
 
 ## Web client
 
@@ -296,3 +315,31 @@ source access. Reminders deduplicate on recipient/source/time, level notices on 
 and level, and QR notices on the specific window update. Read receipts preserve their first
 timestamp. No broker, provider, copied content snapshot, or runtime dependency is introduced.
 See [Phase 8](phases/08-calendar-notifications.md) for limits and API behavior.
+
+## Clubs
+
+A club is an orchestration layer over delivered modules, not a parallel domain. `clubs`
+holds the profile copy shown on the overview, `club_goals` the ordered goal list,
+`club_members` the membership (`mentor` or `member`, soft-removed with `removed_at`), and
+`club_courses` the courses the club surfaces. No club table stores learning content,
+activities, projects, attendance, or XP.
+
+`clubAccess` is the club's scope check: `club.manage` holders who mentor the club — and
+`learning.manage.all` administrators — manage it; everyone else needs an active membership
+in a published club, and any other actor gets 404. Mutations lock the club row `FOR UPDATE`
+first and audit inside the same transaction.
+
+The directory itself — creating a club, archiving it, restoring it — is a third mode of
+`clubAccess` that requires `club.manage` together with `learning.manage.all`; no capability
+was added for it. Archiving is the club's delete: `clubs.archived_at` is set, every row
+stays, the club leaves the members' list, and any manage mutation on it answers 409
+`CLUB_ARCHIVED` until an administrator restores it.
+
+Membership is authorization-neutral. A mentor must already hold `learning.manage` and a
+member `learning.participate`, and every club tab re-applies the scope rule of the module it
+reads: linked courses are filtered by teaching assignment or class enrolment, projects come
+from the project list with a `clubId` filter, meetings from `classroom_sessions` with the
+roster rule, and progress from `xp_entries` and `badge_awards`. A member who is not enrolled
+in a linked course therefore sees an empty workspace. Linking a course calls
+`courseAccess(…, "manage")`, so a club can never reach a course its mentor does not teach.
+See [Phase 32](phases/32-club-management.md).

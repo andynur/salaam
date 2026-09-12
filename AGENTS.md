@@ -33,9 +33,12 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 | `src/core/{foundation,learning,project}-http.ts` | Routers for `/api/admin`, `/api/learning/courses`, `/api/projects` |
 | `src/core/attendance-{http,realtime}.ts` | Attendance HTTP routes and authenticated WebSocket invalidations |
 | `src/core/reporting-http.ts` | Read-only report and CSV export routes under `/api/reports` |
+| `src/core/share-http.ts` | The only public surface: `/share/lessons/:slug` renders a shared lesson |
 | `src/core/` | Config, `HttpError`, validation helpers, permissions, auth, audit, storage, logger, migrations |
 | `src/modules/<domain>/` | `input.ts` validates bodies; `service.ts` and siblings hold SQL and rules |
 | `src/modules/learning/access.ts` | `courseAccess` and `lessonAccess`: scope checks and course locks |
+| `src/modules/learning/documents.ts` | Lesson document autosave, cover images, public share links |
+| `src/shared/markdown.ts`, `html-markdown.ts` | Markdown rendering and HTML import, shared by server and SPA |
 | `src/shared/` | Types shared by server and web |
 | `src/web/` | React SPA; rules in `src/web/AGENTS.md`, UI kit in `DESIGN.md` |
 | `database/` | Migrations and seeds; rules in `database/AGENTS.md` |
@@ -75,6 +78,8 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
   access before notifications and periodically; keep all attendance data on scoped HTTP.
 - Non-GET API requests must send `Origin` equal to `APP_BASE_URL`, including from tests
   and scripts.
+- `/share/lessons/:slug` is the only route without a session: GET only, opaque slug, and
+  nothing but the shared document in the response. Keep it that way.
 
 ## Invariants
 
@@ -84,6 +89,9 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 - Passwords use Argon2id through `Bun.password`. Session tokens are opaque and stored
   only as SHA-256 hashes. Never log passwords, cookies, tokens, or request bodies.
 - Student code never runs in the application process; no `eval`.
+- Lesson bodies and text materials are Markdown rendered by `src/shared/markdown.ts`, which
+  escapes first and emits a fixed tag set. Never render stored content as raw HTML, and
+  don't add a Markdown or rich-text dependency.
 - Applied migrations are immutable; their checksums are verified.
 - No backend framework, ORM, Redis or queue, UI or icon library, or extra runtime service.
   State the reason for any new dependency.
