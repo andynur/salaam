@@ -150,6 +150,20 @@ pg_dump --format=custom --file=/backup/salaam-$(date +%F).dump "$DATABASE_URL"
 tar -czf /backup/storage-$(date +%F).tgz -C "$(dirname "$STORAGE_ROOT")" "$(basename "$STORAGE_ROOT")"
 ```
 
+The repository also provides `bun run backup`. Set `BACKUP_ROOT` to a protected volume
+outside `STORAGE_ROOT`; it creates a timestamped directory containing `database.dump`,
+`storage.tgz`, and a `SHA256SUMS` manifest, then removes directories older than
+`BACKUP_RETENTION_DAYS` (14 by default). Run it from a system scheduler after confirming
+the service account can read the database and storage:
+
+```cron
+15 2 * * * cd /srv/salaam && /usr/local/bin/bun run backup >> /var/log/salaam-backup.log 2>&1
+```
+
+Alert on a non-zero exit, missing newest timestamped directory, low backup-volume space,
+or an age beyond 26 hours. Treat the backup log as operational metadata; it must not include
+the database URL or application secrets.
+
 Restore onto an empty database, then unpack storage, then start the service:
 
 ```sh
