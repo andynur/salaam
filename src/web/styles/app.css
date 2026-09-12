@@ -223,6 +223,11 @@
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@layer components {
+  .attendance-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+}
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (pointer: coarse) {
   .button, .input, .nav-item { min-height: 44px; }

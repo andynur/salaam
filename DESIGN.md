@@ -240,6 +240,11 @@ adding a near-duplicate.
   `.award-text`, `.award-meta`, plus the `.xp-row` and `.rule-row` list rows.
   `.dashboard-side` stacks cards in the dashboard's right column, and `.card-hint` is a
   muted one-line note under a `.card-heading`.
+- **Attendance**: `Attendance.tsx` reuses `.lesson-workspace`, `.lesson-card`, the form
+  kit, `.filter-bar`, lozenges, and scrolling tables. `.attendance-actions` arranges
+  lifecycle forms in responsive columns. A visible live-connection status and manual
+  refresh sit above each session. Editors retain their original version/predecessor
+  during realtime updates so stale edits fail rather than overwrite newer records.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title

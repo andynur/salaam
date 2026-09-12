@@ -66,5 +66,13 @@ export async function learningTasks(db: SQL, actor: Actor): Promise<LearningTask
           (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id}))
       GROUP BY a.id, c.id ORDER BY min(p.submitted_at), a.id LIMIT 5`);
   }
+  if (actor.permissions.includes("learning.view")) {
+    tasks.push(...await db<LearningTask[]>`SELECT 'attendance' AS type, s.id, c.id AS "courseId", c.name AS "courseName", '' AS "lessonId", s.title, s.starts_at::text AS "dueAt", 0 AS pending
+      FROM classroom_sessions s JOIN courses c ON c.id = s.course_id
+      WHERE s.status IN ('scheduled', 'open') AND (
+        (${actor.permissions.includes("learning.manage")} AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id})) AND s.status = 'open')
+        OR (c.published AND s.ends_at >= clock_timestamp() AND EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id}) AND EXISTS (SELECT 1 FROM classroom_roster r WHERE r.session_id = s.id AND r.student_id = ${actor.id})))
+      ORDER BY s.starts_at, s.id LIMIT 5`);
+  }
   return tasks;
 }

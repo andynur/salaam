@@ -8,6 +8,7 @@ import { Icon, type IconName } from "../components/icons";
 
 interface DashboardData { academic: string | null; courses: number; classes: number; tasks: LearningTask[]; events: never[]; growth: { level: Level; badges: number } | null }
 const taskTypes: Record<LearningTask["type"], { label: string; icon: IconName; badge: string }> = {
+  attendance: { label: "Sesi kelas", icon: "attendance", badge: "badge-discovery" },
   assignment: { label: "Kumpulkan tugas", icon: "assignment", badge: "" },
   quiz: { label: "Kerjakan quiz", icon: "quiz", badge: "badge-discovery" },
   exam: { label: "Kerjakan ujian", icon: "timer", badge: "badge-danger" },
@@ -16,7 +17,7 @@ const taskTypes: Record<LearningTask["type"], { label: string; icon: IconName; b
   challenge: { label: "Kerjakan proyek", icon: "board", badge: "badge-discovery" },
   review: { label: "Perlu direview", icon: "check", badge: "badge-gold" },
 };
-const taskHref = (task: LearningTask) => task.type === "review" ? `/projects?${new URLSearchParams({ status: "submitted", challenge: task.id })}`
+const taskHref = (task: LearningTask) => task.type === "attendance" ? `/attendance/courses/${task.courseId}/sessions/${task.id}` : task.type === "review" ? `/projects?${new URLSearchParams({ status: "submitted", challenge: task.id })}`
   : task.type === "challenge" && task.projectId ? `/projects/${task.projectId}`
   : `/learning/courses/${task.courseId}?${new URLSearchParams(task.type === "grading" ? { lesson: task.lessonId, review: task.id } : { lesson: task.lessonId })}`;
 function greeting(timezone: string) {
@@ -39,7 +40,7 @@ export function Dashboard({ actor, timezone, onExpired }: { actor: Actor; timezo
   }, [attempt, onExpired]);
   const date = new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeZone: timezone }).format(new Date());
   const deadline = (value: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
-  const taskMeta = (task: LearningTask) => task.type === "grading" ? `${task.pending} jawaban menunggu` : task.type === "review" ? `${task.pending} proyek menunggu review`
+  const taskMeta = (task: LearningTask) => task.type === "attendance" ? `Sesi kelas${task.dueAt ? ` · ${deadline(task.dueAt)}` : ""}` : task.type === "grading" ? `${task.pending} jawaban menunggu` : task.type === "review" ? `${task.pending} proyek menunggu review`
     : task.type === "lesson" ? "Lesson berikutnya"
     : task.dueAt ? `${task.type === "assignment" || task.type === "challenge" ? "Tenggat" : "Ditutup"} ${deadline(task.dueAt)}` : "Tanpa tenggat";
   const stats: { icon: IconName; tone: string; label: string; value: string | number; hint: string }[] = data ? [

@@ -13,8 +13,8 @@ Coding agents follow skill `deliver-phase`.
 | 3 | Assessment engine | Delivered for choice questions — [record](phases/03-assessment-engine.md) |
 | 4 | Project learning | Delivered — [record](phases/04-project-learning.md) |
 | 5 | Gamification | Delivered — [record](phases/05-gamification.md) |
-| 6 | Attendance and classroom sessions | Next |
-| 7 | QR attendance | Planned |
+| 6 | Attendance and classroom sessions | Delivered — [record](phases/06-attendance.md) |
+| 7 | QR attendance | Next |
 | 8 | Calendar and notifications | Planned |
 | 9 | Reporting | Planned |
 | 10 | Advanced IT learning | Planned |
@@ -57,12 +57,13 @@ administrator-configurable reward rules. XP is awarded in the same transaction a
 that earns it: lesson completion (the Phase 2 hook), assignment grading, a finished quiz or
 exam, and an approved project (the Phase 4 hook).
 
-## Planned
-
 ### Phase 6 — Attendance and classroom sessions
 
-Meeting sessions, rosters, manual attendance, notes, reports, and realtime classroom status.
-Attendance always references a defined session.
+Course meeting sessions with snapshotted rosters, manual attendance and private notes,
+append-only corrections, session lifecycle controls, course/personal reports, dashboard
+shortcuts, and authenticated realtime status. Attendance always references a defined session.
+
+## Planned
 
 ### Phase 7 — QR attendance
 
@@ -110,6 +111,9 @@ Boundaries section has the details.
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5:** XP decay, penalties, and manual XP grants; streaks, seasons, and resets;
   leaderboards visible to students; badge artwork beyond the built-in icons; level-up
-  notifications (Phase 8); XP for attendance (Phase 6).
+  notifications (Phase 8); XP for attendance (deferred pending a correction/reversal policy).
+- **Phase 6:** attendance XP; QR/camera attendance (Phase 7); recurring meetings, bulk
+  marking/import, roster adjustments after creation, history browsing, exports, and
+  cross-course reports; multi-instance realtime delivery.
 - **Operations:** HTTPS proxy validation, backup and restore drills, and load testing on
   school hardware.

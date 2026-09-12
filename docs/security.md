@@ -42,7 +42,7 @@ drills, or school approval of privacy and retention policies.
 - Non-GET API requests require `Origin` to equal `APP_BASE_URL` and reject
   `Sec-Fetch-Site: cross-site`.
 - JSON bodies require `application/json` and are capped before parsing: 4 KiB for login and
-  administration, 64 KiB for learning and project routes. Multipart is accepted only on the
+  administration, 16 KiB for attendance, and 64 KiB for learning and project routes. Multipart is accepted only on the
   upload routes, with a single `file` field. The server-wide body limit is 10.25 MB.
 - SQL uses tagged-template parameters only; raw SQL is limited to version-controlled
   migration files. Identifiers, dates, and enumerations are validated explicitly, and
@@ -84,8 +84,6 @@ errors.
 
 ## Requirements for planned features
 
-- **Attendance** always references a defined meeting session, and corrections stay visible
-  in the audit history.
 - **QR attendance** values are short-lived, opaque, validated on the server, and never
   usable as login credentials.
 - **Coding challenges** run only behind a separate execution boundary with resource limits,
@@ -98,3 +96,24 @@ Back up PostgreSQL and `STORAGE_ROOT` together to a separate location, restrict 
 backup access, monitor job status, and run restore drills before production use. Define
 retention and recovery objectives before enabling destructive cleanup. See
 [operations](operations.md).
+
+## Classroom attendance
+
+Attendance references a roster entry in a defined course session. Teachers manage only
+assigned courses unless granted `learning.manage.all`. Students receive only their own
+rows and counts, and never private notes or correction reasons. Mutations require same
+origin and transactional audit; attendance and session-change histories are append-only
+through the application. They remain restricted school records in database backups.
+
+Attendance JSON bodies are capped at 16 KiB, titles at 150 characters, notes at 2,000,
+reasons at 500, session duration at 24 hours, and rosters at 500 active students. Lists
+return 50 records per page. No new capability, dependency, file upload, or credential type
+is introduced.
+
+WebSocket upgrades require the exact application Origin, a valid login session, and access
+to the requested course/session. The process permits at most 512 connections and four per
+account, with 256-byte incoming payloads and 4 KiB backpressure limits. Client application
+messages close the read-only connection. Authorization is rechecked before invalidations
+and every ten seconds; revoked sessions, inactive accounts, unpublished courses, and lost
+scope close the socket. Messages contain only `{ "type": "changed" }`; HTTP refetches
+repeat authorization. Connected sockets are not proof of classroom attendance.

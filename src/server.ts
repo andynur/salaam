@@ -1,3 +1,5 @@
+import { createAttendanceHandler } from "./core/attendance-http";
+import { createAttendanceRealtime } from "./core/attendance-realtime";
 import index from "./web/index.html";
 import { mkdir } from "node:fs/promises";
 import { loadConfig } from "./core/config";
@@ -18,7 +20,9 @@ import { log } from "./core/logger";
 const config = loadConfig();
 await mkdir(config.storageRoot, { recursive: true, mode: 0o700 });
 const db = connectDatabase(config.databaseUrl);
-const handle = createHttpHandler(config, createAuthService(db, config), () => checkDatabase(db), { foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db), gamification: createGamificationHandler(db), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
+const auth = createAuthService(db, config);
+const realtime = createAttendanceRealtime(db, auth, config);
+const handle = createHttpHandler(config, auth, () => checkDatabase(db), { attendance: createAttendanceHandler(db, realtime.changed), foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db), gamification: createGamificationHandler(db), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
 // Bun 1.4.2 resolves prebuilt HTML assets from cwd. Resolve config/storage first,
 // then use the bundle directory; development HTML imports do not need this.
 if (index.files) process.chdir(import.meta.dir);
@@ -37,8 +41,9 @@ const server = Bun.serve({
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index },
-  fetch(request, server) { return handle(request, server.requestIP(request)?.address ?? "unknown"); },
+  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/admin/users": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index, "/attendance": index, "/attendance/courses/:id": index, "/attendance/courses/:id/sessions/:sessionId": index },
+  websocket: realtime.websocket,
+  fetch(request, server) { if (new URL(request.url).pathname === "/api/attendance/live") return realtime.upgrade(request, server); return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {
     const requestId = crypto.randomUUID();
     log({ level: "error", event: "http.unhandled", requestId });
@@ -54,6 +59,7 @@ async function shutdown() {
   stopping = true;
   const timeout = setTimeout(() => process.exit(1), 10000);
   timeout.unref();
+  realtime.stop();
   await server.stop();
   await db.close({ timeout: 5 });
   clearTimeout(timeout);

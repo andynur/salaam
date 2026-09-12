@@ -16,6 +16,7 @@ export function navigationFor(actor: Actor) {
     ...(can("learning.view") ? [
       { href: "/learning", label: "Pembelajaran", icon: "book", active: (path: string) => path.startsWith("/learning") } satisfies NavItem,
       { href: "/projects", label: "Projects", icon: "board", active: (path: string) => path.startsWith("/projects") } satisfies NavItem,
+      { href: "/attendance", label: "Kehadiran", icon: "attendance", active: (path: string) => path.startsWith("/attendance") } satisfies NavItem,
       { href: "/gamification", label: "Pertumbuhan", icon: "star", active: (path: string) => path.startsWith("/gamification") } satisfies NavItem,
     ] : []),
   ];
@@ -26,7 +27,7 @@ export function navigationFor(actor: Actor) {
   ] as const).filter(([, , , permission]) => can(permission)).map(([href, label, icon]) => ({ href, label, icon, active: exact(href) }));
   const future: FutureItem[] = isStudent
     ? [{ label: "Kalender", icon: "calendar" }]
-    : [{ label: "Kehadiran", icon: "attendance" }, { label: "Kalender", icon: "calendar" }, { label: "Laporan", icon: "chart" }];
+    : [{ label: "Kalender", icon: "calendar" }, { label: "Laporan", icon: "chart" }];
   const groups: NavGroup[] = [{ items: main },...(admin.length ? [{ label: "Administrasi", items: admin }] : [])];
   return { isStudent, groups, future, pages: groups.flatMap(group => group.items) };
 }

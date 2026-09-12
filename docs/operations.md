@@ -73,3 +73,22 @@ in the log line.
 
 HTTPS proxy behavior with real browsers, backup and restore drills, and load testing on
 school hardware and WLAN are still open. Each phase record lists its load-testing caveats.
+
+## Classroom realtime
+
+The same Bun process handles `/api/attendance/live`. Configure the reverse proxy to pass
+WebSocket Upgrade/Connection headers, the browser Origin, and session cookies. Use WSS
+under HTTPS, support protocol pings, and avoid proxy idle timeouts shorter than 60 seconds.
+No new environment variables or services are required. On reconnect the UI refetches
+current HTTP state and also offers manual refresh while the connection is unavailable.
+
+Invalidations are process-local: run one application instance. Multi-instance delivery
+would need cross-process coordination before it is supported. Limit browser tabs to four
+live sessions per account; the process cap is 512. Local validation covers 125 concurrent
+santri connections, not the production proxy or school WLAN. Monitor connection load and
+DB latency during the pilot; permission revalidation runs every ten seconds. Shutdown
+closes sockets before stopping the HTTP server and database pool.
+
+Back up all four attendance tables with the existing PostgreSQL backup. Rollback of
+`0007_attendance.sql` destroys session, roster, attendance, and lifecycle history. Prefer
+a forward fix after real school records exist. Attendance XP remains deferred.

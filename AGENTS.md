@@ -2,7 +2,7 @@
 
 SALAAM (repository and package `salaam`) is the Learning & Growth Platform for
 HSI Boarding School. It is a modular monolith: one Bun process serves the API and a React
-SPA, and PostgreSQL is the source of truth. Phases 0–4 are delivered; `docs/roadmap.md`
+SPA, and PostgreSQL is the source of truth. Phases 0–6 are delivered; `docs/roadmap.md`
 lists what comes next.
 
 ## Commands
@@ -31,6 +31,7 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 | `src/server.ts` | Bootstrap and `Bun.serve` routes; every SPA path is listed here |
 | `src/core/http.ts` | Health, auth, same-origin check, dispatch by URL prefix |
 | `src/core/{foundation,learning,project}-http.ts` | Routers for `/api/admin`, `/api/learning/courses`, `/api/projects` |
+| `src/core/attendance-{http,realtime}.ts` | Attendance HTTP routes and authenticated WebSocket invalidations |
 | `src/core/` | Config, `HttpError`, validation helpers, permissions, auth, audit, storage, logger, migrations |
 | `src/modules/<domain>/` | `input.ts` validates bodies; `service.ts` and siblings hold SQL and rules |
 | `src/modules/learning/access.ts` | `courseAccess` and `lessonAccess`: scope checks and course locks |
@@ -65,6 +66,8 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
   string. `tx.unsafe` is reserved for migration files.
 - Uploads live at generated paths under `STORAGE_ROOT/learning-files/`; the original
   filename is display metadata only.
+- Classroom WebSockets send invalidations only. Recheck authentication and course/session
+  access before notifications and periodically; keep all attendance data on scoped HTTP.
 - Non-GET API requests must send `Origin` equal to `APP_BASE_URL`, including from tests
   and scripts.
 

@@ -13,7 +13,7 @@ export interface Activity { id: string; lessonId: string; kind: "assignment"; ti
 export interface Progress { studentId: string; studentName: string; lessons: number; completed: number; activities: number; submitted: number; graded: number }
 export interface CourseDetail { course: LearningCourse; canParticipate: boolean; modules: CourseModule[]; lessons: Lesson[]; materials: Material[]; activities: Activity[]; assessments: Assessment[]; challenges: Challenge[]; progress: Progress | null }
 // `projectId` is set for a student's challenge task when their project already exists.
-export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading" | "challenge" | "review"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number; projectId?: string | null }
+export interface LearningTask { type: "assignment" | "quiz" | "exam" | "lesson" | "grading" | "challenge" | "review" | "attendance"; id: string; courseId: string; courseName: string; lessonId: string; title: string; dueAt: string | null; pending: number; projectId?: string | null }
 
 // Extension allowlist for uploads. The server also checks each file's leading bytes.
 export const uploadTypes = {

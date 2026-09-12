@@ -23,7 +23,7 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 5 are implemented and validated
+This is an active early-stage project. Phases 0 through 6 are implemented and validated
 locally. SALAAM is not yet presented as a production deployment for a school: HTTPS proxy
 configuration, backup and restore drills, capacity testing, and operational rollout still
 need environment-specific validation.
@@ -36,10 +36,11 @@ need environment-specific validation.
 | 3 — Assessment engine | Question bank, quizzes and exams, server-timed attempts, per-student shuffling, offline-safe autosave, idempotent submission, automatic scoring, audited score adjustments | [Phase 3](docs/phases/03-assessment-engine.md) |
 | 4 — Project learning | Challenges, teacher-formed teams, Kanban boards with conflict-checked moves, reviews with revisions and scores, showcase, student portfolio | [Phase 4](docs/phases/04-project-learning.md) |
 | 5 — Gamification | Append-only XP ledger awarded with the event that earns it, derived levels, automatic badges, administrator-configurable reward rules, growth page and teacher leaderboard | [Phase 5](docs/phases/05-gamification.md) |
+| 6 — Attendance & classroom sessions | Session rosters, manual attendance, private notes, correction history, reports, dashboard tasks, authenticated realtime updates | [Phase 6](docs/phases/06-attendance.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
-The next milestone is **Phase 6 — Attendance and classroom sessions**: meeting sessions,
-rosters, manual attendance, notes, and reports. See the [roadmap](docs/roadmap.md).
+The next milestone is **Phase 7 — QR attendance**: short-lived check-in values validated
+on the server. See the [roadmap](docs/roadmap.md).
 
 ## Architecture
 

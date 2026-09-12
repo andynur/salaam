@@ -11,7 +11,7 @@ measured operational requirement exists.
 | --- | --- |
 | `src/server.ts` | Loads config, opens the pool, wires routers, serves SPA routes and brand assets, shuts down |
 | `src/core/http.ts` | Request pipeline and top-level dispatch |
-| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`), `gamification` (`/api/gamification`) |
+| `src/core/*-http.ts` | Routers: `foundation` (`/api/admin`), `learning` (`/api/learning/courses`), `project` (`/api/projects`), `gamification` (`/api/gamification`), `attendance` (`/api/attendance`) |
 | `src/core/validation.ts` | Body parsing and field validators |
 | `src/core/{auth,permissions,audit,storage,database,config,errors}` | Platform services |
 | `src/modules/users`, `src/modules/academic` | Account provisioning, academic structure, dashboard summary |
@@ -19,6 +19,7 @@ measured operational requirement exists.
 | `src/modules/activities` | Assignments, submissions, grading |
 | `src/modules/assessments` | Question bank, quiz and exam settings, attempts, scoring, adjustments |
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
+| `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
@@ -36,7 +37,7 @@ measured operational requirement exists.
 3. For `/api/learning/`, `/api/projects`, and `/api/admin/`, non-GET requests must pass
    `requireSameOrigin`. The handler resolves the session actor and calls the router.
 4. The router checks the base capability, splits the path, parses the body (`jsonObject`
-   with a 64 KiB limit for learning and projects and 4 KiB elsewhere; `multipartInput` only
+   with a 64 KiB limit for learning and projects, 16 KiB for attendance, and 4 KiB elsewhere; `multipartInput` only
    for material uploads and assignment submissions), and calls a service inside
    `databaseInputError`, which turns constraint violations into 409 or 400.
 5. The service validates input with its module's `input.ts`, checks scope, and runs SQL in
@@ -69,6 +70,7 @@ measured operational requirement exists.
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
+| `0007_attendance` | `classroom_sessions`, `classroom_roster`, `attendance_records`, `classroom_session_events` |
 
 - **Academic:** a course joins a class, a term, and a subject within one academic year;
   composite foreign keys keep classes and terms in the same year. Teachers link to courses
@@ -165,8 +167,9 @@ Downloads repeat the access checks and are served as sandboxed attachments; see
   [security](security.md#http-headers).
 - The PostgreSQL pool holds four connections. Shutdown stops the server, closes the pool,
   and exits within ten seconds.
-- WebSocket is reserved for genuinely realtime features such as classroom status and
-  attendance dashboards. Nothing uses it yet; CRUD stays on HTTP.
+- `/api/attendance/live` upgrades authenticated, same-origin connections through native Bun
+  WebSocket. Committed session changes trigger invalidations, and clients fetch scoped HTTP
+  state. Reconnect also fetches state; PostgreSQL remains authoritative. CRUD stays on HTTP.
 
 ## Data conventions
 
@@ -174,3 +177,29 @@ UUID identifiers, `timestamptz` values in UTC, and the configured school timezon
 display. Business invariants are unique and check constraints; indexes follow real query
 paths. JSONB is only for flexible configuration or snapshots. Soft deletion is used only
 where history must be kept.
+
+## Classroom attendance
+
+Meetings belong to a course independently of assessable activities. Creation snapshots up
+to 500 active enrolled students, including their display name and school identifier. Later
+profile/enrollment changes do not rewrite the roster. Students need current course access
+and a roster entry; they receive only their own attendance and no manager notes or reasons.
+Managers reuse course management capabilities and teaching-assignment scope.
+
+Mutations lock the course `FOR UPDATE`, then the session row, and audit in the same
+transaction. Reads take a shared course lock to keep visibility and session state consistent.
+Creation uses a creator/request-key uniqueness constraint and compares the original payload.
+Attendance revisions form a single append-only chain per roster entry with a composite
+predecessor foreign key and unique predecessor/first-record indexes. Latest means no child
+revision exists. Stale predecessors return 409; exact retries reuse the existing revision.
+Session operations use optimistic versions and retain the last operation for exact retries.
+Every attendance write advances the session version, so closing cannot race a correction.
+
+Scheduled meetings open only with a nonempty roster; open meetings close only when every
+entry is marked. Reopening a closed meeting and cancelling a scheduled/open meeting require
+a reason. Cancelled meetings are terminal. Lifecycle actions and note changes append to
+`classroom_session_events`; audit logs contain resource identifiers, never note text.
+Course reports exclude cancelled sessions. Attendance percentages count present/late over
+closed sessions, while unrecorded and status counts include other noncancelled sessions.
+Dashboard tasks link managers to open sessions and students to nonexpired scheduled/open
+sessions. Attendance does not change learning completion or award XP.
