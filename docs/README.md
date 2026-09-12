@@ -32,6 +32,8 @@ workflow.
 | 7 — QR attendance | [phases/07-qr-attendance.md](phases/07-qr-attendance.md) |
 | 8 — Calendar & notifications | [phases/08-calendar-notifications.md](phases/08-calendar-notifications.md) |
 | 9 — Reporting | [phases/09-reporting.md](phases/09-reporting.md) |
+| 10 — Advanced IT learning boundary | [phases/10-advanced-it-learning.md](phases/10-advanced-it-learning.md) |
+| 11 — Advanced attendance operations | [phases/11-advanced-attendance.md](phases/11-advanced-attendance.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

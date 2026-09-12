@@ -16,6 +16,15 @@ export function attendanceInput(body: Record<string, unknown>) {
   if (typeof body.status !== "string" || !Object.hasOwn(attendanceLabels, body.status)) invalid("Pilih status kehadiran yang valid.");
   return { status: body.status as AttendanceStatus, note: noteInput(body), previousId: body.previousId === null ? null : idField(body, "previousId") };
 }
+export function bulkAttendanceInput(body: Record<string, unknown>) {
+  if (!Array.isArray(body.records) || body.records.length < 1 || body.records.length > 500) invalid("Pilih 1–500 santri untuk ditandai.");
+  return { records: body.records.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) invalid(`Data santri ke-${index + 1} tidak valid.`);
+    const record = value as Record<string, unknown>;
+    const parsed = attendanceInput(record);
+    return { studentId: idField(record, "studentId"), ...parsed };
+  }) };
+}
 export function operationInput(body: Record<string, unknown>) {
   const version = body.version;
   if (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1 || version >= 2147483647) invalid("Versi sesi tidak valid.");

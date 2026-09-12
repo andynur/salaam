@@ -99,8 +99,7 @@ criteria before implementation.
   for authoring or feedback.
 - **Classroom operations:** a parent or guardian portal once access and consent
   requirements are defined; calendar integrations and notification delivery providers;
-  more attendance workflows once the session model is stable; camera-assisted attendance
-  improvements.
+  additional attendance workflows beyond Phase 11; camera-assisted attendance improvements.
 - **Platform:** backup automation and restore verification; metrics, tracing, and long-term
   audit retention policies; multi-instance deployment after measured capacity evidence;
   object storage behind the private storage interface; isolated coding challenge execution.

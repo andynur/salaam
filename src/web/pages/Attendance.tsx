@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AttendanceReport, AttendanceRow, Meeting, MeetingDetail } from "../../shared/attendance";
+import type { AttendanceReport, AttendanceRow, Meeting, MeetingDetail, SessionEvent } from "../../shared/attendance";
 import { attendanceLabels, sessionLabels } from "../../shared/attendance";
 import type { LearningCourse, Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
@@ -7,6 +7,7 @@ import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "
 import { deviceTimezone, Field, formatDateTime, fromLocalInput, MutationForm, Pager, Search, useData } from "../components/learning";
 import { CheckinManager, CheckinStudent } from "../components/checkin";
 const root = "/api/attendance/courses";
+const sessionEventLabels: Record<string, string> = { open: "Sesi dibuka", close: "Sesi ditutup", reopen: "Sesi dibuka untuk koreksi", cancel: "Sesi dibatalkan", note: "Catatan diperbarui" };
 const href = (courseId: string, sessionId?: string) => `/attendance/courses/${courseId}${sessionId ? `/sessions/${sessionId}` : ""}`;
 export function Attendance({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
   const match = /^\/attendance\/courses\/([^/]+)(?:\/sessions\/([^/]+))?$/.exec(location.pathname);
@@ -60,6 +61,8 @@ function SessionView({ courseId, sessionId, timezone, onExpired }: { courseId: s
   useEffect(() => { if (editing) editor.current?.querySelector("select")?.focus(); }, [editing]);
   const sequence = useRef(0);
   const path = `${root}/${courseId}/sessions/${sessionId}`;
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const history = useData<Page<SessionEvent>>(`${path}/history?${new URLSearchParams({ offset: String(historyOffset) })}`, onExpired, data?.session.version);
   const load = useCallback(async () => {
     const current = ++sequence.current;
     try { const result = await api<MeetingDetail>(`${path}?${new URLSearchParams({ q, offset: String(offset) })}`); if (current === sequence.current) { setData(result); setError(""); } }
@@ -95,6 +98,14 @@ function SessionView({ courseId, sessionId, timezone, onExpired }: { courseId: s
         <p className="card-hint">Catatan privat: {data.session.note || "Belum ada catatan"}</p>
         <Button className="button-secondary button-small" disabled={data.session.status === "cancelled"} aria-expanded={!!noteDraft} aria-controls="session-note-editor" onClick={() => setNoteDraft({ note: data.session.note ?? "", version: data.session.version })}>Edit catatan sesi</Button>
         {noteDraft && <div id="session-note-editor"><MutationForm key={noteDraft.version} path={path} method="PATCH" label="Simpan catatan" onExpired={onExpired} saved={() => { setNoteDraft(null); void load(); }} disabled={data.session.status === "cancelled"} body={form => ({ action: "note", version: noteDraft.version, note: form.get("note") })}><Field label="Catatan privat guru" name="note" value={noteDraft.note} area required={false} max={2000} /></MutationForm><Button className="button-secondary button-small" onClick={() => setNoteDraft(null)}>Batal edit catatan</Button></div>}
+      </Card>}
+      {data.course.canManage && data.session.status === "open" && <Card className="lesson-card"><div className="card-heading"><h2>Penandaan massal</h2></div>
+        <MutationForm path={`${path}/bulk-attendance`} method="POST" label="Tandai santri belum dicatat" onExpired={onExpired} saved={() => void load()} disabled={!data.roster.items.some(row => !row.recordId)} body={() => ({ records: data.roster.items.filter(row => !row.recordId).map(row => ({ studentId: row.studentId, status: "present", note: "", previousId: null })) })}>
+          <p className="card-hint">Menandai semua santri yang terlihat di halaman ini sebagai hadir. Gunakan pencarian dan pager untuk halaman lain.</p>
+        </MutationForm>
+      </Card>}
+      {data.course.canManage && <Card className="lesson-card"><div className="card-heading"><h2>Riwayat sesi</h2></div>
+        {history.error ? <ErrorState message={history.error} retry={history.retry} /> : !history.data ? <LoadingState /> : !history.data.items.length ? <EmptyState icon="history" title="Belum ada riwayat" description="Perubahan sesi akan tercatat di sini." /> : <><div className="table-scroll"><table className="data-table"><thead><tr><th>Waktu</th><th>Perubahan</th><th>Oleh</th><th>Alasan</th></tr></thead><tbody>{history.data.items.map(event => <tr key={event.id}><td>{formatDateTime(event.createdAt, timezone)}</td><td>{sessionEventLabels[event.action] ?? event.action}</td><td>{event.actorName}</td><td>{event.reason || "—"}</td></tr>)}</tbody></table></div><Pager offset={historyOffset} next={history.data.nextOffset} change={setHistoryOffset} /></>}
       </Card>}
       {editing && <div ref={editor}><Card className="lesson-card"><div className="card-heading"><h2>Catat kehadiran: {editing.studentName}</h2><Button className="button-secondary button-small" onClick={finishEditing}>Batal</Button></div><MutationForm key={`${editing.studentId}-${editing.recordId}`} path={`${path}/attendance/${editing.studentId}`} method="PATCH" label="Simpan kehadiran" onExpired={onExpired} saved={saved} disabled={data.session.status !== "open"} body={form => ({ status: form.get("status"), note: form.get("note"), previousId: editing.recordId })}>
         <label className="learning-field"><span>Status kehadiran</span><select className="input" name="status" defaultValue={editing.status ?? ""} required><option value="" disabled>Pilih status</option>{Object.entries(attendanceLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><Field label="Catatan privat santri" name="note" value={editing.note ?? ""} area required={false} max={2000} />

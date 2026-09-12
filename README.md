@@ -23,7 +23,7 @@ The platform is built around three principles:
 
 ## Status
 
-This is an active early-stage project. Phases 0 through 9 are implemented and validated
+This is an active early-stage project. Phases 0 through 11 are implemented and validated
 locally, and HTTPS proxy behavior plus a backup and restore drill were validated on
 2026-09-12. SALAAM is not yet presented as a production deployment for a school: capacity
 testing on school hardware and WLAN and the operational rollout still need
@@ -41,10 +41,12 @@ environment-specific validation.
 | 7 — QR attendance | Rotating short-lived check-in codes stored only as digests, camera or typed santri check-in, late thresholds, teacher corrections that still win | [Phase 7](docs/phases/07-qr-attendance.md) |
 | 8 — Calendar & notifications | Scoped academic events, live deadlines and assessment windows, in-app reminders, level and QR notifications, preferences and read receipts | [Phase 8](docs/phases/08-calendar-notifications.md) |
 | 9 — Reporting | Cross-course operational overview, per-course rows, attendance and learning-progress summaries per santri, filtered audit view, and CSV exports behind `reports.view` | [Phase 9](docs/phases/09-reporting.md) |
+| 10 — Advanced IT learning boundary | Typed external-runner contract, bounded execution policy, no-network requirement, and fail-closed configuration; no student code runs in SALAAM | [Phase 10](docs/phases/10-advanced-it-learning.md) |
+| 11 — Advanced attendance operations | Bulk marking for open sessions and manager-only session history with scoped access and audit coverage | [Phase 11](docs/phases/11-advanced-attendance.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
-The next milestone is **Phase 10 — Advanced IT learning**, subject to an isolated execution
-boundary and an approved security review. See the
+The next milestone is **local-server migration planning**, subject to measured operational
+need and an approved security review. See the
 [roadmap](docs/roadmap.md).
 
 ## Architecture
@@ -111,6 +113,9 @@ match the origin used in the browser.
 | `STORAGE_ROOT` | Required private storage path for uploaded files, relative to the working directory |
 | `SCHOOL_TIMEZONE` | IANA timezone used for academic-year summaries; defaults to `Asia/Jakarta` |
 | `SESSION_TTL_HOURS` | Absolute session lifetime from 1 to 168 hours; defaults to 12 |
+| `CODE_RUNNER_URL` | Optional external coding runner endpoint; execution is disabled when absent |
+| `CODE_RUNNER_TOKEN` | Required bearer token when `CODE_RUNNER_URL` is set; keep it private |
+| `CODE_RUNNER_TIMEOUT_MS` | Runner request timeout from 100 to 10,000 ms; defaults to 5,000 |
 | `TEST_DATABASE_URL` | Optional isolated test database; its name must end in `_test` |
 
 Never commit `.env` or credentials. Session tokens are random opaque values and only their

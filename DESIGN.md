@@ -247,7 +247,9 @@ adding a near-duplicate.
   kit, `.filter-bar`, lozenges, and scrolling tables. `.attendance-actions` arranges
   lifecycle forms in responsive columns. A visible live-connection status and manual
   refresh sit above each session. Editors retain their original version/predecessor
-  during realtime updates so stale edits fail rather than overwrite newer records.
+  during realtime updates so stale edits fail rather than overwrite newer records. The
+  session detail also uses the same card/table kit for manager-only session history and
+  a bounded bulk attendance action.
 - **QR check-in**: `checkin.tsx` adds one `.lesson-card` to the session screen.
   `.checkin-display` puts the `.checkin-qr` SVG beside the large `.checkin-code`, stacking
   and centring below 760px. `.checkin-qr-paper` and `.checkin-qr-ink` carry the QR's fills,

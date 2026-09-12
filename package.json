@@ -9,6 +9,7 @@
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "build": "bun scripts/build.ts",
+    "backup": "bun scripts/backup.ts",
     "start": "NODE_ENV=production bun dist/server.js",
     "db:migrate": "bun src/core/database/migrate.ts",
     "db:migrate:rollback": "bun src/core/database/rollback.ts",

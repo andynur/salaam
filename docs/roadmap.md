@@ -17,8 +17,9 @@ Coding agents follow skill `deliver-phase`.
 | 7 | QR attendance | Delivered — [record](phases/07-qr-attendance.md) |
 | 8 | Calendar and notifications | Delivered — [record](phases/08-calendar-notifications.md) |
 | 9 | Reporting | Delivered — [record](phases/09-reporting.md) |
-| 10 | Advanced IT learning | Planned |
-| 11+ | Later evaluation | Backlog |
+| 10 | Advanced IT learning boundary | Delivered — [record](phases/10-advanced-it-learning.md) |
+| 11 | Advanced attendance operations | Delivered — [record](phases/11-advanced-attendance.md) |
+| 12 | Pilot readiness and operational hardening | In progress — [record](phases/12-pilot-readiness.md) |
 
 ## Delivered
 
@@ -86,19 +87,24 @@ and learning-progress summaries, a filtered audit view, and a CSV export of each
 only reads; every figure is derived in one read-only transaction from the rows the earlier
 phases already own.
 
+### Phase 10 — Advanced IT learning boundary
+
+An isolated coding execution contract, fail-closed runner configuration, bounded source and
+result handling, an explicit no-network policy, and an operational review gate. The
+application never runs untrusted student code directly.
+
+### Phase 11 — Advanced attendance operations
+
+Bulk marking for open sessions and manager-only, paginated session history. Both operations
+reuse the existing roster snapshot, append-only attendance chain, lifecycle events, and
+course authorization rules.
+
 ## Planned
 
-### Phase 10 — Advanced IT learning
+### Phase 12 and later
 
-Isolated coding challenges, only once a separate execution boundary, resource limits, a
-network policy, and a review process exist. The application never runs untrusted student
-code directly.
-
-### Phase 11 and later
-
-Local-server migration, advanced attendance improvements, and other
-[post-V1 items](product.md#after-v1), only with a measured operational need and an approved
-privacy and security review.
+Local-server migration and other [post-V1 items](product.md#after-v1), only with a measured
+operational need and an approved privacy and security review.
 
 ## Deferred from delivered phases
 
@@ -118,21 +124,21 @@ Boundaries section has the details.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
-- **Phase 5:** XP decay, penalties, and manual XP grants; streaks, seasons, and resets;
-  leaderboards visible to students; badge artwork beyond the built-in icons; XP for attendance
-  (deferred pending a correction/reversal policy).
-- **Phase 6:** attendance XP; recurring meetings, bulk marking/import, roster adjustments
-  after creation, and history browsing; multi-instance realtime delivery. Exports and
+- **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
+  penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;
+  badge artwork beyond built-in icons; recurring meetings, bulk import, roster adjustments
+  after creation, and recurring check-in windows; geofencing, device binding, proctoring,
+  and biometric identification. Multi-instance realtime delivery remains unsupported.
+- **Phase 6:** recurring meetings, bulk import, and roster adjustments after creation. Exports and
   cross-course reports are delivered in Phase 9.
-- **Phase 7:** attendance XP (still deferred); geofencing, device binding, proctoring, and
-  biometric identification; recurring check-in windows and bulk check-in import;
-  Cross-course attendance reporting and
-  exports are delivered in Phase 9; a QR-specific breakdown is not.
+- **Phase 7:** bulk check-in import and a QR-specific breakdown. Cross-course attendance
+  reporting and exports are delivered in Phase 9.
 - **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder
   lead times, notification attachments, and scheduled report delivery.
 - **Phase 9:** charts and trend lines; scheduled, emailed, or subscribed reports (delivery
   belongs to Phase 8); PDF and spreadsheet exports; per-activity, per-question, and cohort
   analytics; saved report definitions and custom columns; an audit retention policy and
   exports beyond 5,000 rows.
-- **Operations:** load testing on school hardware. HTTPS proxy behavior and a backup and
-  restore drill were validated on 2026-09-12; [operations](operations.md) records both.
+- **Operations:** school hardware/WLAN load testing, scheduled backup execution and alerting,
+  and repeatable restore drills. Local HTTPS proxy behavior and one backup/restore drill passed
+  on 2026-09-12; [operations](operations.md) records the limits of that validation.

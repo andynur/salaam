@@ -22,6 +22,7 @@ measured operational requirement exists.
 | `src/modules/attendance` | Meetings, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
 | `src/modules/reporting` | Cross-course report queries, filter parsing, CSV encoding |
+| `src/modules/coding` | External execution contract, policy limits, and fail-closed runner adapter |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
 | `database/migrations/` | Ordered SQL migrations with `down/` scripts |
@@ -243,6 +244,11 @@ Scheduled meetings open only with a nonempty roster; open meetings close only wh
 entry is marked. Reopening a closed meeting and cancelling a scheduled/open meeting require
 a reason. Cancelled meetings are terminal. Lifecycle actions and note changes append to
 `classroom_session_events`; audit logs contain resource identifiers, never note text.
+Manager-only session history reads those append-only events in 50-row pages. Bulk attendance
+marks up to 500 selected roster entries in one transaction: the session is locked `FOR UPDATE`,
+every predecessor is checked, and any stale row rolls the whole batch back. Identical retries
+skip rows whose latest status and note already match, while a successful batch emits
+`classroom.attendance.bulk_recorded`.
 Course reports exclude cancelled sessions. Attendance percentages count present/late over
 closed sessions, while unrecorded and status counts include other noncancelled sessions.
 Dashboard tasks link managers to open sessions and students to nonexpired scheduled/open

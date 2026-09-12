@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { attendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, operationInput } from "../src/modules/attendance/input";
+import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, operationInput } from "../src/modules/attendance/input";
 const meeting = { title: "Pertemuan", startsAt: "2026-09-12T07:00:00.000Z", endsAt: "2026-09-12T08:00:00.000Z", requestKey: crypto.randomUUID() };
 test("meeting input bounds timestamps, duration, notes and retry identifiers", () => {
   expect(meetingInput(meeting).note).toBe("");
@@ -8,6 +8,10 @@ test("meeting input bounds timestamps, duration, notes and retry identifiers", (
 test("attendance input requires an explicit predecessor and known status", () => {
   expect(attendanceInput({ status: "late", previousId: null })).toEqual({ status: "late", previousId: null, note: "" });
   for (const input of [{ status: "present" }, { status: "constructor", previousId: null }, { status: "yes", previousId: null }, { status: "present", previousId: "bad" }]) expect(() => attendanceInput(input)).toThrow();
+});
+test("bulk attendance input bounds and validates each student record", () => {
+  expect(bulkAttendanceInput({ records: [{ studentId: crypto.randomUUID(), status: "present", previousId: null }] }).records).toHaveLength(1);
+  for (const records of [[], Array.from({ length: 501 }, () => ({ studentId: crypto.randomUUID(), status: "present", previousId: null })), [{ studentId: "bad", status: "present", previousId: null }]]) expect(() => bulkAttendanceInput({ records })).toThrow();
 });
 test("session operations require bounded versions and correction reasons", () => {
   expect(operationInput({ action: "reopen", version: 2, reason: "Koreksi" }).reason).toBe("Koreksi");

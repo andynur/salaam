@@ -4,9 +4,9 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
-import { attendanceInput, meetingInput, operationInput } from "./input";
+import { attendanceInput, bulkAttendanceInput, meetingInput, operationInput } from "./input";
 import { checkinState } from "./checkin";
-import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail } from "../../shared/attendance";
+import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, SessionEvent } from "../../shared/attendance";
 export const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
 export function page<T>(rows: T[], offset: number) { return { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null }; }
 export async function sessionRow(tx: SQL, courseId: string, sessionId: string, lock: boolean | "share" = false) {
@@ -95,6 +95,46 @@ export async function recordAttendance(db: SQL, actor: Actor, courseId: string, 
     await tx`UPDATE classroom_sessions SET version = version + 1, last_operation = NULL, updated_at = clock_timestamp() WHERE id = ${sessionId}`;
     await recordAudit(tx, actor.id, "classroom.attendance.recorded", "attendance_records", row.id, requestId);
     return { id: row.id as string };
+  });
+}
+export async function recordAttendanceBulk(db: SQL, actor: Actor, courseId: string, sessionId: string, body: Record<string, unknown>, requestId: string) {
+  requirePermission(actor, "learning.manage");
+  const input = bulkAttendanceInput(body);
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const session = await sessionRow(tx, courseId, sessionId, true);
+    if (session.status !== "open") throw new HttpError(409, "SESSION_NOT_OPEN", "Buka sesi sebelum mencatat kehadiran.");
+    const seen = new Set<string>();
+    let recorded = 0;
+    for (const item of input.records) {
+      if (seen.has(item.studentId)) throw new HttpError(400, "DUPLICATE_STUDENT", "Santri tidak boleh dipilih lebih dari sekali.");
+      seen.add(item.studentId);
+      if (!(await tx`SELECT 1 FROM classroom_roster WHERE session_id = ${sessionId} AND student_id = ${item.studentId}`).length) notFound();
+      const [latest] = await tx`SELECT a.* FROM attendance_records a WHERE a.session_id = ${sessionId} AND a.student_id = ${item.studentId}
+        AND NOT EXISTS (SELECT 1 FROM attendance_records child WHERE child.previous_id = a.id)`;
+      if (latest && latest.previous_id === item.previousId && latest.status === item.status && latest.note === item.note) continue;
+      if ((latest?.id ?? null) !== item.previousId) throw conflict();
+      await tx`INSERT INTO attendance_records (session_id, student_id, status, note, recorded_by, previous_id)
+        VALUES (${sessionId}, ${item.studentId}, ${item.status}, ${item.note}, ${actor.id}, ${item.previousId})`;
+      recorded++;
+    }
+    if (recorded) {
+      await tx`UPDATE classroom_sessions SET version = version + 1, last_operation = NULL, updated_at = clock_timestamp() WHERE id = ${sessionId}`;
+      await recordAudit(tx, actor.id, "classroom.attendance.bulk_recorded", "classroom_sessions", sessionId, requestId);
+    }
+    return { recorded };
+  });
+}
+export async function sessionHistory(db: SQL, actor: Actor, courseId: string, sessionId: string, offset: number) {
+  requirePermission(actor, "learning.manage");
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", "share");
+    await sessionRow(tx, courseId, sessionId, "share");
+    const rows = await tx<SessionEvent[]>`SELECT e.id, e.session_id AS "sessionId", e.actor_id AS "actorId", u.display_name AS "actorName",
+      e.version, e.action, e.reason, e.note, e.created_at::text AS "createdAt"
+      FROM classroom_session_events e JOIN users u ON u.id = e.actor_id WHERE e.session_id = ${sessionId}
+      ORDER BY e.version DESC, e.id DESC LIMIT 51 OFFSET ${offset}`;
+    return page(rows, offset);
   });
 }
 export async function changeMeeting(db: SQL, actor: Actor, courseId: string, sessionId: string, body: Record<string, unknown>, requestId: string) {

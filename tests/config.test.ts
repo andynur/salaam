@@ -24,4 +24,13 @@ describe("configuration", () => {
     expect(() => loadConfig({ ...env, SESSION_TTL_HOURS: "169" })).toThrow("SESSION_TTL_HOURS");
     expect(() => loadConfig({ ...env, NODE_ENV: "prod" })).toThrow("NODE_ENV");
   });
+  test("validates the optional isolated coding runner", () => {
+    expect(loadConfig({ ...env, CODE_RUNNER_URL: "https://runner.example/execute", CODE_RUNNER_TOKEN: "0123456789abcdef" })).toMatchObject({
+      codingRunnerUrl: "https://runner.example/execute", codingRunnerTimeoutMs: 5000,
+    });
+    expect(() => loadConfig({ ...env, CODE_RUNNER_URL: "https://runner.example/execute" })).toThrow("CODE_RUNNER_TOKEN");
+    expect(() => loadConfig({ ...env, CODE_RUNNER_TOKEN: "0123456789abcdef" })).toThrow("CODE_RUNNER_URL");
+    expect(() => loadConfig({ ...env, NODE_ENV: "production", APP_BASE_URL: "https://school.example", CODE_RUNNER_URL: "http://runner.example/execute", CODE_RUNNER_TOKEN: "0123456789abcdef" })).toThrow("CODE_RUNNER_URL");
+    expect(() => loadConfig({ ...env, CODE_RUNNER_TIMEOUT_MS: "10001" })).toThrow("CODE_RUNNER_TIMEOUT_MS");
+  });
 });

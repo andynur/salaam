@@ -154,6 +154,21 @@ describe.skipIf(!url)("Phase 6 attendance (isolated PostgreSQL schema)", () => {
     expect((await db`SELECT * FROM xp_entries WHERE student_id = ${people.student.id}`).length).toBe(0);
   });
 
+  test("bulk attendance is atomic, retry-safe, audited, and manager-only history is scoped", async () => {
+    const f = await meeting();
+    await json(action(f.path, { action: "open", version: 1 }));
+    const rows = (await detail(f.path)).roster.items;
+    const body = { records: rows.map((row: any) => ({ studentId: row.studentId, status: "present", note: "", previousId: null })) };
+    expect(await json<{ recorded: number }>(request(`${f.path}/bulk-attendance`, people.teacher.cookie, body))).toEqual({ recorded: 2 });
+    expect(await json<{ recorded: number }>(request(`${f.path}/bulk-attendance`, people.teacher.cookie, body))).toEqual({ recorded: 0 });
+    expect((await detail(f.path)).counts).toMatchObject({ present: 2, unrecorded: 0 });
+    const history = await json<any>(request(`${f.path}/history`, people.teacher.cookie));
+    expect(history.items.map((event: any) => event.action)).toEqual(["open"]);
+    expect((await db`SELECT event FROM audit_logs WHERE actor_id = ${people.teacher.id} AND event = 'classroom.attendance.bulk_recorded'`).length).toBe(1);
+    expect((await request(`${f.path}/history`, people.student.cookie)).status).toBe(403);
+    expect((await request(`${f.path}/history`, people.otherTeacher.cookie)).status).toBe(404);
+  });
+
   test("concurrent writers have one winner and failed audit rolls back", async () => {
     const f = await meeting();
     await json(action(f.path, { action: "open", version: 1 }));

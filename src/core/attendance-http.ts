@@ -3,17 +3,21 @@ import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { attendanceReport, changeMeeting, createMeeting, listMeetings, meetingDetail, recordAttendance } from "../modules/attendance/service";
+import { attendanceReport, changeMeeting, createMeeting, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, sessionHistory } from "../modules/attendance/service";
 import { changeCheckinWindow, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
 export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     requirePermission(actor, "learning.view");
     const url = new URL(request.url);
-    const match = /^\/api\/attendance\/courses\/([^/]+)\/(sessions|report)(?:\/([^/]+)(?:\/attendance\/([^/]+)|\/(checkin)(\/codes)?)?)?$/.exec(url.pathname);
+    const match = /^\/api\/attendance\/courses\/([^/]+)\/(sessions|report)(?:\/([^/]+)(?:\/attendance\/([^/]+)|\/(checkin)(\/codes)?|\/(history|bulk-attendance))?)?$/.exec(url.pathname);
     if (!match) throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
     const courseId = idField({ id: match[1] }, "id").toLowerCase();
     const sessionId = match[3] ? idField({ id: match[3] }, "id").toLowerCase() : null;
     try {
+      if (request.method === "GET" && sessionId && match[7] === "history") {
+        const { offset } = listInput(url);
+        return Response.json(await sessionHistory(db, actor, courseId, sessionId, offset));
+      }
       if (request.method === "GET" && !match[4] && !match[5]) {
         const { pattern, offset } = listInput(url);
         if (match[2] === "report" && !sessionId) return Response.json(await attendanceReport(db, actor, courseId, pattern, offset));
@@ -42,6 +46,11 @@ export function createAttendanceHandler(db: SQL, changed: (courseId: string, ses
         if (request.method === "PATCH" && sessionId) {
           const body = await jsonObject(request, 16384);
           const result = match[4] ? await recordAttendance(db, actor, courseId, sessionId, idField({ id: match[4] }, "id"), body, requestId) : await changeMeeting(db, actor, courseId, sessionId, body, requestId);
+          changed(courseId, sessionId);
+          return Response.json(result);
+        }
+        if (request.method === "POST" && sessionId && match[7] === "bulk-attendance") {
+          const result = await recordAttendanceBulk(db, actor, courseId, sessionId, await jsonObject(request, 65536), requestId);
           changed(courseId, sessionId);
           return Response.json(result);
         }

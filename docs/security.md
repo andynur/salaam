@@ -92,9 +92,17 @@ errors.
 
 ## Requirements for planned features
 
-- **Coding challenges** run only behind a separate execution boundary with resource limits,
-  a network policy, and review. The application process never executes student code.
+- **Coding challenges** use `src/modules/coding` only as an external-runner client. Source is
+  capped at 32 KiB, stdin at 8 KiB, runner output at 64 KiB, wall time at 5 seconds, CPU
+  time at 2 seconds, memory at 128 MiB, and processes at one. Every request carries the
+  required `network: none` policy. The external runner must enforce these values with an OS
+  isolation mechanism and pass the review checklist in the Phase 10 record; the application
+  process never executes student code. With no `CODE_RUNNER_URL` and token, the boundary is
+  unavailable rather than falling back to local execution.
 - **Biometrics and face recognition** stay outside V1.
+- **Attendance bulk marking** is manager-only, limited to 500 roster rows per request, and
+  requires the latest predecessor for every row. The session lock and transaction boundary
+  prevent partial writes; private session and attendance notes remain hidden from students.
 
 ## Backups and recovery
 

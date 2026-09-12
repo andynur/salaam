@@ -17,6 +17,18 @@ match the public origin exactly, because every mutation is checked against it. S
 `SCHOOL_TIMEZONE` explicitly. `STORAGE_ROOT` must be private and outside any static
 directory.
 
+### Isolated coding runner
+
+Phase 10 does not add a runner process to the SALAAM deployment. If a separately operated
+runner is approved, set `CODE_RUNNER_URL`, `CODE_RUNNER_TOKEN`, and optionally
+`CODE_RUNNER_TIMEOUT_MS` (100–10,000 ms). Production runner URLs use HTTPS unless the
+runner is on loopback. The token is sent only as an authorization header and is never
+logged. The runner must independently enforce a disposable filesystem, one process, 128 MiB
+memory, 2 seconds CPU, 5 seconds wall time, no network namespace, no secrets, no host mounts,
+and a read-only base image. Before enabling it, record the image digest, patch source,
+egress test, resource-limit test, log-redaction test, and rollback owner. A missing or
+invalid runner configuration leaves execution disabled.
+
 ## First administrator
 
 Set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_IDENTIFIER`, and
@@ -42,6 +54,16 @@ and keep a backup from before the release.
 
 `APP_BASE_URL` must be the public HTTPS origin the browser uses, not the loopback address:
 every mutation, and the WebSocket upgrade, compares the request `Origin` against it.
+
+### Attendance operations
+
+Teachers can mark all currently visible, unrecorded roster rows as present from an open
+session. The action accepts at most 500 rows, locks the session for the complete transaction,
+and is safe to retry when the submitted predecessor and status still match. A stale row
+causes the whole batch to roll back with 409; the operation is audited as
+`classroom.attendance.bulk_recorded`. Session history is manager-only, paginated in 50-row
+pages, and reads the existing append-only lifecycle events. It does not expose private notes
+to students or permit roster changes after the session snapshot.
 
 A Caddy site block covers all of it:
 
