@@ -50,6 +50,7 @@ workflow.
 | 25 — Project task comments | [phases/25-project-task-comments.md](phases/25-project-task-comments.md) |
 | 26 — Project file deliverables | [phases/26-project-file-deliverables.md](phases/26-project-file-deliverables.md) |
 | 27 — Reporting trends | [phases/27-report-trends.md](phases/27-report-trends.md) |
+| 28 — Attendance roster adjustments | [phases/28-attendance-roster-adjustments.md](phases/28-attendance-roster-adjustments.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

@@ -3,12 +3,24 @@ import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { attendanceReport, changeMeeting, createMeeting, createMeetingSeries, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, sessionHistory } from "../modules/attendance/service";
+import { adjustRoster, attendanceReport, changeMeeting, createMeeting, createMeetingSeries, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, rosterOptions, sessionHistory } from "../modules/attendance/service";
 import { changeCheckinWindow, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
 export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     requirePermission(actor, "learning.view");
     const url = new URL(request.url);
+    const rosterMatch = /^\/api\/attendance\/courses\/([^/]+)\/sessions\/([^/]+)\/(roster|roster-options)$/.exec(url.pathname);
+    if (rosterMatch) {
+      const rosterCourseId = idField({ id: rosterMatch[1] }, "id").toLowerCase();
+      const rosterSessionId = idField({ id: rosterMatch[2] }, "id").toLowerCase();
+      if (rosterMatch[3] === "roster-options" && request.method === "GET") return Response.json(await rosterOptions(db, actor, rosterCourseId, rosterSessionId));
+      if (rosterMatch[3] === "roster" && request.method === "PATCH") {
+        const result = await adjustRoster(db, actor, rosterCourseId, rosterSessionId, await jsonObject(request, 4096), requestId);
+        changed(rosterCourseId, rosterSessionId);
+        return Response.json(result);
+      }
+      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+    }
     const match = /^\/api\/attendance\/courses\/([^/]+)\/(sessions|report)(?:\/([^/]+)(?:\/attendance\/([^/]+)|\/(checkin)(\/codes)?|\/(history|bulk-attendance))?)?$/.exec(url.pathname);
     if (!match) throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
     const courseId = idField({ id: match[1] }, "id").toLowerCase();

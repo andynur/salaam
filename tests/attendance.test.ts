@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, meetingSeriesInput, operationInput } from "../src/modules/attendance/input";
+import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, meetingSeriesInput, operationInput, rosterAdjustmentInput } from "../src/modules/attendance/input";
 const meeting = { title: "Pertemuan", startsAt: "2026-09-12T07:00:00.000Z", endsAt: "2026-09-12T08:00:00.000Z", requestKey: crypto.randomUUID() };
 test("meeting input bounds timestamps, duration, notes and retry identifiers", () => {
   expect(meetingInput(meeting).note).toBe("");
@@ -20,6 +20,12 @@ test("bulk attendance input bounds and validates each student record", () => {
 test("session operations require bounded versions and correction reasons", () => {
   expect(operationInput({ action: "reopen", version: 2, reason: "Koreksi" }).reason).toBe("Koreksi");
   for (const input of [{ action: "reopen", version: 1 }, { action: "cancel", version: 1 }, { action: "open", version: 0 }, { action: "open", version: 1.5 }, { action: "delete", version: 1 }]) expect(() => operationInput(input)).toThrow();
+});
+test("roster adjustment input requires a version, student and scope", () => {
+  const studentId = crypto.randomUUID();
+  expect(rosterAdjustmentInput({ studentId, version: 1, active: false })).toEqual({ studentId, version: 1, active: false, scope: "session" });
+  expect(rosterAdjustmentInput({ studentId, version: 2, active: true, scope: "future_series" }).scope).toBe("future_series");
+  for (const input of [{ studentId, version: 0, active: true }, { studentId: "bad", version: 1, active: true }, { studentId, version: 1, active: "true" }, { studentId, version: 1, active: true, scope: "all" }]) expect(() => rosterAdjustmentInput(input)).toThrow();
 });
 test("check-in window input bounds rotation and late thresholds", () => {
   expect(checkinWindowInput({ action: "start" })).toEqual({ action: "start", rotateSeconds: 30, lateAfter: null });

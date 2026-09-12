@@ -35,6 +35,7 @@ Coding agents follow skill `deliver-phase`.
 | 25 | Project task comments | Delivered — [record](phases/25-project-task-comments.md) |
 | 26 | Project file deliverables | Delivered — [record](phases/26-project-file-deliverables.md) |
 | 27 | Reporting trends | Delivered — [record](phases/27-report-trends.md) |
+| 28 | Attendance roster adjustments | Delivered — [record](phases/28-attendance-roster-adjustments.md) |
 
 ## Delivered
 
@@ -165,11 +166,11 @@ Boundaries section has the details.
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
   penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;
-  badge artwork beyond built-in icons; roster adjustments after session creation and recurring
-  check-in windows; geofencing, device binding, proctoring,
+  badge artwork beyond built-in icons; recurring check-in windows; geofencing, device binding, proctoring,
   and biometric identification. Multi-instance realtime delivery remains unsupported.
-- **Phase 6:** roster adjustments after session creation. Bulk import and recurring meetings are
-  delivered in Phase 13. Exports and cross-course reports are delivered in Phase 9.
+- **Phase 6:** bulk import and recurring meetings are delivered in Phase 13. Roster adjustments
+  after session creation are delivered in Phase 28. Exports and cross-course reports are
+  delivered in Phase 9.
 - **Phase 7:** bulk check-in import and a QR-specific breakdown. Cross-course attendance
   reporting and exports are delivered in Phase 9.
 - **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder

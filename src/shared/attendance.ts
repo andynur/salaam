@@ -8,6 +8,7 @@ export interface MeetingSeriesInput { title: string; startsAt: string; endsAt: s
 export interface AttendanceRow { studentId: string; studentName: string; identifier: string | null; recordId: string | null; status: AttendanceStatus | null; note: string | null; recordedAt: string | null }
 export interface AttendanceCounts { total: number; unrecorded: number; present: number; late: number; excused: number; sick: number; absent: number }
 export interface MeetingDetail { course: LearningCourse; session: Meeting; counts: AttendanceCounts; roster: Page<AttendanceRow>; checkin: CheckinState }
+export interface RosterOption { studentId: string; studentName: string; identifier: string | null }
 export interface AttendanceReport extends AttendanceCounts { studentId: string; studentName: string; closed: number; attended: number; rate: number | null }
 export interface SessionEvent { id: string; sessionId: string; actorId: string; actorName: string; version: number; action: string; reason: string; note: string; createdAt: string }
 // A check-in code proves presence while it is displayed; it never authenticates anyone.

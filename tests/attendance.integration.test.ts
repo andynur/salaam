@@ -331,4 +331,30 @@ describe.skipIf(!url)("Phase 6 attendance (isolated PostgreSQL schema)", () => {
     expect(report.items.every((r: any) => r.unrecorded === 1 && r.rate === null)).toBe(true);
   });
 
+  test("managers can adjust a roster, preserve history, and apply changes to future series sessions", async () => {
+    const yearId = (await db`SELECT academic_year_id FROM classes WHERE id = ${classId}`)[0].academic_year_id;
+    const targetClass = await academic("classes", { yearId, name: `Roster adjustments ${crypto.randomUUID().slice(0, 6)}` });
+    const [added] = await db<{ id: string }[]>`INSERT INTO users (email, display_name, password_hash) SELECT ${`roster-added-${crypto.randomUUID()}@example.test`}, 'Roster added', password_hash FROM users WHERE id = ${adminId} RETURNING id`;
+    await db`INSERT INTO user_roles SELECT ${added!.id}, id FROM roles WHERE key = 'student'`;
+    await academic("enrollments", { classId: targetClass, studentId: added!.id });
+    const f = await workspace(targetClass);
+    const created = await json<{ id: string }>(request(base(f.courseId), people.teacher.cookie, input()), 201);
+    const path = `${base(f.courseId)}/${created.id}`;
+    const options = await json<any>(request(`${path}/roster-options`, people.teacher.cookie));
+    expect(options).toHaveLength(0);
+    const removed = await json<any>(action(`${path}/roster`, { studentId: added!.id, active: false, version: 1 }));
+    expect(removed).toMatchObject({ active: false, affectedSessions: 1 });
+    expect((await detail(path)).counts.total).toBe(0);
+    expect((await db`SELECT removed_at FROM classroom_roster WHERE session_id = ${created.id} AND student_id = ${added!.id}`)[0].removed_at).not.toBeNull();
+    const restored = await json<any>(action(`${path}/roster`, { studentId: added!.id, active: true, version: 2 }));
+    expect(restored).toMatchObject({ active: true, affectedSessions: 1 });
+    expect((await detail(path)).counts.total).toBe(1);
+    expect((await db`SELECT count(*)::int AS count FROM classroom_session_events WHERE session_id = ${created.id} AND action = 'roster'`)[0].count).toBe(2);
+    const series = await json<any>(request(`${base(f.courseId)}/series`, people.teacher.cookie, { title: "Roster future", startsAt: "2026-10-01T07:00:00.000Z", endsAt: "2026-10-01T08:00:00.000Z", intervalDays: 7, occurrenceCount: 2, note: "", qrRotateSeconds: 30, qrLateAfterMinutes: null, requestKey: crypto.randomUUID() }), 201);
+    const sessions = await db<{ id: string }[]>`SELECT id FROM classroom_sessions WHERE series_id = ${series.id} ORDER BY occurrence_index`;
+    await json<any>(action(`${base(f.courseId)}/${sessions[0]!.id}/roster`, { studentId: added!.id, active: false, version: 1, scope: "future_series" }));
+    expect((await db`SELECT count(*)::int AS count FROM classroom_roster r JOIN classroom_sessions s ON s.id = r.session_id WHERE s.series_id = ${series.id} AND r.student_id = ${added!.id} AND r.removed_at IS NULL`)[0].count).toBe(0);
+    expect((await action(`${path}/roster`, { studentId: added!.id, active: false, version: 2 })).status).toBe(409);
+  });
+
 });

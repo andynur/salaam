@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AttendanceReport, AttendanceRow, Meeting, MeetingDetail, SessionEvent } from "../../shared/attendance";
+import type { AttendanceReport, AttendanceRow, Meeting, MeetingDetail, RosterOption, SessionEvent } from "../../shared/attendance";
 import { attendanceLabels, sessionLabels } from "../../shared/attendance";
 import type { LearningCourse, Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
@@ -92,6 +92,7 @@ function SessionView({ courseId, sessionId, timezone, onExpired }: { courseId: s
     <div className="filter-bar"><span role="status" className={`badge ${connected ? "badge-success" : "badge-draft"}`}>{connected ? "Pembaruan langsung aktif" : "Menghubungkan ulang…"}</span><Button className="button-secondary button-small" onClick={() => void load()}>Muat ulang</Button>{data && <span className="badge">{sessionLabels[data.session.status]}</span>}</div>
     {error && <ErrorState message={error} retry={() => void load()} />}{!data ? !error && <LoadingState /> : <>
       <Card><div className="card-heading"><h2>Ringkasan kehadiran</h2><span>{data.counts.total} santri</span></div><div className="filter-bar">{Object.entries(attendanceLabels).map(([key, label]) => <span className="badge" key={key}>{label}: {data.counts[key as keyof typeof attendanceLabels]}</span>)}<span className="badge badge-gold">Belum dicatat: {data.counts.unrecorded}</span></div></Card>
+      {data.course.canManage && <RosterManager path={path} session={data.session} roster={data.roster.items} onExpired={onExpired} saved={() => void load()} />}
       {data.course.canManage
         ? <CheckinManager path={path} session={data.session} checkin={data.checkin} timezone={timezone} onExpired={onExpired} saved={() => void load()} />
         : <CheckinStudent path={path} session={data.session} checkin={data.checkin} timezone={timezone} onExpired={onExpired} saved={() => void load()} />}
@@ -117,6 +118,19 @@ function SessionView({ courseId, sessionId, timezone, onExpired }: { courseId: s
       </Card>
     </>}
   </div>;
+}
+function RosterManager({ path, session, roster, onExpired, saved }: { path: string; session: Meeting; roster: AttendanceRow[]; onExpired: () => void; saved: () => void }) {
+  const options = useData<RosterOption[]>(`${path}/roster-options`, onExpired, session.version);
+  if (session.status !== "scheduled" && session.status !== "open") return null;
+  const students = [...roster.map(row => ({ studentId: row.studentId, studentName: row.studentName, identifier: row.identifier })), ...(options.data ?? [])].filter((student, index, all) => all.findIndex(item => item.studentId === student.studentId) === index);
+  return <Card className="lesson-card"><div className="card-heading"><h2>Kelola roster</h2></div>
+    {options.error ? <ErrorState message={options.error} retry={options.retry} /> : <MutationForm key={session.version} path={`${path}/roster`} method="PATCH" label="Simpan perubahan roster" onExpired={onExpired} saved={saved} disabled={!students.length} body={form => ({ studentId: form.get("studentId"), active: form.get("active") === "true", scope: form.get("scope"), version: session.version })}>
+      <p className="card-hint">Roster sesi adalah snapshot. Mengeluarkan santri tetap menyimpan riwayat absensinya; perubahan seri berlaku untuk sesi mendatang yang masih terjadwal atau berlangsung.</p>
+      <label className="learning-field"><span>Santri</span><select className="input" name="studentId" required>{students.map(student => <option key={student.studentId} value={student.studentId}>{student.studentName}{student.identifier ? ` (${student.identifier})` : ""}</option>)}</select></label>
+      <label className="learning-field"><span>Perubahan</span><select className="input" name="active" defaultValue="true"><option value="true">Tambahkan / aktifkan</option><option value="false">Keluarkan dari sesi</option></select></label>
+      {session.seriesId && <label className="learning-field"><span>Cakupan</span><select className="input" name="scope" defaultValue="session"><option value="session">Sesi ini saja</option><option value="future_series">Sesi mendatang dalam seri</option></select></label>}
+    </MutationForm>}
+  </Card>;
 }
 function SessionActions({ session, path, onExpired, saved }: { session: Meeting; path: string; onExpired: () => void; saved: () => void }) {
   const actions = session.status === "scheduled" ? [["open", "Buka sesi"], ["cancel", "Batalkan sesi"]] : session.status === "open" ? [["close", "Tutup sesi"], ["cancel", "Batalkan sesi"]] : session.status === "closed" ? [["reopen", "Buka untuk koreksi"]] : [];

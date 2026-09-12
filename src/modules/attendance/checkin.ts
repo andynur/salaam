@@ -81,7 +81,7 @@ export async function submitCheckin(db: SQL, actor: Actor, courseId: string, ses
     // A shared course and session lock lets a whole class check in without serializing,
     // while closing or cancelling the session still waits for in-flight check-ins.
     await courseAccess(tx, actor, courseId, "participate", "share");
-    if (!(await tx`SELECT 1 FROM classroom_roster WHERE session_id = ${sessionId} AND student_id = ${actor.id}`).length) {
+    if (!(await tx`SELECT 1 FROM classroom_roster WHERE session_id = ${sessionId} AND student_id = ${actor.id} AND removed_at IS NULL`).length) {
       await sessionRow(tx, courseId, sessionId);
       notFound();
     }

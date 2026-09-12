@@ -48,6 +48,15 @@ export function operationInput(body: Record<string, unknown>) {
   if (["reopen", "cancel"].includes(action) && !reason) invalid("Isi alasan perubahan sesi.");
   return { version, action, reason, note: noteInput(body) };
 }
+export function rosterAdjustmentInput(body: Record<string, unknown>) {
+  const version = body.version;
+  if (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1 || version >= 2147483647) invalid("Versi sesi tidak valid.");
+  const active = body.active;
+  if (typeof active !== "boolean") invalid("Status roster tidak valid.");
+  const scope = body.scope ?? "session";
+  if (scope !== "session" && scope !== "future_series") invalid("Cakupan perubahan roster tidak valid.");
+  return { studentId: idField(body, "studentId").toLowerCase(), version, active, scope: scope as "session" | "future_series" };
+}
 export function checkinWindowInput(body: Record<string, unknown>) {
   if (!["start", "stop"].includes(String(body.action))) invalid("Operasi absensi QR tidak valid.");
   const action = body.action as "start" | "stop";
