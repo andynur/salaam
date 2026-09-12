@@ -19,7 +19,7 @@ export interface ProjectRow {
   id: string; title: string; status: ProjectStatus; courseId: string; courseName: string; className: string; challengeId: string; challengeTitle: string;
   teamMode: TeamMode; dueAt: string | null; members: ProjectMember[]; taskCount: number; doneCount: number; showcased: boolean; updatedAt: string;
 }
-export interface ProjectTask { id: string; title: string; description: string; status: TaskStatus; position: number; assigneeId: string | null; assigneeName: string | null; version: number; updatedAt: string }
+export interface ProjectTask { id: string; title: string; description: string; status: TaskStatus; position: number; assigneeId: string | null; assigneeName: string | null; dueAt: string | null; labels: string[]; version: number; updatedAt: string }
 export interface ProjectReview { id: string; decision: ReviewDecision; score: number | null; feedback: string; reviewerName: string; createdAt: string }
 export interface ProjectDetail {
   project: { id: string; title: string; summary: string; deliverableUrl: string | null; status: ProjectStatus; firstSubmittedAt: string | null; submittedAt: string | null; showcasedAt: string | null; updatedAt: string };

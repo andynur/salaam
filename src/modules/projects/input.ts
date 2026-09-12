@@ -48,10 +48,16 @@ export function versionInput(body: Record<string, unknown>) {
   return integer(body.version, 1, 1000000, "Versi kartu tidak valid. Muat ulang board.");
 }
 export function taskInput(body: Record<string, unknown>) {
+  const rawLabels = body.labels ?? [];
+  if (!Array.isArray(rawLabels) || rawLabels.some(label => typeof label !== "string")) invalid("Label kartu tidak valid.");
+  const labels = [...new Set((rawLabels as string[]).map(label => label.trim()).filter(Boolean))];
+  if (labels.length > 10 || labels.some(label => label.length > 40)) invalid("Kartu boleh memiliki maksimal 10 label, masing-masing 40 karakter.");
   return {
     title: textField(body, "title", 150),
     description: optionalText(body, "description", 5000, "Deskripsi"),
     assigneeId: assigneeInput(body),
+    dueAt: timestampInput(body, "dueAt", "Tenggat"),
+    labels,
     status: body.status === undefined ? "todo" as TaskStatus : taskStatusInput(body.status),
   };
 }

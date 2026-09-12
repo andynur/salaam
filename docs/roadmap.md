@@ -31,6 +31,7 @@ Coding agents follow skill `deliver-phase`.
 | 21 | Question bank import and export | In progress — [record](phases/21-question-import-export.md) |
 | 22 | Assessment question pools | In progress — [record](phases/22-assessment-question-pools.md) |
 | 23 | Question statistics | In progress — [record](phases/23-question-statistics.md) |
+| 24 | Project task metadata | In progress — [record](phases/24-project-task-metadata.md) |
 
 ## Delivered
 
@@ -156,7 +157,7 @@ Boundaries section has the details.
   scanning and inline previews; rich text or Markdown.
 - **Phase 3:** proctoring; live monitoring over
   WebSocket.
-- **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
+- **Phase 4:** student-formed teams; custom columns, comments, and
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,

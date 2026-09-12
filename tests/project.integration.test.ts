@@ -155,7 +155,7 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
     expect((await request(project(projectId), otherTeacher.cookie)).status).toBe(404);
     expect(await detail(projectId, teacher.cookie)).toMatchObject({ canManage: true, isMember: false, canEdit: true });
     const card = (title: string, extra: Record<string, unknown> = {}, cookie = student.cookie) => json<{ id: string; version: number }>(request(project(`${projectId}/tasks`), cookie, { title, ...extra }), 201);
-    const one = await card("Riset kebutuhan", { assigneeId: peer.id });
+    const one = await card("Riset kebutuhan", { assigneeId: peer.id, dueAt: "2026-10-01T10:00:00Z", labels: [" UI ", "Backend"] });
     const two = await card("Desain halaman");
     const three = await card("Tulis konten", {}, teacher.cookie);
     expect((await request(project(`${projectId}/tasks`), student.cookie, { title: "x", assigneeId: third.id })).status).toBe(400);
@@ -166,10 +166,10 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
     await json(move(three.id, "todo", 0, 1));
     const columns = (value: ProjectDetail) => Object.fromEntries((["todo", "in_progress", "review", "done"] as const).map(status => [status, value.tasks.filter(task => task.status === status).sort((a, b) => a.position - b.position).map(task => task.title)]));
     expect(columns(await detail(projectId))).toEqual({ todo: ["Tulis konten", "Riset kebutuhan"], in_progress: ["Desain halaman"], review: [], done: [] });
-    const edit = (taskId: string, version: number, title: string) => request(project(`${projectId}/tasks/${taskId}`), peer.cookie, { title, assigneeId: student.id, version }, "PATCH");
+    const edit = (taskId: string, version: number, title: string) => request(project(`${projectId}/tasks/${taskId}`), peer.cookie, { title, assigneeId: student.id, dueAt: "2026-10-01T10:00:00Z", labels: ["UI", "Backend"], version }, "PATCH");
     expect((await edit(one.id, 5, "Riset pengguna")).status).toBe(409);
     expect(await json<unknown>(edit(one.id, 1, "Riset pengguna"))).toEqual({ id: one.id, version: 2 });
-    expect((await detail(projectId)).tasks.find(task => task.id === one.id)).toMatchObject({ title: "Riset pengguna", assigneeName: "student", version: 2 });
+    expect((await detail(projectId)).tasks.find(task => task.id === one.id)).toMatchObject({ title: "Riset pengguna", assigneeName: "student", dueAt: "2026-10-01 17:00:00+07", labels: ["UI", "Backend"], version: 2 });
     await json(request(project(`${projectId}/tasks/${three.id}/archive`), student.cookie, { archived: true, version: 2 }));
     const afterArchive = await detail(projectId);
     expect(afterArchive.tasks.filter(task => task.status === "todo").map(task => [task.title, task.position])).toEqual([["Riset pengguna", 0]]);

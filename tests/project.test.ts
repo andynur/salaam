@@ -31,7 +31,9 @@ test("team members, cards, moves and reviews are strictly validated", () => {
   const [a, b] = [crypto.randomUUID(), crypto.randomUUID()];
   expect(memberIdsInput({ memberIds: [a, b.toUpperCase()] })).toEqual([a, b]);
   for (const memberIds of [[], [a, a], ["bad"], Array.from({ length: 11 }, () => crypto.randomUUID()), a]) expect(() => memberIdsInput({ memberIds })).toThrow();
-  expect(taskInput({ title: "Riset", assigneeId: "" })).toEqual({ title: "Riset", description: "", assigneeId: null, status: "todo" });
+  expect(taskInput({ title: "Riset", assigneeId: "" })).toEqual({ title: "Riset", description: "", assigneeId: null, dueAt: null, labels: [], status: "todo" });
+  expect(taskInput({ title: "Riset", labels: [" UI ", "ui", "Backend"], dueAt: "2026-10-01T10:00:00Z" })).toMatchObject({ labels: ["UI", "ui", "Backend"], dueAt: "2026-10-01T10:00:00.000Z" });
+  expect(() => taskInput({ title: "Riset", labels: Array.from({ length: 11 }, (_, index) => `label-${index}`) })).toThrow();
   expect(taskInput({ title: "Riset", status: "review", assigneeId: a }).status).toBe("review");
   expect(() => taskInput({ title: "Riset", status: "blocked" })).toThrow();
   expect(moveInput({ status: "done", position: 0, version: 3 })).toEqual({ status: "done", position: 0, version: 3 });

@@ -137,7 +137,7 @@ export async function projectDetail(db: SQL, actor: Actor, projectId: string): P
     const { course, challenge, ...project } = row;
     const members = await tx<ProjectMember[]>`SELECT u.id, u.display_name AS name FROM project_members pm JOIN users u ON u.id = pm.student_id
       WHERE pm.project_id = ${projectId} ORDER BY u.display_name, u.id`;
-    const tasks = await tx<ProjectTask[]>`SELECT t.id, t.title, t.description, t.status, t.position, t.assignee_id AS "assigneeId", u.display_name AS "assigneeName",
+    const tasks = await tx<ProjectTask[]>`SELECT t.id, t.title, t.description, t.status, t.position, t.assignee_id AS "assigneeId", u.display_name AS "assigneeName", t.due_at::text AS "dueAt", t.labels,
         t.version, t.updated_at::text AS "updatedAt"
       FROM project_tasks t LEFT JOIN users u ON u.id = t.assignee_id
       WHERE t.project_id = ${projectId} AND t.archived_at IS NULL ORDER BY t.status, t.position, t.created_at, t.id`;

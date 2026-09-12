@@ -45,6 +45,8 @@ workflow.
 | 20 — Assessment accommodations | [phases/20-assessment-accommodations.md](phases/20-assessment-accommodations.md) |
 | 21 — Question bank import and export | [phases/21-question-import-export.md](phases/21-question-import-export.md) |
 | 22 — Assessment question pools | [phases/22-assessment-question-pools.md](phases/22-assessment-question-pools.md) |
+| 23 — Question statistics | [phases/23-question-statistics.md](phases/23-question-statistics.md) |
+| 24 — Project task metadata | [phases/24-project-task-metadata.md](phases/24-project-task-metadata.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

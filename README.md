@@ -54,6 +54,8 @@ environment-specific validation.
 | 20 — Assessment accommodations | Auditable per-student time extensions for timed assessments | [Phase 20](docs/phases/20-assessment-accommodations.md) |
 | 21 — Question bank import and export | Bounded, atomic CSV exchange for course question banks | [Phase 21](docs/phases/21-question-import-export.md) |
 | 22 — Assessment question pools | Random, snapshotted question selection with deterministic scoring | [Phase 22](docs/phases/22-assessment-question-pools.md) |
+| 23 — Question statistics | Derived question-bank usage, response, and automatic correctness metrics | [Phase 23](docs/phases/23-question-statistics.md) |
+| 24 — Project task metadata | Bounded labels and optional card-level deadlines | [Phase 24](docs/phases/24-project-task-metadata.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

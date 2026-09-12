@@ -10,7 +10,7 @@ import { projectAccess, requireEditable } from "./service";
 
 // Board cards are working notes, so card writes are not audited; project-level
 // decisions (submission, review, showcase, membership) are.
-type CardRow = { id: string; title: string; description: string; assigneeId: string | null; status: TaskStatus; position: number; version: number; archived: boolean };
+type CardRow = { id: string; title: string; description: string; assigneeId: string | null; dueAt: Date | null; labels: string[]; status: TaskStatus; position: number; version: number; archived: boolean };
 
 const taskChanged = () => new HttpError(409, "TASK_CHANGED", "Kartu sudah diubah anggota lain. Muat ulang board lalu coba lagi.");
 async function editable(tx: SQL, actor: Actor, projectId: string) {
@@ -20,7 +20,7 @@ async function checkAssignee(tx: SQL, projectId: string, assigneeId: string | nu
   if (assigneeId && !(await tx`SELECT 1 FROM project_members WHERE project_id = ${projectId} AND student_id = ${assigneeId}`).length) invalid("Penanggung jawab harus anggota tim.");
 }
 async function card(tx: SQL, projectId: string, taskId: string) {
-  const row = (await tx<CardRow[]>`SELECT id, title, description, assignee_id AS "assigneeId", status, position, version, archived_at IS NOT NULL AS archived
+  const row = (await tx<CardRow[]>`SELECT id, title, description, assignee_id AS "assigneeId", due_at AS "dueAt", labels, status, position, version, archived_at IS NOT NULL AS archived
     FROM project_tasks WHERE id = ${taskId} AND project_id = ${projectId} FOR UPDATE`)[0];
   if (!row) notFound();
   return row;
@@ -51,8 +51,8 @@ export async function createTask(db: SQL, actor: Actor, projectId: string, body:
     await checkAssignee(tx, projectId, input.assigneeId);
     await activeCount(tx, projectId);
     const position = (await column(tx, projectId, input.status, null)).length;
-    const row = (await tx<{ id: string; version: number }[]>`INSERT INTO project_tasks (project_id, title, description, status, position, assignee_id, created_by)
-      VALUES (${projectId}, ${input.title}, ${input.description}, ${input.status}, ${position}, ${input.assigneeId}, ${actor.id}) RETURNING id, version`)[0]!;
+    const row = (await tx<{ id: string; version: number }[]>`INSERT INTO project_tasks (project_id, title, description, status, position, assignee_id, due_at, labels, created_by)
+      VALUES (${projectId}, ${input.title}, ${input.description}, ${input.status}, ${position}, ${input.assigneeId}, ${input.dueAt}, ARRAY(SELECT jsonb_array_elements_text(${JSON.stringify(input.labels)}::text::jsonb)), ${actor.id}) RETURNING id, version`)[0]!;
     await touch(tx, projectId);
     return row;
   });
@@ -67,9 +67,9 @@ export async function updateTask(db: SQL, actor: Actor, projectId: string, taskI
     const current = await card(tx, projectId, taskId);
     if (current.archived) notFound();
     // A retry of an applied edit finds the requested content and returns it.
-    if (current.title === input.title && current.description === input.description && current.assigneeId === input.assigneeId) return { id: taskId, version: current.version };
+    if (current.title === input.title && current.description === input.description && current.assigneeId === input.assigneeId && (current.dueAt ? new Date(current.dueAt).toISOString() : null) === input.dueAt && JSON.stringify(current.labels) === JSON.stringify(input.labels)) return { id: taskId, version: current.version };
     if (current.version !== version) throw taskChanged();
-    const row = (await tx<{ id: string; version: number }[]>`UPDATE project_tasks SET title = ${input.title}, description = ${input.description}, assignee_id = ${input.assigneeId},
+    const row = (await tx<{ id: string; version: number }[]>`UPDATE project_tasks SET title = ${input.title}, description = ${input.description}, assignee_id = ${input.assigneeId}, due_at = ${input.dueAt}, labels = ARRAY(SELECT jsonb_array_elements_text(${JSON.stringify(input.labels)}::text::jsonb)),
       version = version + 1, updated_at = clock_timestamp() WHERE id = ${taskId} RETURNING id, version`)[0]!;
     await touch(tx, projectId);
     return row;

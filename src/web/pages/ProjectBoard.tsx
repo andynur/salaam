@@ -3,7 +3,7 @@ import { taskStatuses, type ProjectDetail, type ProjectTask, type ReviewDecision
 import { api, ApiError } from "../lib/api";
 import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Icon } from "../components/icons";
-import { Field, errorMessage, formatDateTime } from "../components/learning";
+import { Field, errorMessage, formatDateTime, fromLocalInput, toLocalInput } from "../components/learning";
 import { AvatarStack, MemberPicker, ProjectStatusBadge, initials, jsonRequest, projectsApi, taskStatusLabels } from "../components/projects";
 
 type Run = (path: string, body: unknown, done: string, method?: string) => Promise<boolean>;
@@ -129,6 +129,8 @@ function Board({ data, pending, run, timezone }: Common) {
             <button type="button" className="board-card-title" onClick={() => setEditing(task.id)}>{task.title}</button>
             {task.description && <p className="board-card-desc">{task.description}</p>}
             <div className="board-card-footer">
+              {task.labels.length > 0 && <span className="board-card-labels">{task.labels.map(label => <span className="badge badge-gold" key={label}>{label}</span>)}</span>}
+              {task.dueAt && <span className="board-card-due">Tenggat {formatDateTime(task.dueAt, timezone)}</span>}
               {task.assigneeName ? <span className="board-assignee"><span className="avatar avatar-small" aria-hidden="true">{initials(task.assigneeName)}</span><span>{task.assigneeName}</span></span>
                 : <span className="board-card-unassigned">Belum ditugaskan</span>}
               {editable && <span className="board-card-moves">
@@ -175,7 +177,7 @@ function TaskEditor({ task, data, pending, run, timezone, close }: { task: Proje
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    if (await run(`tasks/${task.id}`, { title: form.get("title"), description: form.get("description"), assigneeId: form.get("assigneeId") || null, version: task.version }, "Kartu disimpan.", "PATCH")) close();
+    if (await run(`tasks/${task.id}`, { title: form.get("title"), description: form.get("description"), assigneeId: form.get("assigneeId") || null, dueAt: fromLocalInput(form.get("dueAt")), labels: String(form.get("labels") ?? "").split(","), version: task.version }, "Kartu disimpan.", "PATCH")) close();
   }
   function archive() {
     if (confirm(`Arsipkan kartu "${task.title}"? Kartu tidak lagi tampil di board.`)) void run(`tasks/${task.id}/archive`, { archived: true, version: task.version }, "Kartu diarsipkan.").then(ok => { if (ok) close(); });
@@ -186,6 +188,8 @@ function TaskEditor({ task, data, pending, run, timezone, close }: { task: Proje
       <Field name="title" label="Judul kartu" value={task.title} />
       <label className="learning-field"><span>Penanggung jawab</span><select className="input" name="assigneeId" defaultValue={task.assigneeId ?? ""}><option value="">Belum ditentukan</option>{data.members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
       <Field name="description" label="Deskripsi (opsional)" area required={false} max={5000} value={task.description} />
+      <Field name="dueAt" type="datetime-local" required={false} label={`Tenggat kartu (opsional, ${timezone})`} value={toLocalInput(task.dueAt)} />
+      <Field name="labels" label="Label (pisahkan dengan koma)" required={false} max={500} value={task.labels.join(", ")} />
       {editable && <div className="form-actions"><Button type="submit">Simpan kartu</Button><Button type="button" className="button-secondary" onClick={archive}><Icon name="archive" />Arsipkan</Button></div>}
     </fieldset></form>
     <p className="learning-muted task-editor-meta">Kolom {taskStatusLabels[task.status]} · diperbarui {formatDateTime(task.updatedAt, timezone)}</p>
