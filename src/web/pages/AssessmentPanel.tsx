@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { Assessment, AssessmentKind, AssessmentRubric, AttemptRow, Question, QuestionType, ResultsVisibility, RubricCriterion, ScoreAdjustment } from "../../shared/assessment";
+import type { Assessment, AssessmentKind, AssessmentRubric, AttemptRow, Question, QuestionType, ResultsVisibility, RubricCriterion, ScoreAdjustment, ScoringMode } from "../../shared/assessment";
 import type { Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState } from "../components/ui";
@@ -9,6 +9,7 @@ type Common = { courseId: string; timezone: string; onExpired: () => void };
 const kindLabels: Record<AssessmentKind, string> = { quiz: "Quiz", exam: "Ujian" };
 const typeLabels: Record<QuestionType, string> = { single_choice: "Pilihan ganda · satu jawaban", multiple_choice: "Pilihan ganda · banyak jawaban", true_false: "Benar/Salah", short_answer: "Jawaban singkat", essay: "Esai" };
 const visibilityLabels: Record<ResultsVisibility, string> = { after_submit: "Nilai & pembahasan setelah dikumpulkan", after_close: "Nilai & pembahasan setelah ditutup", score_only: "Hanya nilai setelah dikumpulkan", hidden: "Disembunyikan dari santri" };
+const scoringLabels: Record<ScoringMode, string> = { all_or_nothing: "Semua benar atau nol", partial_credit: "Poin sebagian untuk jawaban benar", negative_marking: "Kurangi poin untuk pilihan salah" };
 const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
@@ -82,6 +83,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
       maxAttempts: kind === "exam" ? 1 : Number(form.get("maxAttempts")),
       shuffleQuestions: form.get("shuffleQuestions") === "on", shuffleOptions: form.get("shuffleOptions") === "on",
       resultsVisibility: form.get("resultsVisibility"),
+      scoringMode: form.get("scoringMode"),
     };
     saving.current = true; setPending(true); setError("");
     try {
@@ -102,6 +104,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
       <Field name="timeLimitMinutes" type="number" required={kind === "exam"} min={1} max={600} step="1" label={`Batas waktu menit${kind === "exam" ? "" : " (opsional)"}`} value={settings?.timeLimitMinutes ?? ""} />
       {kind === "quiz" && <Field name="maxAttempts" type="number" min={1} max={10} step="1" label="Jumlah percobaan" value={settings?.maxAttempts ?? 1} />}
       <label className="learning-field"><span>Tampilan hasil untuk santri</span><select className="input" name="resultsVisibility" defaultValue={settings?.resultsVisibility ?? (kind === "exam" ? "after_close" : "after_submit")}>{Object.entries(visibilityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <label className="learning-field"><span>Skema penilaian</span><select className="input" name="scoringMode" defaultValue={settings?.scoringMode ?? "all_or_nothing"}>{Object.entries(scoringLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label className="submission-confirm"><input type="checkbox" name="shuffleQuestions" defaultChecked={settings?.shuffleQuestions ?? true} /> Acak urutan soal per santri</label>
       <label className="submission-confirm"><input type="checkbox" name="shuffleOptions" defaultChecked={settings?.shuffleOptions ?? true} /> Acak urutan opsi per santri</label>
       <Field name="instructions" label="Instruksi" area max={20000} value={value?.instructions} />
@@ -119,7 +122,7 @@ function AssessmentEditor({ courseId, lessonId, value, close, saved, timezone, o
       </div>
       <div className="form-actions"><Button type="submit" disabled={pending || locked}>{pending ? "Menyimpan…" : "Simpan pengaturan & soal"}</Button></div>
     </fieldset>{error && <ErrorState message={error} />}</form>
-    <p className="learning-muted">Publikasikan setelah soal dipilih. Pilihan ganda banyak jawaban dinilai benar hanya jika semua pilihan tepat. Sisa waktu dihitung oleh server ({timezone}).</p>
+    <p className="learning-muted">Publikasikan setelah soal dipilih. Poin sebagian menghitung pilihan benar; mode negatif mengurangi 25% poin per pilihan salah. Sisa waktu dihitung oleh server ({timezone}).</p>
   </Card>;
 }
 

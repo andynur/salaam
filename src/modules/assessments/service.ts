@@ -34,7 +34,7 @@ export async function saveAssessment(db: SQL, actor: Actor, courseId: string, bo
       await tx`UPDATE activities SET title = ${title}, instructions = ${instructions}, due_at = ${settings.closesAt} WHERE id = ${id}`;
       await tx`UPDATE assessment_settings SET opens_at = ${settings.opensAt}, closes_at = ${settings.closesAt}, time_limit_minutes = ${settings.timeLimitMinutes},
           max_attempts = ${settings.maxAttempts}, shuffle_questions = ${settings.shuffleQuestions}, shuffle_options = ${settings.shuffleOptions},
-          results_visibility = ${settings.resultsVisibility}
+          results_visibility = ${settings.resultsVisibility}, scoring_mode = ${settings.scoringMode}
         WHERE activity_id = ${id}`;
       activityId = id;
     } else {
@@ -43,9 +43,9 @@ export async function saveAssessment(db: SQL, actor: Actor, courseId: string, bo
       // due_at mirrors the closing time so deadline-aware views need no assessment join.
       activityId = (await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at)
         VALUES (${courseId}, ${lessonId}, ${kind}, ${title}, ${instructions}, ${settings.closesAt}) RETURNING id`)[0]!.id;
-      await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility)
+      await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility, scoring_mode)
         VALUES (${activityId}, ${kind}, ${settings.opensAt}, ${settings.closesAt}, ${settings.timeLimitMinutes}, ${settings.maxAttempts},
-          ${settings.shuffleQuestions}, ${settings.shuffleOptions}, ${settings.resultsVisibility})`;
+          ${settings.shuffleQuestions}, ${settings.shuffleOptions}, ${settings.resultsVisibility}, ${settings.scoringMode})`;
     }
     await recordAudit(tx, actor.id, `assessment.${id ? "updated" : "created"}`, "activities", activityId, requestId);
     return { id: activityId };
@@ -104,7 +104,7 @@ export async function listRubrics(db: SQL, actor: Actor, courseId: string, activ
 export async function listAssessments(db: SQL, actor: Actor, courseId: string, manager: boolean) {
   return db<Assessment[]>`SELECT a.id, a.lesson_id AS "lessonId", a.kind, a.title, a.instructions, a.published, a.archived_at IS NOT NULL AS archived,
       json_build_object('opensAt', s.opens_at, 'closesAt', s.closes_at, 'timeLimitMinutes', s.time_limit_minutes, 'maxAttempts', s.max_attempts,
-        'shuffleQuestions', s.shuffle_questions, 'shuffleOptions', s.shuffle_options, 'resultsVisibility', s.results_visibility) AS settings,
+        'shuffleQuestions', s.shuffle_questions, 'shuffleOptions', s.shuffle_options, 'resultsVisibility', s.results_visibility, 'scoringMode', s.scoring_mode) AS settings,
       (SELECT count(*)::int FROM assessment_questions aq WHERE aq.activity_id = a.id) AS "questionCount",
       (SELECT COALESCE(sum(aq.points), 0)::float8 FROM assessment_questions aq WHERE aq.activity_id = a.id) AS "maxScore",
       EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id) AS locked,

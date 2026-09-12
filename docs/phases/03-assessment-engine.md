@@ -185,8 +185,8 @@ Phase 3 does not include:
 - essay or short-answer questions and manual per-question grading (delivered in Phase 16),
   plus rubrics (delivered in Phase 17)
 - surveys and questionnaires
-- partial credit for multiple choice, negative marking, or question weighting beyond
-  points
+- per-question custom marking policy is delivered in Phase 19; question weighting beyond
+  points remains out of scope
 - time extensions, attempt resets, or per-student accommodations
 - proctoring, tab-switch detection, or lockdown browsers
 - question import/export, question pools with random subsets, or item statistics

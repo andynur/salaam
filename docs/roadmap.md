@@ -26,6 +26,7 @@ Coding agents follow skill `deliver-phase`.
 | 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
 | 17 | Assessment rubrics | Delivered — [record](phases/17-assessment-rubrics.md) |
 | 18 | Surveys and questionnaires | In progress — [record](phases/18-surveys-questionnaires.md) |
+| 19 | Assessment marking | In progress — [record](phases/19-assessment-marking.md) |
 
 ## Delivered
 
@@ -50,7 +51,8 @@ grading, and student progress on the shared Activity Engine.
 
 Question banks, quizzes and exams, attempts, timers, randomization, autosave, reconnect
 recovery, automatic scoring, idempotent final submission, and written-answer manual grading
-(Phase 16). Rubrics (Phase 17) and surveys/questionnaires (Phase 18) extend the engine.
+(Phase 16). Rubrics (Phase 17), surveys/questionnaires (Phase 18), and assessment marking
+(Phase 19) extend the engine.
 
 ### Phase 4 — Project learning
 
@@ -148,8 +150,8 @@ Boundaries section has the details.
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
   scanning and inline previews; rich text or Markdown.
-- **Phase 3:** partial credit and negative marking; time extensions and accommodations;
-  proctoring; question import, export, pools, and statistics; live monitoring over
+- **Phase 3:** time extensions and accommodations; proctoring; question import, export,
+  pools, and statistics; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and
   attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and

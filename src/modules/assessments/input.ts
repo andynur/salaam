@@ -1,5 +1,5 @@
 import { idField, invalid, textField } from "../../core/validation";
-import type { AssessmentKind, AssessmentSettings, QuestionOption, QuestionType, ResultsVisibility, RubricCriterion } from "../../shared/assessment";
+import type { AssessmentKind, AssessmentSettings, QuestionOption, QuestionType, ResultsVisibility, RubricCriterion, ScoringMode } from "../../shared/assessment";
 
 const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 const twoDecimals = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) <= 0.000001;
@@ -59,7 +59,9 @@ export function settingsInput(body: Record<string, unknown>, kind: AssessmentKin
   const resultsVisibility = body.resultsVisibility ?? "after_submit";
   if (!["after_submit", "after_close", "score_only", "hidden"].includes(String(resultsVisibility)) || typeof resultsVisibility !== "string") invalid("Pengaturan tampilan hasil tidak valid.");
   if (kind === "exam" && (maxAttempts !== 1 || timeLimitMinutes === null || !closesAt)) invalid("Ujian wajib satu kali percobaan, memiliki batas waktu, dan waktu tutup.");
-  return { opensAt, closesAt, timeLimitMinutes: timeLimitMinutes as number | null, maxAttempts, shuffleQuestions: flag(body, "shuffleQuestions", true), shuffleOptions: flag(body, "shuffleOptions", true), resultsVisibility: resultsVisibility as ResultsVisibility };
+  const scoringMode = body.scoringMode ?? "all_or_nothing";
+  if (scoringMode !== "all_or_nothing" && scoringMode !== "partial_credit" && scoringMode !== "negative_marking") invalid("Mode penilaian tidak valid.");
+  return { opensAt, closesAt, timeLimitMinutes: timeLimitMinutes as number | null, maxAttempts, shuffleQuestions: flag(body, "shuffleQuestions", true), shuffleOptions: flag(body, "shuffleOptions", true), resultsVisibility: resultsVisibility as ResultsVisibility, scoringMode: scoringMode as ScoringMode };
 }
 export function itemsInput(body: Record<string, unknown>) {
   const items = body.items;

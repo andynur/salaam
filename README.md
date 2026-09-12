@@ -50,6 +50,7 @@ environment-specific validation.
 | 16 — Written assessment grading | Short-answer and essay questions, autosaved written responses, and manual per-question grading | [Phase 16](docs/phases/16-written-assessment-grading.md) |
 | 17 — Assessment rubrics | Bounded criteria, criterion scores, and append-only rubric breakdowns for written answers | [Phase 17](docs/phases/17-assessment-rubrics.md) |
 | 18 — Surveys and questionnaires | Published feedback activities with validated, one-time student responses | [Phase 18](docs/phases/18-surveys-questionnaires.md) |
+| 19 — Assessment marking | Partial credit and bounded negative marking for choice assessments | [Phase 19](docs/phases/19-assessment-marking.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

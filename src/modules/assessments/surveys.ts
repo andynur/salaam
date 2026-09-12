@@ -8,6 +8,12 @@ import { courseAccess, lessonAccess, notFound } from "../learning/access";
 import { surveyAnswersInput, surveyKindInput, surveyQuestionsInput } from "./input";
 import type { Survey, SurveyQuestion } from "../../shared/assessment";
 
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).sort().join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
 export async function saveSurvey(db: SQL, actor: Actor, courseId: string, body: Record<string, unknown>, requestId: string, id?: string) {
   requirePermission(actor, "learning.manage");
   const kind = surveyKindInput(body);
@@ -93,7 +99,7 @@ export async function respondSurvey(db: SQL, actor: Actor, courseId: string, act
     const existing = (await tx<{ id: string; answers: Record<string, string | string[]> }[]>`SELECT id, answers FROM survey_responses WHERE activity_id = ${activityId} AND student_id = ${actor.id} FOR UPDATE`)[0];
     if (existing) {
       const previous = typeof existing.answers === "string" ? JSON.parse(existing.answers) as Record<string, string | string[]> : existing.answers;
-      if (JSON.stringify(previous) !== JSON.stringify(normalized)) throw new HttpError(409, "ALREADY_RESPONDED", "Respons survey sudah dikirim dan tidak dapat diubah.");
+      if (canonical(previous) !== canonical(normalized)) throw new HttpError(409, "ALREADY_RESPONDED", "Respons survey sudah dikirim dan tidak dapat diubah.");
       return { id: existing.id };
     }
     const [response] = await tx`INSERT INTO survey_responses (activity_id, course_id, student_id, answers) VALUES (${activityId}, ${courseId}, ${actor.id}, ${JSON.stringify(normalized)}::text::jsonb) RETURNING id`;

@@ -24,13 +24,15 @@ test("questions support choice and written answers with valid answer keys", () =
 test("quiz and exam settings enforce windows, limits and exam integrity rules", () => {
   expect(assessmentKindInput({ kind: "exam" })).toBe("exam");
   expect(() => assessmentKindInput({ kind: "assignment" })).toThrow();
-  expect(settingsInput({}, "quiz")).toEqual({ opensAt: null, closesAt: null, timeLimitMinutes: null, maxAttempts: 1, shuffleQuestions: true, shuffleOptions: true, resultsVisibility: "after_submit" });
+  expect(settingsInput({}, "quiz")).toEqual({ opensAt: null, closesAt: null, timeLimitMinutes: null, maxAttempts: 1, shuffleQuestions: true, shuffleOptions: true, resultsVisibility: "after_submit", scoringMode: "all_or_nothing" });
+  expect(settingsInput({ scoringMode: "negative_marking" }, "quiz").scoringMode).toBe("negative_marking");
   const exam = settingsInput({ opensAt: "2026-09-12T01:00:00Z", closesAt: "2026-09-12T03:00:00Z", timeLimitMinutes: 90, shuffleOptions: false, resultsVisibility: "after_close" }, "exam");
   expect(exam).toMatchObject({ opensAt: "2026-09-12T01:00:00.000Z", closesAt: "2026-09-12T03:00:00.000Z", timeLimitMinutes: 90, maxAttempts: 1, shuffleOptions: false });
   for (const [body, kind] of [
     [{ opensAt: "2026-09-12T03:00:00Z", closesAt: "2026-09-12T01:00:00Z" }, "quiz"],
     [{ timeLimitMinutes: 0 }, "quiz"], [{ timeLimitMinutes: 1.5 }, "quiz"], [{ maxAttempts: 11 }, "quiz"],
     [{ shuffleQuestions: "yes" }, "quiz"], [{ resultsVisibility: "always" }, "quiz"], [{ closesAt: "tomorrow" }, "quiz"],
+    [{ scoringMode: "weighted" }, "quiz"],
     [{ closesAt: "2026-09-12T03:00:00Z", timeLimitMinutes: 60, maxAttempts: 2 }, "exam"],
     [{ closesAt: "2026-09-12T03:00:00Z" }, "exam"],
     [{ timeLimitMinutes: 60 }, "exam"],

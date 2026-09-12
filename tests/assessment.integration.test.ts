@@ -299,6 +299,20 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     expect((await post(f.courseId, `surveys/${survey}/respond`, { answers }, outsider)).status).toBe(404);
   });
 
+  test("partial and negative marking score choice selections from the server snapshot", async () => {
+    const f = await course();
+    const partial = await assessment(f.courseId, f.lessonId, { shuffleQuestions: false, scoringMode: "partial_credit" }, [questionBodies[1]!], [3]);
+    const partialAttempt = await json<{ id: string }>(start(f.courseId, partial.id), 201);
+    await json(answer(f.courseId, partialAttempt.id, partial.questionIds[0]!, ["a"], 1));
+    await json(post(f.courseId, `attempts/${partialAttempt.id}/submit`, {}, student));
+    expect((await detail(f.courseId, partialAttempt.id)).score).toBeCloseTo(1.5, 5);
+    const negative = await assessment(f.courseId, f.lessonId, { shuffleQuestions: false, scoringMode: "negative_marking" }, [questionBodies[1]!], [3]);
+    const negativeAttempt = await json<{ id: string }>(start(f.courseId, negative.id), 201);
+    await json(answer(f.courseId, negativeAttempt.id, negative.questionIds[0]!, ["a", "b", "c"], 1));
+    await json(post(f.courseId, `attempts/${negativeAttempt.id}/submit`, {}, student));
+    expect((await detail(f.courseId, negativeAttempt.id)).score).toBeCloseTo(2.63, 5);
+  });
+
   test("125 students start, answer and submit one exam concurrently", async () => {
     const loadClass = await academic("classes", { yearId, name: `Load ${crypto.randomUUID().slice(0, 8)}` });
     const f = await course(loadClass);

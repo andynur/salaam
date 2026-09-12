@@ -19,7 +19,11 @@ function shuffled<T>(items: T[]) {
 
 // Choice answers are all-or-nothing: the sorted selection must equal the sorted key.
 async function finalizeAttempt(tx: SQL, attemptId: string, reason: "student" | "expired", requestId: string) {
-  await tx`UPDATE attempt_answers ans SET awarded = CASE WHEN q.type IN ('short_answer', 'essay') THEN NULL WHEN ans.selected = q.correct THEN q.points ELSE 0 END
+  await tx`UPDATE attempt_answers ans SET awarded = CASE WHEN q.type IN ('short_answer', 'essay') THEN NULL
+    WHEN q.scoring_mode = 'all_or_nothing' THEN CASE WHEN ans.selected = q.correct THEN q.points ELSE 0 END
+    ELSE GREATEST(0, q.points * (SELECT count(*) FROM jsonb_array_elements_text(ans.selected) AS selected(value) WHERE q.correct ? selected.value) / jsonb_array_length(q.correct)
+      - CASE WHEN q.scoring_mode = 'negative_marking' THEN q.points * 0.25 * (jsonb_array_length(ans.selected) - (SELECT count(*) FROM jsonb_array_elements_text(ans.selected) AS selected(value) WHERE q.correct ? selected.value)) / jsonb_array_length(q.correct) ELSE 0 END)
+    END
     FROM attempt_questions q WHERE q.attempt_id = ans.attempt_id AND q.question_id = ans.question_id AND ans.attempt_id = ${attemptId}`;
   const finalized = await tx<{ studentId: string; activityId: string; courseId: string }[]>`UPDATE attempts SET submission_reason = ${reason},
       submitted_at = CASE WHEN ${reason} = 'expired' THEN deadline_at ELSE clock_timestamp() END,
@@ -47,11 +51,11 @@ export async function finalizeExpired(db: SQL, scope: { attemptId?: string; acti
   });
 }
 
-type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean };
+type Settings = { timeLimitMinutes: number | null; closesAt: Date | null; opened: boolean; maxAttempts: number; shuffleQuestions: boolean; shuffleOptions: boolean; scoringMode: string };
 export async function startAttempt(db: SQL, actor: Actor, courseId: string, activityId: string, requestId: string) {
   return db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "participate", "share");
-    const settings = (await tx<Settings[]>`SELECT s.time_limit_minutes AS "timeLimitMinutes", s.closes_at AS "closesAt", s.max_attempts AS "maxAttempts",
+    const settings = (await tx<Settings[]>`SELECT s.time_limit_minutes AS "timeLimitMinutes", s.closes_at AS "closesAt", s.max_attempts AS "maxAttempts", s.scoring_mode AS "scoringMode",
         s.shuffle_questions AS "shuffleQuestions", s.shuffle_options AS "shuffleOptions", (s.opens_at IS NULL OR s.opens_at <= clock_timestamp()) AS opened
       FROM activities a JOIN assessment_settings s ON s.activity_id = a.id JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
       WHERE a.id = ${activityId} AND a.course_id = ${courseId} AND a.published AND l.published AND m.published
@@ -74,7 +78,7 @@ export async function startAttempt(db: SQL, actor: Actor, courseId: string, acti
       FROM assessment_questions aq JOIN questions q ON q.id = aq.question_id WHERE aq.activity_id = ${activityId} ORDER BY aq.position, q.id`;
     if (!questions.length) throw new HttpError(409, "NO_QUESTIONS", "Penilaian belum memiliki soal.");
     const snapshot = (settings.shuffleQuestions ? shuffled(questions) : questions).map((question, position) => ({
-      ...question, position, options: settings.shuffleOptions ? shuffled(question.options) : question.options,
+      ...question, position, scoring_mode: settings.scoringMode, options: settings.shuffleOptions ? shuffled(question.options) : question.options,
     }));
     const maxScore = questions.reduce((total, question) => total + Number(question.points), 0);
     // One clock reading fixes the start, the window check, and the deadline together.
@@ -84,10 +88,10 @@ export async function startAttempt(db: SQL, actor: Actor, courseId: string, acti
       FROM (SELECT clock_timestamp() AS at) now WHERE ${settings.closesAt}::timestamptz IS NULL OR ${settings.closesAt}::timestamptz > now.at
       RETURNING id`;
     if (!created[0]) throw new HttpError(409, "CLOSED", "Penilaian sudah ditutup.");
-    await tx`INSERT INTO attempt_questions (attempt_id, question_id, position, type, prompt, options, correct, explanation, points)
-      SELECT ${created[0].id}, item."questionId", item.position, item.type, item.prompt, item.options, item.correct, item.explanation, item.points
+    await tx`INSERT INTO attempt_questions (attempt_id, question_id, position, type, prompt, options, correct, explanation, points, scoring_mode)
+      SELECT ${created[0].id}, item."questionId", item.position, item.type, item.prompt, item.options, item.correct, item.explanation, item.points, item.scoring_mode
       FROM jsonb_to_recordset(${JSON.stringify(snapshot)}::text::jsonb)
-        AS item("questionId" uuid, position integer, type text, prompt text, options jsonb, correct jsonb, explanation text, points numeric)`;
+        AS item("questionId" uuid, position integer, type text, prompt text, options jsonb, correct jsonb, explanation text, points numeric, scoring_mode text)`;
     await recordAudit(tx, actor.id, "assessment.attempt.started", "attempts", created[0].id, requestId);
     return { id: created[0].id, resumed: false };
   });
@@ -113,7 +117,7 @@ export async function attemptDetail(db: SQL, actor: Actor, courseId: string, att
     const submitted = row.submittedAt !== null;
     const resultsVisible = course.canManage || (submitted && (row.visibility === "after_submit" || (row.visibility === "after_close" && row.closed)));
     const scoreVisible = resultsVisible || (submitted && row.visibility === "score_only");
-    const questions = await tx<AttemptQuestion[]>`SELECT q.question_id AS "questionId", q.position, q.type, q.prompt, q.options, q.points::float8 AS points,
+    const questions = await tx<AttemptQuestion[]>`SELECT q.question_id AS "questionId", q.position, q.type, q.prompt, q.options, q.points::float8 AS points, q.scoring_mode AS "scoringMode",
         q.correct, q.explanation, COALESCE(ans.selected, '[]'::jsonb) AS selected, ans.answer_text AS "answerText", COALESCE(ans.revision, 0) AS revision, ans.awarded::float8 AS awarded,
         (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text, 'breakdown', g.breakdown) FROM attempt_question_grades g WHERE g.attempt_id = q.attempt_id AND g.question_id = q.question_id ORDER BY g.created_at DESC, g.id DESC LIMIT 1) AS "manualGrade",
         (SELECT json_build_object('id', r.id, 'questionId', r.question_id, 'title', r.title, 'criteria', r.criteria) FROM assessment_rubrics r JOIN attempts t ON t.activity_id = r.activity_id WHERE t.id = q.attempt_id AND r.question_id = q.question_id) AS rubric
