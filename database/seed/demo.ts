@@ -99,8 +99,8 @@ const sha256 = (value: string) => new Bun.CryptoHasher("sha256").update(value).d
 // People
 // ---------------------------------------------------------------------------------------
 const TEACHERS = [
-  { name: "Ahmad Zaki Mubarok", email: "ahmad.zaki@hsibs.my.id", identifier: "GRU2026001" },
-  { name: "Siti Nur Hasanah", email: "siti.hasanah@hsibs.my.id", identifier: "GRU2026002" },
+  { name: "Andy Nur", email: "andynur@hsibs.my.id", identifier: "GRU2026001" },
+  { name: "Ari Heru Rinaldi", email: "ariheru@hsibs.my.id", identifier: "GRU2026002" },
 ];
 const FIRST_NAMES = [
   "Ahmad", "Muhammad", "Abdullah", "Yusuf", "Ibrahim", "Hamzah", "Zaid", "Umar", "Ali", "Bilal",
@@ -767,6 +767,197 @@ async function main() {
       await recordAudit(tx, teacherId, "demo_seed.checkin_started", "attendance_checkin_windows", live.id, requestId());
     }
 
+    // --- Clubs: directory, own courses, and membership across clubs ---------------------
+    // A club orchestrates rows that already exist, so each club needs real learning data
+    // behind it. Coders Club reuses the three JavaScript courses; Builders Club and
+    // Multimedia Club get one course each, seeded the same way but smaller. Membership then
+    // decides who sees what: several santri join two clubs, which is what the progress,
+    // challenge, and project tabs are meant to show.
+    interface ClubCourseSeed {
+      subjectCode: string; subjectName: string; courseName: string; classIndex: number; teacherId: string;
+      lessons: [string, string][]; assignment: [string, string]; challenge: [string, string];
+      projects: string[]; meetingHour: number;
+    }
+    async function seedClubCourse(seed: ClubCourseSeed) {
+      const [subjectRow] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES (${seed.subjectCode}, ${seed.subjectName}) RETURNING id`;
+      const [courseRow] = await tx<{ id: string }[]>`INSERT INTO courses (name, academic_year_id, term_id, class_id, subject_id, published)
+        VALUES (${seed.courseName}, ${yearId}, ${termId}, ${classIds[seed.classIndex]}, ${subjectRow!.id}, true) RETURNING id`;
+      const courseId = courseRow!.id;
+      const teacherId = seed.teacherId;
+      await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${courseId}, ${teacherId})`;
+      await recordAudit(tx, teacherId, "demo_seed.course_created", "courses", courseId, requestId());
+      const [moduleRow] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
+        VALUES (${courseId}, 'Bagian I – Dasar', 0, true) RETURNING id`;
+      const classStudentIds = STUDENTS.filter(s => s.classIndex === seed.classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
+
+      const lessonIds: string[] = [];
+      for (let index = 0; index < seed.lessons.length; index++) {
+        const [title, body] = seed.lessons[index]!;
+        const [lesson] = await tx<{ id: string }[]>`INSERT INTO lessons (course_id, module_id, title, content, position, published)
+          VALUES (${courseId}, ${moduleRow!.id}, ${title}, ${body}, ${index}, true) RETURNING id`;
+        lessonIds.push(lesson!.id);
+        await tx`INSERT INTO lesson_materials (course_id, lesson_id, title, kind, content)
+          VALUES (${courseId}, ${lesson!.id}, 'Ringkasan pertemuan', 'text', ${body})`;
+      }
+      for (const studentId of classStudentIds) {
+        const student = STUDENTS[studentIds.indexOf(studentId)]!;
+        for (let index = 0; index < lessonIds.length; index++) {
+          if (!chance(Math.max(0.2, student.skill - index * 0.12))) continue;
+          await tx`INSERT INTO lesson_completions (lesson_id, student_id, completed_at) VALUES (${lessonIds[index]}, ${studentId}, ${wib(-int(1, 40), int(9, 20), int(0, 59))})`;
+        }
+      }
+
+      const [assignment] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at, published)
+        VALUES (${courseId}, ${lessonIds[1]}, 'assignment', ${seed.assignment[0]}, ${seed.assignment[1]}, ${wib(4, 21)}, true) RETURNING id`;
+      await recordAudit(tx, teacherId, "demo_seed.activity_published", "activities", assignment!.id, requestId());
+      for (const studentId of classStudentIds) {
+        const student = STUDENTS[studentIds.indexOf(studentId)]!;
+        if (!chance(0.2 + student.skill * 0.6)) continue;
+        const submittedAt = days(-int(1, 10));
+        const [submission] = await tx<{ id: string }[]>`INSERT INTO submissions (activity_id, student_id, content, submitted_at)
+          VALUES (${assignment!.id}, ${studentId}, 'Berikut hasil pekerjaan saya beserta catatan proses pengerjaannya.', ${submittedAt}) RETURNING id`;
+        if (!chance(0.7)) continue;
+        const gradedAt = new Date(Math.min(submittedAt.getTime() + int(1, 4) * 86400000, hours(-2).getTime()));
+        await tx`INSERT INTO submission_grades (submission_id, grader_id, score, feedback, created_at)
+          VALUES (${submission!.id}, ${teacherId}, ${int(70, 98)}, 'Kerja bagus. Lanjutkan dengan memperhatikan detail pada bagian akhir.', ${gradedAt})`;
+        await recordAudit(tx, teacherId, "demo_seed.submission_graded", "submissions", submission!.id, requestId());
+      }
+
+      const [challenge] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
+        VALUES (${courseId}, ${lessonIds[lessonIds.length - 1]}, 'challenge', ${seed.challenge[0]}, ${seed.challenge[1]}, true) RETURNING id`;
+      await tx`INSERT INTO challenge_settings (activity_id, team_mode, max_team_size) VALUES (${challenge!.id}, 'team', 3)`;
+      await recordAudit(tx, teacherId, "demo_seed.activity_published", "activities", challenge!.id, requestId());
+
+      const roster = shuffle(classStudentIds);
+      for (let index = 0; index < seed.projects.length; index++) {
+        const members = roster.slice(index * 3, index * 3 + 3);
+        if (!members.length) break;
+        const approved = index === 0;
+        const submittedAt = days(-int(2, 12));
+        const [project] = await tx<{ id: string }[]>`INSERT INTO projects
+            (activity_id, course_id, title, summary, deliverable_url, status, first_submitted_at, submitted_at, showcased_at, showcased_by, created_by)
+          VALUES (${challenge!.id}, ${courseId}, ${seed.projects[index]},
+            'Karya klub yang dikerjakan satu tim dari ide, pengerjaan, sampai review mentor.',
+            'https://github.com/hsi-santri/klub-demo', ${approved ? "approved" : "submitted"}, ${days(-int(14, 28))}, ${submittedAt},
+            ${approved ? days(-3) : null}, ${approved ? teacherId : null}, ${members[0]}) RETURNING id`;
+        for (const memberId of members) await tx`INSERT INTO project_members (project_id, activity_id, student_id) VALUES (${project!.id}, ${challenge!.id}, ${memberId})`;
+        const cards: [string, "todo" | "in_progress" | "review" | "done"][] = [
+          ["Kumpulkan referensi dan kebutuhan", "done"], ["Kerjakan bagian utama", "done"],
+          ["Uji hasil bersama tim", approved ? "done" : "review"], ["Susun dokumentasi karya", approved ? "done" : "todo"],
+        ];
+        for (let position = 0; position < cards.length; position++) {
+          await tx`INSERT INTO project_tasks (project_id, title, status, position, assignee_id, created_by)
+            VALUES (${project!.id}, ${cards[position]![0]}, ${cards[position]![1]}, ${position}, ${pick(members)}, ${members[0]})`;
+        }
+        if (!approved) continue;
+        const reviewedAt = new Date(Math.min(submittedAt.getTime() + 2 * 86400000, hours(-3).getTime()));
+        await tx`INSERT INTO project_reviews (project_id, reviewer_id, decision, score, feedback, created_at)
+          VALUES (${project!.id}, ${teacherId}, 'approved', ${int(80, 96)}, 'Karya selesai dengan rapi dan bermanfaat untuk sekolah. Selamat!', ${reviewedAt})`;
+        for (const memberId of members) {
+          await tx`INSERT INTO portfolio_entries (project_id, student_id, reflection)
+            VALUES (${project!.id}, ${memberId}, 'Lewat karya klub ini saya belajar bekerja sama dalam tim dan menyelesaikan karya nyata sampai direview mentor.')`;
+        }
+        await recordAudit(tx, teacherId, "demo_seed.project_showcased", "projects", project!.id, requestId());
+      }
+
+      // Club meetings are ordinary classroom sessions on the club's course, written the way
+      // the attendance routes write them: a roster snapshot, then attendance rows.
+      const rosterRows = await tx<{ id: string; name: string; identifier: string | null }[]>`SELECT u.id, u.display_name AS name,
+          (SELECT p.identifier FROM user_profiles p JOIN roles r ON r.id = p.role_id WHERE p.user_id = u.id AND r.key = 'student') AS identifier
+        FROM class_members m JOIN users u ON u.id = m.student_id
+        WHERE m.class_id = ${classIds[seed.classIndex]} AND u.is_active ORDER BY u.id`;
+      for (let week = 0; week < 5; week++) {
+        const scheduled = week === 4;
+        const startsAt = scheduled ? wib(3, seed.meetingHour) : wib(-28 + week * 7, seed.meetingHour);
+        const endsAt = new Date(startsAt.getTime() + 90 * 60000);
+        const requestKey = crypto.randomUUID();
+        const title = scheduled ? "Pertemuan klub – Review karya" : `Pertemuan klub ${week + 1}`;
+        const payload = JSON.stringify({ courseId, title, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), requestKey, note: "" });
+        const [session] = await tx<{ id: string }[]>`INSERT INTO classroom_sessions
+            (course_id, title, starts_at, ends_at, status, note, reason, created_by, request_key, creation_payload, created_at, updated_at)
+          VALUES (${courseId}, ${title}, ${startsAt}, ${endsAt}, ${scheduled ? "scheduled" : "closed"}, '', '', ${teacherId}, ${requestKey},
+            ${payload}::text::jsonb, ${new Date(startsAt.getTime() - 7 * 86400000)}, ${startsAt}) RETURNING id`;
+        for (const student of rosterRows) {
+          await tx`INSERT INTO classroom_roster (session_id, student_id, student_name, identifier)
+            VALUES (${session!.id}, ${student.id}, ${student.name}, ${student.identifier})`;
+        }
+        if (scheduled) { await tx`UPDATE classroom_sessions SET version = 1 WHERE id = ${session!.id}`; continue; }
+        let version = 2;
+        await tx`INSERT INTO classroom_session_events (session_id, actor_id, version, action, reason, note, created_at)
+          VALUES (${session!.id}, ${teacherId}, ${version}, 'open', '', '', ${startsAt})`;
+        for (const student of rosterRows) {
+          const status = attendanceStatus(STUDENTS[studentIds.indexOf(student.id)]!.skill);
+          version += 1;
+          await tx`INSERT INTO attendance_records (session_id, student_id, status, note, recorded_by, previous_id, created_at)
+            VALUES (${session!.id}, ${student.id}, ${status}, '', ${teacherId}, NULL, ${new Date(startsAt.getTime() + int(2, 20) * 60000)})`;
+        }
+        version += 1;
+        await tx`INSERT INTO classroom_session_events (session_id, actor_id, version, action, reason, note, created_at)
+          VALUES (${session!.id}, ${teacherId}, ${version}, 'close', '', '', ${endsAt})`;
+        await tx`UPDATE classroom_sessions SET version = ${version} WHERE id = ${session!.id}`;
+        await recordAudit(tx, teacherId, "demo_seed.session_closed", "classroom_sessions", session!.id, requestId());
+      }
+      return courseId;
+    }
+
+    const buildersCourseId = await seedClubCourse({
+      subjectCode: "DPD101", subjectName: "Desain Produk Digital",
+      courseName: `Desain Produk Digital – ${CLASS_NAMES[0]}`, classIndex: 0, teacherId: mainTeacherId, meetingHour: 13,
+      lessons: [
+        ["Dasar Desain Antarmuka", "Antarmuka yang baik lahir dari keteraturan: hierarki visual, ruang kosong yang cukup, tipografi yang mudah dibaca, dan warna yang konsisten. Pada pertemuan ini kita membedah antarmuka aplikasi yang dipakai sehari-hari dan menamai keputusan desain di dalamnya."],
+        ["Riset Pengguna dan Persona", "Sebelum merancang, kita perlu memahami siapa penggunanya. Kita berlatih menyusun pertanyaan wawancara, merangkum temuan, dan menuliskannya menjadi persona serta perjalanan pengguna yang ringkas."],
+        ["Wireframe dan Prototipe", "Wireframe menahan kita dari terlalu cepat memikirkan warna. Kita membuat kerangka layar, menyusunnya menjadi alur, lalu mengubahnya menjadi prototipe yang dapat diklik dan diuji."],
+        ["Design System dan Komponen", "Produk yang tumbuh membutuhkan komponen yang dapat dipakai ulang: tombol, kartu, formulir, dan token warna. Kita menyusun design system sederhana agar tim bekerja dengan bahasa visual yang sama."],
+      ],
+      assignment: ["Audit antarmuka aplikasi sekolah", "Pilih satu layar aplikasi yang Anda pakai sehari-hari. Tuliskan tiga masalah desain yang Anda temukan beserta usulan perbaikan dan alasannya."],
+      challenge: ["Redesign Portal Santri", "Rancang ulang satu alur pada portal santri, dari riset singkat, wireframe, sampai prototipe yang dapat diuji. Kerjakan bertiga dan presentasikan hasilnya pada pertemuan klub."],
+      projects: ["Redesign Portal Santri", "Prototipe Aplikasi Kantin Santri"],
+    });
+    const multimediaCourseId = await seedClubCourse({
+      subjectCode: "MMK101", subjectName: "Multimedia dan Konten Kreatif",
+      courseName: `Multimedia dan Konten Kreatif – ${CLASS_NAMES[2]}`, classIndex: 2, teacherId: coTeacherId, meetingHour: 15,
+      lessons: [
+        ["Dasar Fotografi: Komposisi dan Cahaya", "Foto yang kuat dimulai dari komposisi dan cahaya. Kita membahas rule of thirds, garis pandu, arah cahaya, serta segitiga eksposur, lalu berlatih memotret kegiatan sekolah."],
+        ["Videografi: Pengambilan Gambar", "Kita mempelajari ukuran gambar, pergerakan kamera yang stabil, dan cara merekam suara yang bersih, kemudian menyusun daftar gambar sebelum meliput sebuah kegiatan."],
+        ["Penyuntingan Video dan Audio", "Penyuntingan menyusun potongan gambar menjadi cerita: memilih take terbaik, menjaga ritme, menyeimbangkan audio, dan menambahkan teks yang terbaca di layar kecil."],
+        ["Naskah Vlog dan Konten Media Sosial", "Konten yang bermanfaat direncanakan. Kita menyusun naskah singkat, menentukan pesan utama, dan menjaga adab liputan: meminta izin, menjaga privasi, dan menampilkan sekolah dengan jujur."],
+      ],
+      assignment: ["Foto esai kegiatan asrama", "Kumpulkan lima foto yang menceritakan satu kegiatan asrama secara berurutan, lengkapi dengan keterangan singkat untuk setiap foto."],
+      challenge: ["Produksi Vlog Pekan Santri", "Produksi satu vlog berdurasi tiga menit tentang kegiatan pekan santri: susun naskah, ambil gambar, sunting, lalu publikasikan setelah direview mentor."],
+      projects: ["Vlog Pekan Santri", "Dokumentasi Wisuda Tahfidz"],
+    });
+
+    const clubRows = await tx<{ id: string; slug: string }[]>`SELECT id, slug FROM clubs`;
+    const clubId = (slug: string) => clubRows.find(row => row.slug === slug)!.id;
+    async function linkClubCourse(slug: string, courseId: string, teacherId: string) {
+      await tx`INSERT INTO club_courses (club_id, course_id, linked_by) VALUES (${clubId(slug)}, ${courseId}, ${teacherId})`;
+      await recordAudit(tx, teacherId, "demo_seed.club_course_linked", "club_courses", courseId, requestId());
+    }
+    for (const course of courses) await linkClubCourse("coders-club", course.id, course.teacherId);
+    await linkClubCourse("builders-club", buildersCourseId, mainTeacherId);
+    await linkClubCourse("multimedia-club", multimediaCourseId, coTeacherId);
+
+    async function joinClub(slug: string, userId: string, role: "mentor" | "member", joinedAt: Date) {
+      await tx`INSERT INTO club_members (club_id, user_id, role, joined_at) VALUES (${clubId(slug)}, ${userId}, ${role}, ${joinedAt})
+        ON CONFLICT (club_id, user_id) DO NOTHING`;
+      await recordAudit(tx, role === "mentor" ? mainTeacherId : null, "demo_seed.club_member_added", "club_members", userId, requestId());
+    }
+    await joinClub("coders-club", mainTeacherId, "mentor", days(-50));
+    await joinClub("coders-club", coTeacherId, "mentor", days(-50));
+    await joinClub("builders-club", mainTeacherId, "mentor", days(-45));
+    await joinClub("multimedia-club", coTeacherId, "mentor", days(-45));
+    // Membership follows the class a club's courses belong to, so a santri only ever sees
+    // club content they are already enrolled in. The overlaps are deliberate: four santri of
+    // X RPL 1 and three of XI RPL 1 belong to two clubs at once.
+    const byClass = (classIndex: number) => STUDENTS.filter(s => s.classIndex === classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
+    const [first, second, third] = [byClass(0), byClass(1), byClass(2)];
+    const coders = [...first!.slice(0, 6), ...second!.slice(0, 6), ...third!.slice(0, 4)];
+    const builders = first!.slice(2, 9);      // four of them also code
+    const multimedia = third!.slice(1, 8);    // three of them also code
+    for (const studentId of coders) await joinClub("coders-club", studentId, "member", days(-int(20, 44)));
+    for (const studentId of builders) await joinClub("builders-club", studentId, "member", days(-int(15, 40)));
+    for (const studentId of multimedia) await joinClub("multimedia-club", studentId, "member", days(-int(15, 40)));
+
     // --- Gamification: XP and badges through the application's own award path -----------
     // Calling awardXp keeps the ledger, the badge thresholds, and the level-up notices
     // identical to what a real term would have produced, including its idempotency: a
@@ -855,6 +1046,47 @@ async function main() {
     await seedEvent("Libur Maulid Nabi", "Tidak ada kegiatan belajar mengajar.", wib(30, 0), wib(30, 23), null);
     await seedEvent("Ujian Akhir Semester Ganjil", "Pekan ujian akhir semester untuk seluruh tingkat.", wib(80, 7), wib(87, 12), null);
 
+    // The annual academic calendar is date-based and remains separate from the live agenda.
+    async function seedAcademicCalendarEvent(title: string, description: string, startsOn: string, endsOn: string, category: string, classId: string | null = null) {
+      const [row] = await tx<{ id: string }[]>`INSERT INTO academic_calendar_events
+        (academic_year_id, class_id, title, description, category, starts_on, ends_on, created_by)
+        VALUES (${yearId}, ${classId}, ${title}, ${description}, ${category}, ${startsOn}, ${endsOn}, ${mainTeacherId}) RETURNING id`;
+      await recordAudit(tx, mainTeacherId, "demo_seed.academic_calendar_event_created", "academic_calendar_events", row!.id, requestId());
+    }
+    const academicCalendarEvents: [string, string, string, string, string, string | null][] = [
+      ["Libur semester / Tahun ajaran baru", "Libur semester dan persiapan tahun ajaran baru.", "2026-07-29", "2026-08-11", "holiday", null],
+      ["Serah terima santri", "Orientasi dan serah terima santri baru.", "2026-08-12", "2026-08-12", "student", null],
+      ["MPLS", "Masa pengenalan lingkungan sekolah.", "2026-08-13", "2026-08-19", "student", null],
+      ["Dauroh Ilmu Ust. Ayatullah", "Kegiatan pembinaan dan penguatan ilmu.", "2026-08-01", "2026-08-02", "academic", null],
+      ["Nusantara Spirit Day", "Kegiatan kebersamaan sekolah.", "2026-08-16", "2026-08-17", "student", null],
+      ["Sharing the Joy", "Kegiatan berbagi dan refleksi.", "2026-10-18", "2026-10-18", "student", null],
+      ["Life to learn", "Sesi pengembangan karakter.", "2026-11-15", "2026-11-15", "learning", null],
+      ["Ujian Tahfidz", "Penilaian hafalan tahfidz.", "2026-12-09", "2026-12-13", "assessment", null],
+      ["SAS", "Sumatif akhir semester.", "2026-12-14", "2026-12-19", "assessment", null],
+      ["Portofolio", "Pengumpulan dan presentasi portofolio.", "2026-12-20", "2026-12-22", "learning", null],
+      ["Class Meeting", "Pertemuan kelas dan evaluasi semester.", "2026-12-23", "2026-12-24", "student", null],
+      ["Liburan semester", "Libur semester ganjil.", "2026-12-27", "2027-01-09", "holiday", null],
+      ["Kedatangan santri", "Kedatangan santri setelah liburan.", "2027-01-10", "2027-01-10", "student", null],
+      ["Presentasi tugas liburan", "Presentasi tugas selama liburan.", "2027-01-11", "2027-01-11", "learning", null],
+      ["KBM pertama", "Kegiatan belajar mengajar semester genap dimulai.", "2027-01-12", "2027-01-12", "academic", null],
+      ["Prakiraan libur awal Ramadhan", "Tanggal dapat berubah mengikuti keputusan resmi.", "2027-02-08", "2027-02-08", "holiday", null],
+      ["Ramadhan Journey", "Program pembelajaran dan ibadah Ramadhan.", "2027-02-09", "2027-02-27", "academic", null],
+      ["Ramadhan Fest", "Kegiatan penutup program Ramadhan.", "2027-02-20", "2027-02-21", "student", null],
+      ["Libur I'tikaf", "Libur dan persiapan I'tikaf.", "2027-03-01", "2027-03-08", "holiday", null],
+      ["Perkiraan Idul Fitri", "Tanggal dapat berubah mengikuti keputusan resmi.", "2027-03-09", "2027-03-09", "holiday", null],
+      ["Libur Idul Fitri", "Libur Idul Fitri.", "2027-03-10", "2027-03-19", "holiday", null],
+      ["Kedatangan santri", "Kedatangan santri setelah libur Idul Fitri.", "2027-03-20", "2027-03-20", "student", null],
+      ["Mission Impossible", "Kegiatan tantangan dan kolaborasi.", "2027-04-11", "2027-04-11", "student", null],
+      ["Stories of Wisdom", "Sesi berbagi inspirasi.", "2027-04-24", "2027-04-24", "learning", null],
+      ["Idul Adha", "Libur Idul Adha.", "2027-05-16", "2027-05-16", "holiday", null],
+      ["Libur Idul Adha", "Libur Idul Adha.", "2027-05-17", "2027-05-18", "holiday", null],
+      ["Edurance", "Kegiatan ketahanan dan kebersamaan.", "2027-05-22", "2027-05-23", "student", null],
+      ["Ujian Tahfidz", "Penilaian hafalan tahfidz semester genap.", "2027-06-02", "2027-06-06", "assessment", null],
+      ["SAS", "Sumatif akhir semester genap.", "2027-06-07", "2027-06-12", "assessment", null],
+      ["Class Meeting", "Pertemuan kelas dan evaluasi akhir tahun.", "2027-06-18", "2027-06-18", "student", null],
+    ];
+    for (const event of academicCalendarEvents) await seedAcademicCalendarEvent(...event);
+
     // A few santri have tuned their notifications, so the preference form starts from a
     // saved state and the worker has something to suppress rather than deliver.
     for (let index = 0; index < 6; index++) {
@@ -877,10 +1109,12 @@ async function main() {
   // Part of the inbox has already been read, so the unread filter shows a real difference.
   await db`UPDATE notifications SET read_at = clock_timestamp()
     WHERE status = 'delivered' AND read_at IS NULL AND left(md5(id::text), 1) IN ('0', '1', '2', '3', '4')`;
-  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number }[]>`SELECT
+  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number; clubs: number; clubMembers: number }[]>`SELECT
     (SELECT COALESCE(sum(points), 0)::int FROM xp_entries) AS xp, (SELECT count(*)::int FROM badge_awards) AS badges,
     (SELECT count(*)::int FROM classroom_sessions) AS sessions, (SELECT count(*)::int FROM attendance_records) AS records,
-    (SELECT count(*)::int FROM academic_events) AS events`;
+    (SELECT count(*)::int FROM academic_events) AS events,
+    (SELECT count(*)::int FROM clubs WHERE archived_at IS NULL AND published) AS clubs,
+    (SELECT count(*)::int FROM club_members WHERE removed_at IS NULL AND role = 'member') AS "clubMembers"`;
 
   console.log("Demo data seeded.");
   console.log(`- Academic year: ${DEMO_ACADEMIC_YEAR}, classes: ${CLASS_NAMES.join(", ")}`);
@@ -890,6 +1124,7 @@ async function main() {
   console.log(`- Gamification: ${totals!.xp} XP awarded, ${totals!.badges} badges earned`);
   console.log(`- Attendance: ${totals!.sessions} classroom sessions, ${totals!.records} attendance rows, QR check-in open on the session running now`);
   console.log(`- Calendar: ${totals!.events} academic events; notifications ${generated} generated, ${delivered} delivered, ${suppressed} suppressed by preference`);
+  console.log(`- Clubs: ${totals!.clubs} klub aktif (Coders, Builders, Multimedia) dengan ${totals!.clubMembers} keanggotaan santri; sebagian santri mengikuti dua klub`);
   console.log("- Reports derive from the data above; an administrator sees every course, a teacher only the ones they teach.");
   console.log("Bootstrap an administrator separately with `bun run db:bootstrap-admin` if one does not exist yet.");
 }

@@ -12,6 +12,8 @@ import type { ProjectHandler } from "./project-http";
 import type { AttendanceHandler } from "./attendance-http";
 import type { GamificationHandler } from "./gamification-http";
 import type { ReportingHandler } from "./reporting-http";
+import type { ShareHandler } from "./share-http";
+import type { ClubHandler } from "./club-http";
 import { jsonObject } from "./validation";
 
 export function securityHeaders(production: boolean): Record<string, string> {
@@ -45,7 +47,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
   return { email: body.email.trim().toLowerCase(), password: body.password };
 }
 
-export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler }) {
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler; share?: ShareHandler; clubs?: ClubHandler }) {
   const limiter = new LoginLimiter();
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
@@ -88,6 +90,9 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if ((path === "/api/projects" || path.startsWith("/api/projects/")) && services?.projects) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.projects(request, await auth.actor(request), requestId);
+      } else if ((path === "/api/clubs" || path.startsWith("/api/clubs/")) && services?.clubs) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.clubs(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/gamification/") && services?.gamification) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.gamification(request, await auth.actor(request), requestId);
@@ -100,6 +105,11 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if ((path === "/api/calendar" || path.startsWith("/api/calendar/") || path === "/api/notifications" || path.startsWith("/api/notifications/")) && services?.calendar) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.calendar(request, await auth.actor(request), requestId);
+      } else if (path.startsWith("/share/") && services?.share) {
+        // Public lesson pages: the slug is the only credential, so no session is read and
+        // nothing but GET is accepted.
+        if (method !== "GET") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+        response = await services.share(request);
       } else if (path.startsWith("/api/admin/") && services) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.foundation(request, await auth.actor(request), requestId);

@@ -23,6 +23,7 @@ export function navigationFor(actor: Actor) {
       { href: "/attendance", label: "Kehadiran", icon: "attendance", active: (path: string) => path.startsWith("/attendance") } satisfies NavItem,
       { href: "/gamification", label: "Pertumbuhan", icon: "star", active: (path: string) => path.startsWith("/gamification") } satisfies NavItem,
     ] : []),
+    ...(can("club.view") ? [{ href: "/club", label: "Club", icon: "club", active: (path: string) => path.startsWith("/club") } satisfies NavItem] : []),
     ...(can("reports.view") ? [{ href: "/reports", label: "Laporan", icon: "chart", active: (path: string) => path.startsWith("/reports") } satisfies NavItem] : []),
   ];
   const admin: NavItem[] = ([

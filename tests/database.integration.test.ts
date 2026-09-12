@@ -93,6 +93,19 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
   });
   // Runs last: rollback/reset undo application data, so nothing after this may rely on it.
   test("rollback undoes exactly the latest migration; reset replays every migration from empty", async () => {
+    expect(await rollback(db)).toBe("0030_club_directory.sql");
+    expect((await db`SELECT id FROM clubs WHERE slug IN ('builders-club', 'multimedia-club')`).length).toBe(0);
+    expect((await db`SELECT id FROM clubs WHERE slug = 'coders-club'`).length).toBe(1);
+    expect(await rollback(db)).toBe("0029_submission_form_fields.sql");
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'submissions' AND column_name IN ('screenshot_file_id', 'github_url', 'jam_url', 'feedback')`).length).toBe(0);
+    expect(await rollback(db)).toBe("0028_club_management.sql");
+    expect((await db`SELECT to_regclass('clubs') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT to_regclass('club_members') AS relation`)[0].relation).toBeNull();
+    expect((await db`SELECT id FROM permissions WHERE key IN ('club.view', 'club.manage')`).length).toBe(0);
+    expect(await rollback(db)).toBe("0027_academic_calendar.sql");
+    expect((await db`SELECT to_regclass('academic_calendar_events') AS relation`)[0].relation).toBeNull();
+    expect(await rollback(db)).toBe("0026_lesson_documents.sql");
+    expect((await db`SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'lessons' AND column_name IN ('version', 'cover_file_id', 'share_slug')`).length).toBe(0);
     expect(await rollback(db)).toBe("0025_attendance_checkin_imports.sql");
     expect((await db`SELECT to_regclass('attendance_checkin_imports') AS relation`)[0].relation).toBeNull();
     expect(await rollback(db)).toBe("0024_attendance_roster_adjustments.sql");
@@ -142,7 +155,7 @@ describe.skipIf(!url)("PostgreSQL integration (isolated temporary schema)", () =
 
     const allNames = (await readMigrations("database/migrations")).map(migration => migration.name);
     const result = await reset(db);
-    expect(result.rolledBack).toEqual(allNames.slice(0, -16).reverse());
+    expect(result.rolledBack).toEqual(allNames.slice(0, -21).reverse());
     expect(result.applied).toEqual(allNames);
     expect((await db`SELECT to_regclass('users') AS relation`)[0].relation).not.toBeNull();
     expect((await db`SELECT * FROM users`).length).toBe(0);

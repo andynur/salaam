@@ -17,6 +17,8 @@ import { createLearningHandler, maxLearningUploadRequestBytes } from "./core/lea
 import { createProjectHandler } from "./core/project-http";
 import { createGamificationHandler } from "./core/gamification-http";
 import { createReportingHandler } from "./core/reporting-http";
+import { createShareHandler } from "./core/share-http";
+import { createClubHandler } from "./core/club-http";
 import { studentGrowthCard } from "./modules/gamification/service";
 import { log } from "./core/logger";
 
@@ -26,7 +28,7 @@ const db = connectDatabase(config.databaseUrl);
 const auth = createAuthService(db, config);
 const realtime = createAttendanceRealtime(db, auth, config);
 const stopNotifications = startNotificationWorker(db);
-const handle = createHttpHandler(config, auth, () => checkDatabase(db), { calendar: createCalendarHandler(db), attendance: createAttendanceHandler(db, realtime.changed), foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db, config.storageRoot), gamification: createGamificationHandler(db), reports: createReportingHandler(db, config.timezone), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
+const handle = createHttpHandler(config, auth, () => checkDatabase(db), { calendar: createCalendarHandler(db), attendance: createAttendanceHandler(db, realtime.changed), foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db, config.storageRoot), gamification: createGamificationHandler(db), reports: createReportingHandler(db, config.timezone), share: createShareHandler(db, config.storageRoot, config.timezone), clubs: createClubHandler(db), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
 // Bun 1.4.2 resolves prebuilt HTML assets from cwd. Resolve config/storage first,
 // then use the bundle directory; development HTML imports do not need this.
 if (index.files) process.chdir(import.meta.dir);
@@ -45,7 +47,7 @@ const server = Bun.serve({
   development: config.environment === "development" ? { hmr: true, console: false } : false,
   // Sized for learning uploads; login, administration, and JSON routes enforce smaller limits.
   maxRequestBodySize: maxLearningUploadRequestBytes,
-  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/calendar": index, "/notifications": index, "/admin/users": index, "/admin/import": index, "/admin/transfers": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index, "/reports": index, "/attendance": index, "/attendance/courses/:id": index, "/attendance/courses/:id/sessions/:sessionId": index },
+  routes: { ...brandRoutes, "/": index, "/login": index, "/dashboard": index, "/calendar": index, "/notifications": index, "/admin/users": index, "/admin/import": index, "/admin/transfers": index, "/admin/academic": index, "/admin/audit": index, "/learning": index, "/learning/courses/:id": index, "/learning/courses/:id/attempts/:attemptId": index, "/projects": index, "/projects/:id": index, "/gamification": index, "/club": index, "/reports": index, "/attendance": index, "/attendance/courses/:id": index, "/attendance/courses/:id/sessions/:sessionId": index },
   websocket: realtime.websocket,
   fetch(request, server) { if (new URL(request.url).pathname === "/api/attendance/live") return realtime.upgrade(request, server); return handle(request, server.requestIP(request)?.address ?? "unknown"); },
   error(error) {

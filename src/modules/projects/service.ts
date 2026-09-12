@@ -100,7 +100,9 @@ export async function createProject(db: SQL, actor: Actor, courseId: string, act
   });
 }
 
-export async function listProjects(db: SQL, actor: Actor, pattern: string, offset: number, status: ProjectStatus | null, activityId: string | null) {
+// `clubId` narrows the list to the courses a club has linked, so the club workspace reuses
+// this one project query instead of listing projects of its own.
+export async function listProjects(db: SQL, actor: Actor, pattern: string, offset: number, status: ProjectStatus | null, activityId: string | null, clubId: string | null = null) {
   requirePermission(actor, "learning.view");
   return db<ProjectRow[]>`SELECT p.id, p.title, p.status, c.id AS "courseId", c.name AS "courseName", cl.name AS "className",
       a.id AS "challengeId", a.title AS "challengeTitle", s.team_mode AS "teamMode", a.due_at::text AS "dueAt",
@@ -115,6 +117,7 @@ export async function listProjects(db: SQL, actor: Actor, pattern: string, offse
     WHERE (p.title ILIKE ${pattern} OR a.title ILIKE ${pattern} OR c.name ILIKE ${pattern})
       AND (${status}::text IS NULL OR p.status = ${status}::text)
       AND (${activityId}::uuid IS NULL OR p.activity_id = ${activityId}::uuid)
+      AND (${clubId}::uuid IS NULL OR EXISTS (SELECT 1 FROM club_courses cc WHERE cc.club_id = ${clubId}::uuid AND cc.course_id = c.id))
       AND ((${can(actor, "learning.manage")} AND (${can(actor, "learning.manage.all")} OR EXISTS
           (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = c.id AND ta.teacher_id = ${actor.id})))
         OR (${can(actor, "learning.participate")} AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.student_id = ${actor.id})
