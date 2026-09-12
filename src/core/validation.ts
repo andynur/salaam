@@ -20,8 +20,8 @@ export async function jsonObject(request: Request, maxBytes = 4096): Promise<Rec
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid("Isi data yang valid.");
   return value as Record<string, unknown>;
 }
-// Accepts text fields plus at most one file in the `file` field.
-export async function multipartInput(request: Request, maxBytes: number): Promise<{ body: Record<string, unknown>; file: File | null }> {
+// Accepts text fields plus primary file and optional screenshot uploads.
+export async function multipartInput(request: Request, maxBytes: number): Promise<{ body: Record<string, unknown>; file: File | null; files?: Record<string, File> }> {
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "multipart/form-data") {
     throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Gunakan formulir berkas.");
   }
@@ -29,21 +29,24 @@ export async function multipartInput(request: Request, maxBytes: number): Promis
   let form: FormData;
   try { form = await request.formData(); } catch { invalid("Data formulir tidak valid."); }
   const body: Record<string, unknown> = {};
+  const files: Record<string, File> = {};
   let file: File | null = null;
-  let fileField = false;
   for (const [key, value] of form) {
-    if (key === "file") {
-      if (fileField) invalid("Lampirkan satu berkas saja.");
-      fileField = true;
+    if (value instanceof File) {
+      if (key !== "file" && key !== "screenshot") invalid("Jenis lampiran tidak didukung.");
+      if (files[key]) invalid("Lampirkan setiap jenis berkas satu kali.");
       // An empty browser file input submits a nameless, empty file.
-      if (typeof value !== "string" && (value.name || value.size)) file = value;
+      if (value.name || value.size) {
+        files[key] = value;
+        if (key === "file") file = value;
+      }
       else if (typeof value === "string" && value) invalid("Data berkas tidak valid.");
     } else {
       if (typeof value !== "string" || key in body) invalid("Data formulir tidak valid.");
       body[key] = value;
     }
   }
-  return { body, file };
+  return Object.keys(files).length ? { body, file, files } : { body, file };
 }
 export function textField(body: Record<string, unknown>, key: string, max = 100): string {
   const value = body[key];

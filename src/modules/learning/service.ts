@@ -6,7 +6,7 @@ import { idField, invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
 import { awardXp } from "../gamification/awards";
 import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
-import type { CourseDetail, CourseModule, Lesson, Material, LearningCourse, Progress, StoredFile } from "../../shared/learning";
+import { maxLessonContent, type CourseDetail, type CourseModule, type Lesson, type Material, type LearningCourse, type Progress, type StoredFile } from "../../shared/learning";
 import { courseAccess, lessonAccess, notFound } from "./access";
 import { archivedInput, materialInput, positionInput, publishedInput } from "./input";
 import { listActivities } from "../activities/service";
@@ -64,8 +64,10 @@ export async function courseDetail(db: SQL, actor: Actor, courseId: string): Pro
     const modules = await tx<CourseModule[]>`SELECT id, title, position, published, archived_at IS NOT NULL AS archived FROM course_modules
       WHERE course_id = ${courseId} AND (${drafts} OR (published AND archived_at IS NULL)) ORDER BY position, created_at, id`;
     const lessons = await tx<Lesson[]>`SELECT l.id, l.module_id AS "moduleId", l.title, l.content, l.position, l.published, l.archived_at IS NOT NULL AS archived,
+      l.version, l.updated_at AS "updatedAt", CASE WHEN ${drafts} THEN l.share_slug END AS "shareSlug",
+      CASE WHEN f.id IS NULL THEN NULL ELSE json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) END AS cover,
       EXISTS (SELECT 1 FROM lesson_completions lc WHERE lc.lesson_id = l.id AND lc.student_id = ${actor.id}) AS completed
-      FROM lessons l JOIN course_modules m ON m.id = l.module_id
+      FROM lessons l JOIN course_modules m ON m.id = l.module_id LEFT JOIN stored_files f ON f.id = l.cover_file_id
       WHERE l.course_id = ${courseId} AND (${drafts} OR (l.published AND m.published AND l.archived_at IS NULL AND m.archived_at IS NULL))
       ORDER BY l.position, l.created_at, l.id`;
     const materials = await tx<Material[]>`SELECT lm.id, lm.lesson_id AS "lessonId", lm.title, lm.kind, lm.content, lm.archived_at IS NOT NULL AS archived,
@@ -97,14 +99,18 @@ export async function saveContent(db: SQL, storageRoot: string, actor: Actor, co
       rows = id ? await tx`UPDATE course_modules SET title = ${title}, position = ${position} WHERE id = ${id} AND course_id = ${courseId} AND archived_at IS NULL RETURNING id`
         : await tx`INSERT INTO course_modules (course_id, title, position) VALUES (${courseId}, ${title}, ${position}) RETURNING id`;
     } else if (resource === "lessons") {
-      const content = textField(body, "content", 20000);
+      // On update the document body is optional: the inline editor owns it, and a
+      // metadata-only save must not touch the content or its autosave version.
+      const content = id && body.content === undefined ? null : textField(body, "content", maxLessonContent);
       const position = positionInput(body);
       if (id) {
         // A lesson may move to another active module of the same course; its materials,
         // activities, submissions, and completions stay attached to the lesson.
         const moduleId = body.moduleId === undefined ? null : idField(body, "moduleId");
         if (moduleId && !(await tx`SELECT id FROM course_modules WHERE id = ${moduleId} AND course_id = ${courseId} AND archived_at IS NULL`).length) notFound();
-        rows = await tx`UPDATE lessons SET title = ${title}, content = ${content}, position = ${position}, module_id = COALESCE(${moduleId}::uuid, module_id)
+        rows = await tx`UPDATE lessons SET title = ${title}, content = COALESCE(${content}, content), position = ${position},
+          module_id = COALESCE(${moduleId}::uuid, module_id), updated_at = clock_timestamp(),
+          version = version + CASE WHEN ${content}::text IS NULL THEN 0 ELSE 1 END
           WHERE id = ${id} AND course_id = ${courseId} AND archived_at IS NULL RETURNING id`;
       } else {
         const moduleId = idField(body, "moduleId");

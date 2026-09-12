@@ -7,7 +7,7 @@ import { recordAudit } from "../../core/audit/repository";
 import { awardXp } from "../gamification/awards";
 import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
 import { courseAccess, lessonAccess, notFound } from "../learning/access";
-import { activityInput, deadlineExceptionInput, gradeInput, returnInput, submissionContentInput } from "../learning/input";
+import { activityInput, deadlineExceptionInput, gradeInput, returnInput, submissionContentInput, submissionFormInput } from "../learning/input";
 import type { Activity, Grade, StoredFile, Submission } from "../../shared/learning";
 
 export async function listActivities(db: SQL, actor: Actor, courseId: string, drafts: boolean) {
@@ -17,6 +17,8 @@ export async function listActivities(db: SQL, actor: Actor, courseId: string, dr
       'content', s.content, 'submittedAt', s.submitted_at::text,
       'file', (SELECT json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes)
         FROM stored_files f WHERE f.id = s.file_id),
+      'screenshotFile', (SELECT json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) FROM stored_files f WHERE f.id = s.screenshot_file_id),
+      'githubUrl', s.github_url, 'jamUrl', s.jam_url, 'feedback', s.feedback,
       'revision', s.revision, 'status', s.status,
       'returnReason', (SELECT r.reason FROM submission_returns r WHERE r.submission_id = s.id ORDER BY r.created_at DESC, r.id DESC LIMIT 1),
       'grade', (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text)
@@ -52,12 +54,20 @@ export async function saveActivity(db: SQL, actor: Actor, courseId: string, body
   });
 }
 
-export async function submitActivity(db: SQL, storageRoot: string, actor: Actor, courseId: string, activityId: string, body: Record<string, unknown>, file: File | null, requestId: string) {
+export async function submitActivity(db: SQL, storageRoot: string, actor: Actor, courseId: string, activityId: string, body: Record<string, unknown>, file: File | null, screenshotOrRequestId: File | null | string, requestId?: string) {
+  const screenshot = typeof screenshotOrRequestId === "string" ? null : screenshotOrRequestId;
+  // Keep the original single-file multipart contract when no screenshot field is sent;
+  // the structured form opts into the stricter ZIP-plus-screenshot contract.
+  const legacySubmission = screenshot === null;
+  requestId = typeof screenshotOrRequestId === "string" ? screenshotOrRequestId : requestId!;
   requirePermission(actor, "learning.participate");
   const content = submissionContentInput(body);
+  const { githubUrl, jamUrl, feedback } = submissionFormInput(body);
   const upload = file ? await uploadInput(file) : null;
-  if (!content && !upload) invalid("Isi jawaban atau lampirkan berkas.");
-  return withFileCleanup(storageRoot, upload, store => db.begin(async tx => {
+  const screenshotUpload = screenshot ? await uploadInput(screenshot) : null;
+  if (!legacySubmission && (!upload || upload.mediaType !== "application/zip")) invalid("Berkas ZIP wajib dilampirkan.");
+  if (!legacySubmission && (!screenshotUpload || !screenshotUpload.mediaType.startsWith("image/"))) invalid("Screenshot gambar wajib dilampirkan.");
+  return withFileCleanup(storageRoot, upload, store => withFileCleanup(storageRoot, screenshotUpload, storeScreenshot => db.begin(async tx => {
     await courseAccess(tx, actor, courseId, "participate", true);
     const activities = await tx`SELECT a.id, (COALESCE((SELECT e.due_at FROM submission_deadline_exceptions e WHERE e.activity_id = a.id AND e.student_id = ${actor.id}), a.due_at) IS NOT NULL AND clock_timestamp() >= COALESCE((SELECT e.due_at FROM submission_deadline_exceptions e WHERE e.activity_id = a.id AND e.student_id = ${actor.id}), a.due_at)) AS closed
       FROM activities a JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
@@ -73,19 +83,21 @@ export async function submitActivity(db: SQL, storageRoot: string, actor: Actor,
         return { id: existing[0].id };
       }
       if (upload) await recordStoredFile(tx, courseId, actor.id, upload);
-      await tx`UPDATE submissions SET content = ${content}, file_id = ${upload?.id ?? null}, submitted_at = clock_timestamp(), revision = revision + 1, status = 'submitted' WHERE id = ${existing[0].id}`;
+      if (screenshotUpload) await recordStoredFile(tx, courseId, actor.id, screenshotUpload);
+      await tx`UPDATE submissions SET content = ${content}, file_id = ${upload?.id ?? null}, screenshot_file_id = ${screenshotUpload?.id ?? null}, github_url = ${githubUrl}, jam_url = ${jamUrl}, feedback = ${feedback}, submitted_at = clock_timestamp(), revision = revision + 1, status = 'submitted' WHERE id = ${existing[0].id}`;
       await recordAudit(tx, actor.id, "activity.resubmitted", "submissions", existing[0].id, requestId);
-      await store();
+      await store(); await storeScreenshot();
       return { id: existing[0].id };
     }
     if (activities[0].closed) throw new HttpError(409, "DEADLINE_PASSED", "Tenggat pengumpulan sudah berakhir.");
     if (upload) await recordStoredFile(tx, courseId, actor.id, upload);
-    const rows = await tx<{ id: string }[]>`INSERT INTO submissions (activity_id, student_id, content, file_id)
-      VALUES (${activityId}, ${actor.id}, ${content}, ${upload?.id ?? null}) RETURNING id`;
+    if (screenshotUpload) await recordStoredFile(tx, courseId, actor.id, screenshotUpload);
+    const rows = await tx<{ id: string }[]>`INSERT INTO submissions (activity_id, student_id, content, file_id, screenshot_file_id, github_url, jam_url, feedback)
+      VALUES (${activityId}, ${actor.id}, ${content}, ${upload?.id ?? null}, ${screenshotUpload?.id ?? null}, ${githubUrl}, ${jamUrl}, ${feedback}) RETURNING id`;
     await recordAudit(tx, actor.id, "activity.submitted", "submissions", rows[0]!.id, requestId);
-    await store();
+    await store(); await storeScreenshot();
     return rows[0]!;
-  }));
+  })));
 }
 
 export async function returnSubmission(db: SQL, actor: Actor, courseId: string, submissionId: string, body: Record<string, unknown>, requestId: string) {
@@ -129,6 +141,8 @@ export async function listSubmissions(db: SQL, actor: Actor, courseId: string, a
     if (!activities.length) notFound();
     return tx<Submission[]>`SELECT s.id, s.activity_id AS "activityId", s.student_id AS "studentId", u.display_name AS "studentName", s.content, s.submitted_at::text AS "submittedAt",
       (SELECT json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) FROM stored_files f WHERE f.id = s.file_id) AS file,
+      (SELECT json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) FROM stored_files f WHERE f.id = s.screenshot_file_id) AS "screenshotFile",
+      s.github_url AS "githubUrl", s.jam_url AS "jamUrl", s.feedback,
       (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text)
         FROM submission_grades g WHERE g.submission_id = s.id AND g.revision = s.revision ORDER BY g.created_at DESC, g.id DESC LIMIT 1) AS grade,
       s.revision, s.status,
@@ -174,11 +188,11 @@ export async function gradeHistory(db: SQL, actor: Actor, courseId: string, subm
   });
 }
 
-export async function submissionFile(db: SQL, actor: Actor, courseId: string, submissionId: string): Promise<StoredFile> {
+export async function submissionFile(db: SQL, actor: Actor, courseId: string, submissionId: string, kind: "file" | "screenshot" = "file"): Promise<StoredFile> {
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     const { course } = await courseAccess(tx, actor, courseId, "view");
     const rows = await tx<StoredFile[]>`SELECT f.id, f.original_name AS name, f.media_type AS "mediaType", f.size_bytes AS "sizeBytes"
-      FROM submissions s JOIN stored_files f ON f.id = s.file_id JOIN activities a ON a.id = s.activity_id
+      FROM submissions s JOIN stored_files f ON f.id = CASE WHEN ${kind} = 'screenshot' THEN s.screenshot_file_id ELSE s.file_id END JOIN activities a ON a.id = s.activity_id
       JOIN lessons l ON l.id = a.lesson_id JOIN course_modules m ON m.id = l.module_id
       WHERE s.id = ${submissionId} AND a.course_id = ${courseId} AND f.course_id = ${courseId}
         AND (${course.canManage} OR (s.student_id = ${actor.id} AND a.published AND l.published AND m.published

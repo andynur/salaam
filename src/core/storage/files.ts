@@ -62,15 +62,18 @@ export async function withFileCleanup<T>(root: string, upload: Upload | null, ru
   }
 }
 
-export async function fileResponse(root: string, file: StoredFile) {
+// Uploads download by default. `inline` is for a lesson cover image and nothing else: the
+// bytes were verified against an image signature, and the response still carries a sandbox
+// and nosniff so the browser can only treat it as a picture.
+export async function fileResponse(root: string, file: StoredFile, disposition: "attachment" | "inline" = "attachment") {
   const handle = Bun.file(storedFilePath(root, file.id));
   if (!(await handle.exists())) throw new HttpError(404, "FILE_MISSING", "Berkas tidak ditemukan di penyimpanan.");
+  const inline = disposition === "inline" && file.mediaType.startsWith("image/");
   const fallback = file.name.replace(/[^\x20-\x7e]|["\\]/g, "_");
   const encoded = encodeURIComponent(file.name).replace(/['()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
   return new Response(handle, { headers: {
     "Content-Type": file.mediaType === "text/plain" ? "text/plain; charset=utf-8" : file.mediaType,
-    // Always download; never render uploaded content inside the application origin.
-    "Content-Disposition": `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`,
+    "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${fallback}"; filename*=UTF-8''${encoded}`,
     "Content-Security-Policy": "sandbox; default-src 'none'",
   } });
 }

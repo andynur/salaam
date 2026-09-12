@@ -1,10 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
-import { activityInput, archivedInput, assessmentAccommodationInput, deadlineExceptionInput, gradeInput, materialInput, positionInput, publishedInput, returnInput, submissionContentInput } from "../src/modules/learning/input";
+import { activityInput, archivedInput, assessmentAccommodationInput, deadlineExceptionInput, documentInput, gradeInput, materialInput, positionInput, publishedInput, returnInput, shareInput, submissionContentInput } from "../src/modules/learning/input";
 import { jsonObject, multipartInput } from "../src/core/validation";
 import { loginInput } from "../src/core/http";
 import { fileResponse, storedFilePath, uploadInput, withFileCleanup } from "../src/core/storage/files";
-import { maxUploadBytes } from "../src/shared/learning";
+import { maxLessonContent, maxUploadBytes } from "../src/shared/learning";
 
 const storage = `.test-artifacts/learning-unit-${crypto.randomUUID()}`;
 afterAll(() => rm(storage, { recursive: true, force: true }));
@@ -19,6 +19,17 @@ test("materials accept text, HTTP links and file descriptions, never script or c
   expect(() => materialInput({ title: "Berkas", kind: "file", content: "a".repeat(2001) }, true)).toThrow();
   expect(() => materialInput({ title: "Bad", kind: "text", content: "Teks" }, true)).toThrow();
   expect(() => materialInput({ title: "Bad", kind: "script", content: "../../private" })).toThrow();
+});
+test("lesson documents validate the body, the autosave version and the share flag", () => {
+  expect(documentInput({ content: " # Judul\n\nIsi ", version: 1 })).toEqual({ title: null, content: "# Judul\n\nIsi", version: 1 });
+  expect(documentInput({ content: "Isi", version: 3, title: " Bab 1 " }).title).toBe("Bab 1");
+  expect(documentInput({ content: "a".repeat(maxLessonContent), version: 1 }).content).toHaveLength(maxLessonContent);
+  for (const version of [0, -1, 1.5, "1", null, undefined, 2147483647]) expect(() => documentInput({ content: "Isi", version })).toThrow();
+  for (const content of ["", "   ", null, 42, "a".repeat(maxLessonContent + 1)]) expect(() => documentInput({ content, version: 1 })).toThrow();
+  expect(() => documentInput({ content: "Isi", version: 1, title: "" })).toThrow();
+  expect(shareInput({ shared: true })).toBe(true);
+  expect(shareInput({ shared: false })).toBe(false);
+  for (const shared of ["true", 1, null, undefined]) expect(() => shareInput({ shared })).toThrow();
 });
 test("authoring validates order, boolean publishing/archiving and strict server timestamps", () => {
   for (const position of [-1, 10001, 1.5, "1", null]) expect(() => positionInput({ position })).toThrow();

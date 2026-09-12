@@ -4,8 +4,9 @@ import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput, multipartInput } from "./validation";
 import { fileResponse } from "./storage/files";
-import { maxUploadBytes } from "../shared/learning";
+import { maxLessonContent, maxUploadBytes } from "../shared/learning";
 import { archiveContent, completeLesson, courseDetail, courseProgress, listCourses, materialFile, publishContent, saveContent } from "../modules/learning/service";
+import { lessonCover, saveLessonDocument, setLessonCover, setLessonShare } from "../modules/learning/documents";
 import { grantDeadlineException, gradeHistory, gradeSubmission, listSubmissions, returnSubmission, saveActivity, submissionFile, submitActivity } from "../modules/activities/service";
 import { archiveQuestion, exportQuestions, importQuestions, listQuestions, saveQuestion } from "../modules/assessments/questions";
 import { listRubrics, saveAssessment, saveRubric, setAssessmentItems } from "../modules/assessments/service";
@@ -18,6 +19,8 @@ import { accommodationStudentId, grantAssessmentAccommodation } from "../modules
 
 // Room for multipart boundaries and text fields around one maximum-size file.
 export const maxLearningUploadRequestBytes = maxUploadBytes + 256 * 1024;
+// Markdown is multi-byte at worst; allow four bytes per character plus JSON framing.
+export const maxLessonDocumentRequestBytes = maxLessonContent * 4 + 4096;
 
 function page<T>(rows: T[], offset: number) { return { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null }; }
 export function createLearningHandler(db: SQL, storageRoot: string) {
@@ -42,7 +45,9 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           if (resource === "activities" && action === "submissions") return Response.json(page(await listSubmissions(db, actor, courseId, id, pattern, offset), offset));
           if (resource === "submissions" && action === "grades") return Response.json(page(await gradeHistory(db, actor, courseId, id, offset), offset));
           if (resource === "materials" && action === "file") return fileResponse(storageRoot, await materialFile(db, actor, courseId, id));
+          if (resource === "lessons" && action === "cover") return fileResponse(storageRoot, await lessonCover(db, actor, courseId, id), "inline");
           if (resource === "submissions" && action === "file") return fileResponse(storageRoot, await submissionFile(db, actor, courseId, id));
+          if (resource === "submissions" && action === "screenshot") return fileResponse(storageRoot, await submissionFile(db, actor, courseId, id, "screenshot"), "inline");
           if (resource === "assessments" && action === "attempts") return Response.json(page(await listAttempts(db, actor, courseId, id, pattern, offset, requestId), offset));
           if (resource === "assessments" && action === "rubrics") return Response.json(await listRubrics(db, actor, courseId, id));
           if (resource === "attempts" && action === "adjustments") return Response.json(page(await adjustmentHistory(db, actor, courseId, id, offset), offset));
@@ -52,12 +57,16 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
         const id = item && !(resource === "questions" && (item === "import" || item === "export")) ? idField({ id: item }, "id") : undefined;
         const contentSave = (method === "POST" && parts.length === 3) || (method === "PATCH" && parts.length === 4 && id !== undefined);
         const submit = method === "POST" && parts.length === 5 && resource === "activities" && action === "submit";
+        const cover = method === "POST" && parts.length === 5 && resource === "lessons" && action === "cover";
         const itemAction = method === "POST" && parts.length === 5 && id !== undefined;
-        // Only material authoring and assignment submission accept multipart uploads.
+        // Only material authoring, lesson covers, and assignment submission accept uploads.
         const multipart = request.headers.get("content-type")?.split(";")[0]?.trim() === "multipart/form-data";
-        const { body, file } = multipart && ((contentSave && resource === "materials") || submit)
+        // A lesson document body is long-form Markdown, so it gets its own size allowance.
+        const jsonLimit = resource === "questions" && item === "import" ? 1024 * 1024
+          : resource === "lessons" && action === "document" ? maxLessonDocumentRequestBytes : 65536;
+        const { body, file, files } = multipart && ((contentSave && resource === "materials") || submit || cover)
           ? await multipartInput(request, maxLearningUploadRequestBytes)
-          : { body: await jsonObject(request, resource === "questions" && item === "import" ? 1024 * 1024 : 65536), file: null };
+          : { body: await jsonObject(request, jsonLimit), file: null };
         let result: unknown;
         let created = false;
         if (method === "POST" && parts.length === 3 && resource === "publish") {
@@ -70,10 +79,18 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await archiveQuestion(db, actor, courseId, id, body, requestId);
         } else if (method === "POST" && parts.length === 4 && resource === "questions" && item === "import") {
           result = await importQuestions(db, actor, courseId, body, requestId);
+        } else if (itemAction && resource === "lessons" && action === "document") {
+          result = await saveLessonDocument(db, actor, courseId, id, body, requestId);
+        } else if (cover && id) {
+          result = await setLessonCover(db, storageRoot, actor, courseId, id, body, file, requestId);
+        } else if (itemAction && resource === "lessons" && action === "share") {
+          result = await setLessonShare(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "lessons" && action === "complete") {
           result = await completeLesson(db, actor, courseId, id, requestId);
         } else if (submit && id) {
-          result = await submitActivity(db, storageRoot, actor, courseId, id, body, file, requestId);
+          result = multipart
+            ? await submitActivity(db, storageRoot, actor, courseId, id, body, file, files?.screenshot ?? null, requestId)
+            : await submitActivity(db, storageRoot, actor, courseId, id, body, file, requestId);
         } else if (itemAction && resource === "submissions" && action === "grade") {
           result = await gradeSubmission(db, actor, courseId, id, body, requestId);
         } else if (itemAction && resource === "submissions" && action === "return") {

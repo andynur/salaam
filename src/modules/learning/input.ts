@@ -1,4 +1,5 @@
 import { invalid, textField } from "../../core/validation";
+import { maxLessonContent } from "../../shared/learning";
 
 export function positionInput(body: Record<string, unknown>) {
   const value = body.position;
@@ -12,6 +13,20 @@ export function publishedInput(body: Record<string, unknown>) {
 export function archivedInput(body: Record<string, unknown>) {
   if (typeof body.archived !== "boolean") invalid("Status arsip tidak valid.");
   return body.archived;
+}
+// Autosave payload for a lesson document: the Markdown body plus the version the editor
+// last saw. The title travels with it so renaming a document needs no second request.
+export function documentInput(body: Record<string, unknown>) {
+  const version = body.version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1 || version > 2147483646) invalid("Versi dokumen tidak valid. Muat ulang halaman.");
+  const content = body.content;
+  if (typeof content !== "string" || !content.trim() || content.trim().length > maxLessonContent) invalid(`Isi dokumen harus 1–${maxLessonContent} karakter.`);
+  const title = body.title === undefined || body.title === null ? null : textField(body, "title", 150);
+  return { title, content: content.trim(), version };
+}
+export function shareInput(body: Record<string, unknown>) {
+  if (typeof body.shared !== "boolean") invalid("Status berbagi tidak valid.");
+  return body.shared;
 }
 export function materialInput(body: Record<string, unknown>, hasFile = false) {
   const title = textField(body, "title", 150);
@@ -55,6 +70,14 @@ export function submissionContentInput(body: Record<string, unknown>) {
   const content = body.content ?? "";
   if (typeof content !== "string" || content.trim().length > 20000) invalid("Jawaban maksimal 20000 karakter.");
   return content.trim();
+}
+export function submissionFormInput(body: Record<string, unknown>) {
+  const githubUrl = body.githubUrl === undefined || body.githubUrl === "" ? "" : textField(body, "githubUrl", 2000);
+  const jamUrl = body.jamUrl === undefined || body.jamUrl === "" ? "" : textField(body, "jamUrl", 2000);
+  const feedback = body.feedback === undefined || body.feedback === "" ? "" : typeof body.feedback === "string" && body.feedback.trim().length <= 5000 ? body.feedback.trim() : invalid("Saran dan masukan maksimal 5000 karakter.");
+  if (githubUrl) httpUrlInput(githubUrl);
+  if (jamUrl) httpUrlInput(jamUrl);
+  return { githubUrl, jamUrl, feedback };
 }
 export function returnInput(body: Record<string, unknown>) {
   return { reason: textField(body, "reason", 5000) };

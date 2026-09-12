@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 import type { Actor } from "../../core/permissions";
-import { uploadTypes } from "../../shared/learning";
+import { maxLessonContent, uploadTypes } from "../../shared/learning";
 import type { Activity, CourseDetail, CourseModule, Grade, LearningCourse, Lesson, Material, Page, Progress, StoredFile, Submission } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Icon } from "../components/icons";
 import { Field, MutationForm, Pager, Search, Status, chosenFile, deviceTimezone, errorMessage as message, formatDateTime as date, fromLocalInput, learningApi as base, toLocalInput, useData } from "../components/learning";
+import { DocumentEditor, LessonCover, LessonShare, Markdown } from "../components/editor";
 import { LessonAssessments, QuestionBank } from "./AssessmentPanel";
 import { AttemptRunner } from "./AttemptRunner";
 import { LessonChallenges } from "./ChallengePanel";
@@ -95,14 +96,20 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
           {!lessons.some(item => item.moduleId === module.id) && <p className="outline-empty">Belum ada lesson.</p>}
         </section>)}</Card>
         <div className="lesson-workspace">{!lesson ? <Card><EmptyState title="Belum ada lesson" description="Lesson yang tersedia akan tampil di sini." /></Card> : <>
-          <Card className="lesson-card"><div className="learning-row"><h2>{lesson.title}</h2>{course.canManage && <Status published={lesson.published} />}</div>{course.canManage && <div className="learning-actions"><Button className="button-secondary button-small" onClick={() => setEditor({ resource: "lessons", parentId: lesson.moduleId, value: lesson })}>Edit lesson</Button>{publishButton(`lessons/${lesson.id}`, lesson.published, lesson.title)}{archiveButton(`lessons/${lesson.id}`, lesson.title)}</div>}<p className="learning-prose">{lesson.content}</p>
+          <Card className="lesson-card lesson-document">
+            <LessonCover courseId={courseId} lesson={lesson} canManage={course.canManage} onExpired={onExpired} changed={changed} />
+            {course.canManage ? <>
+              <div className="learning-row"><Status published={lesson.published} /><div className="learning-actions">{publishButton(`lessons/${lesson.id}`, lesson.published, lesson.title)}<Button className="button-secondary button-small" onClick={() => setEditor({ resource: "lessons", parentId: lesson.moduleId, value: lesson })}>Pengaturan lesson</Button>{archiveButton(`lessons/${lesson.id}`, lesson.title)}</div></div>
+              <DocumentEditor key={lesson.id} courseId={courseId} lesson={lesson} onExpired={onExpired} renamed={changed} />
+              <LessonShare courseId={courseId} lesson={lesson} onExpired={onExpired} changed={changed} />
+            </> : <><h2>{lesson.title}</h2><Markdown source={lesson.content} /></>}
             {data.canParticipate && <MutationForm path={`${base}/${courseId}/lessons/${lesson.id}/complete`} label={lesson.completed ? "✓ Lesson selesai" : "Tandai lesson selesai"} disabled={lesson.completed} onExpired={onExpired} saved={changed} body={() => ({})} />}
           </Card>
           <Card className="lesson-card"><div className="learning-row"><h2>Materi pendukung</h2>{course.canManage && <Button className="button-secondary button-small" onClick={() => setEditor({ resource: "materials", parentId: lesson.id })}>Tambah materi</Button>}</div>
             {materials.filter(item => item.lessonId === lesson.id).map(material => <article className="material-item" key={material.id}><div className="learning-row"><h3>{material.title}</h3>{course.canManage && <div className="learning-actions"><Button className="button-secondary button-small" onClick={() => setEditor({ resource: "materials", parentId: lesson.id, value: material })}>Edit materi</Button>{archiveButton(`materials/${material.id}`, material.title)}</div>}</div>
               {material.kind === "link" ? <a className="material-link" href={material.content} target="_blank" rel="noopener noreferrer">Buka {material.title} ↗</a>
-                : material.kind === "file" && material.file ? <>{material.content && <p className="learning-prose">{material.content}</p>}<FileLink href={`${base}/${courseId}/materials/${material.id}/file`} file={material.file} /></>
-                : <p className="learning-prose">{material.content}</p>}</article>)}
+                : material.kind === "file" && material.file ? <>{material.content && <Markdown source={material.content} />}<FileLink href={`${base}/${courseId}/materials/${material.id}/file`} file={material.file} /></>
+                : <Markdown source={material.content} />}</article>)}
             {!materials.some(item => item.lessonId === lesson.id) && <p className="learning-muted">Belum ada materi pendukung.</p>}
           </Card>
           <Card className="lesson-card"><div className="learning-row"><h2>Tugas</h2>{course.canManage && <Button className="button-secondary button-small" onClick={() => setEditor({ resource: "activities", parentId: lesson.id })}>Tambah tugas</Button>}</div>
@@ -145,7 +152,9 @@ function ContentEditor({ editor, modules, courseId, onExpired, close, saved }: {
       <Field name="title" label="Judul" value={value?.title} />
       {editor.resource === "lessons" && <label className="learning-field"><span>Modul</span><select name="moduleId" className="input" defaultValue={editor.value?.moduleId ?? editor.parentId}>{modules.map(module => <option key={module.id} value={module.id}>{module.position}. {module.title}</option>)}</select></label>}
       {(editor.resource === "modules" || editor.resource === "lessons") && <Field name="position" label="Urutan" type="number" value={editor.value?.position ?? 1} min={0} max={10000} step="1" />}
-      {editor.resource === "lessons" && <Field name="content" label="Isi lesson" area max={20000} value={editor.value?.content} />}
+      {editor.resource === "lessons" && (value
+        ? <p className="learning-muted field-wide">Isi dokumen diedit langsung di halaman lesson dan tersimpan otomatis.</p>
+        : <Field name="content" label="Isi lesson" area max={maxLessonContent} value="" />)}
       {editor.resource === "materials" && <>
         <label className="learning-field"><span>Jenis materi</span><select name="kind" className="input" value={kind} onChange={event => setKind(event.target.value as Material["kind"])}><option value="text">Teks</option><option value="link">Tautan HTTP/HTTPS</option><option value="file">Berkas</option></select></label>
         {kind === "file" ? <>
@@ -162,9 +171,12 @@ function StudentSubmission({ activity, courseId, timezone, onExpired, saved }: C
   const submission = activity.submission;
   if (submission && submission.status === "submitted") return <div className="submitted-answer"><p className="badge badge-success">✓ Dikumpulkan {date(submission.submittedAt, timezone)}</p>{submission.content && <p className="learning-prose">{submission.content}</p>}{submission.file && <FileLink href={`${base}/${courseId}/submissions/${submission.id}/file`} file={submission.file} />}{submission.grade ? <><h4>Nilai: {submission.grade.score} / 100</h4><p className="learning-prose">{submission.grade.feedback}</p><History courseId={courseId} submissionId={submission.id} timezone={timezone} onExpired={onExpired} /></> : <p className="learning-muted">Menunggu penilaian guru.</p>}</div>;
   if (submission) return <div className="submitted-answer"><p className="badge badge-warning">Perlu revisi</p><p className="learning-prose">{submission.returnReason}</p><MutationForm path={`${base}/${courseId}/activities/${activity.id}/submit`} label="Kirim revisi" onExpired={onExpired} saved={saved} body={form => chosenFile(form) ? form : { content: form.get("content") }}><Field name="content" label="Jawaban revisi" area required={false} max={20000} value={submission.content} /><label className="learning-field field-wide"><span>Lampiran revisi (opsional)</span><input className="input" type="file" name="file" accept={accept} /></label><label className="submission-confirm field-wide"><input type="checkbox" required /> Saya sudah memeriksa revisi jawaban.</label></MutationForm></div>;
-  return <MutationForm path={`${base}/${courseId}/activities/${activity.id}/submit`} label="Kumpulkan jawaban" onExpired={onExpired} saved={saved} body={form => chosenFile(form) ? form : { content: form.get("content") }}>
-    <Field name="content" label="Jawaban Anda (teks atau tautan karya)" area required={false} max={20000} />
-    <label className="learning-field field-wide"><span>Lampiran berkas (opsional, maks. 10 MB)</span><input className="input" type="file" name="file" accept={accept} /></label>
+  return <MutationForm path={`${base}/${courseId}/activities/${activity.id}/submit`} label="Kumpulkan tugas" onExpired={onExpired} saved={saved} body={form => form}>
+    <label className="learning-field"><span>File tugas (.zip) *</span><input className="input" type="file" name="file" accept=".zip" required /></label>
+    <label className="learning-field"><span>Screenshot hasil tugas *</span><input className="input" type="file" name="screenshot" accept=".png,.jpg,.jpeg,.webp" required /></label>
+    <Field name="githubUrl" label="Link repository GitHub (opsional)" required={false} max={2000} />
+    <Field name="jamUrl" label="Link rekaman Jam.dev (opsional)" required={false} max={2000} />
+    <Field name="feedback" label="Saran dan masukan terkait tugas / materi / kelas" area required={false} max={5000} />
     <label className="submission-confirm field-wide"><input type="checkbox" required /> Saya sudah memeriksa jawaban dan lampiran. Jawaban yang dikumpulkan tidak dapat diganti.</label>
   </MutationForm>;
 }
