@@ -3,11 +3,12 @@ import { taskStatuses, type ProjectDetail, type ProjectTask, type ProjectTaskCom
 import { api, ApiError } from "../lib/api";
 import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Icon } from "../components/icons";
-import { Field, errorMessage, formatDateTime, fromLocalInput, toLocalInput, useData } from "../components/learning";
+import { Field, MutationForm, errorMessage, formatDateTime, fromLocalInput, toLocalInput, useData } from "../components/learning";
+import { uploadTypes } from "../../shared/learning";
 import { AvatarStack, MemberPicker, ProjectStatusBadge, initials, jsonRequest, projectsApi, taskStatusLabels } from "../components/projects";
 
 type Run = (path: string, body: unknown, done: string, method?: string) => Promise<boolean>;
-type Common = { data: ProjectDetail; pending: boolean; run: Run; timezone: string; onExpired: () => void };
+type Common = { data: ProjectDetail; pending: boolean; run: Run; reload: () => Promise<void>; timezone: string; onExpired: () => void };
 
 // Keeps the current board on screen while reloading, so moves never flash a spinner.
 function useProject(projectId: string, onExpired: () => void) {
@@ -76,7 +77,7 @@ export function ProjectDetailPage({ projectId, timezone, onExpired }: { projectI
       <span><Icon name="check" />{done}/{data.tasks.length} kartu selesai</span>
     </div>
     <nav className="tabs" aria-label="Halaman proyek">{tabButton("board", "Board")}{tabButton("overview", `Ringkasan & review${data.reviews.length ? ` (${data.reviews.length})` : ""}`)}</nav>
-    {tab === "board" ? <Board data={data} pending={pending} run={run} timezone={timezone} onExpired={onExpired} /> : <Overview data={data} pending={pending} run={run} timezone={timezone} onExpired={onExpired} />}
+    {tab === "board" ? <Board data={data} pending={pending} run={run} reload={reload} timezone={timezone} onExpired={onExpired} /> : <Overview data={data} pending={pending} run={run} reload={reload} timezone={timezone} onExpired={onExpired} />}
   </>;
 }
 
@@ -203,25 +204,23 @@ function TaskEditor({ task, data, pending, run, timezone, onExpired, close }: { 
   </Card></div>;
 }
 
-function Overview({ data, pending, run, timezone, onExpired }: Common) {
+function Overview({ data, pending, run, reload, timezone, onExpired }: Common) {
   const { project, challenge } = data;
+  const accept = Object.keys(uploadTypes).map(extension => `.${extension}`).join(",");
   const [editingMembers, setEditingMembers] = useState(false);
-  function saveDetails(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    void run("", { title: form.get("title"), summary: form.get("summary"), deliverableUrl: form.get("deliverableUrl") }, "Detail proyek disimpan.", "PATCH");
-  }
   return <div className="project-layout">
     <div className="project-main">
       <Card className="lesson-card"><h2>Detail proyek</h2>
-        {data.canEdit ? <form className="learning-form" onSubmit={saveDetails}><fieldset className="admin-fields" disabled={pending}>
+        {data.canEdit ? <MutationForm path={`${projectsApi}/${project.id}`} method="PATCH" label="Simpan detail" onExpired={onExpired} saved={() => void reload()} body={form => form} disabled={pending}>
           <Field name="title" label="Judul proyek" value={project.title} />
           <Field name="deliverableUrl" type="url" label="Tautan hasil karya (opsional)" required={false} max={2000} value={project.deliverableUrl ?? ""} />
           <Field name="summary" label="Ringkasan hasil (wajib sebelum dikirim)" area required={false} max={5000} value={project.summary} />
-          <div className="form-actions"><Button type="submit">Simpan detail</Button></div>
-        </fieldset></form>
+          <label className="learning-field"><span>Unggah berkas hasil karya (opsional)</span><input className="input" name="file" type="file" accept={accept} /></label>
+          {project.deliverableFile && <a className="material-link" href={`${projectsApi}/${project.id}/file`}>Unduh {project.deliverableFile.name} ↓</a>}
+        </MutationForm>
           : <>{project.summary ? <p className="learning-prose">{project.summary}</p> : <p className="learning-muted">Belum ada ringkasan hasil.</p>}
-            {project.deliverableUrl && <a className="material-link" href={project.deliverableUrl} target="_blank" rel="noopener noreferrer">Lihat hasil karya<Icon name="link" /></a>}</>}
+            {project.deliverableUrl && <a className="material-link" href={project.deliverableUrl} target="_blank" rel="noopener noreferrer">Lihat hasil karya<Icon name="link" /></a>}
+            {project.deliverableFile && <a className="material-link" href={`${projectsApi}/${project.id}/file`}>Unduh {project.deliverableFile.name} ↓</a>}</>}
       </Card>
       <Card className="lesson-card"><h2>Instruksi challenge</h2><p className="learning-muted">{challenge.dueAt ? `Tenggat pengiriman ${formatDateTime(challenge.dueAt, timezone)} (${timezone})` : "Tanpa tenggat"}</p><p className="learning-prose">{challenge.instructions}</p></Card>
       <Card className="lesson-card"><h2>Riwayat review</h2>

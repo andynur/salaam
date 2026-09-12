@@ -26,7 +26,7 @@ const db = connectDatabase(config.databaseUrl);
 const auth = createAuthService(db, config);
 const realtime = createAttendanceRealtime(db, auth, config);
 const stopNotifications = startNotificationWorker(db);
-const handle = createHttpHandler(config, auth, () => checkDatabase(db), { calendar: createCalendarHandler(db), attendance: createAttendanceHandler(db, realtime.changed), foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db), gamification: createGamificationHandler(db), reports: createReportingHandler(db, config.timezone), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
+const handle = createHttpHandler(config, auth, () => checkDatabase(db), { calendar: createCalendarHandler(db), attendance: createAttendanceHandler(db, realtime.changed), foundation: createFoundationHandler(db), learning: createLearningHandler(db, config.storageRoot), projects: createProjectHandler(db, config.storageRoot), gamification: createGamificationHandler(db), reports: createReportingHandler(db, config.timezone), dashboard: async actor => ({ ...(await academicSummary(db, actor, config.timezone)), tasks: await learningTasks(db, actor), growth: await studentGrowthCard(db, actor) }) });
 // Bun 1.4.2 resolves prebuilt HTML assets from cwd. Resolve config/storage first,
 // then use the bundle directory; development HTML imports do not need this.
 if (index.files) process.chdir(import.meta.dir);

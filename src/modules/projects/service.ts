@@ -4,6 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { invalid, textField } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
+import { recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
 import { awardProjectApproval } from "../gamification/awards";
 import { courseAccess, notFound } from "../learning/access";
 import { memberIdsInput, projectInput, reviewInput, showcaseInput } from "./input";
@@ -126,13 +127,14 @@ export async function listProjects(db: SQL, actor: Actor, pattern: string, offse
 export async function projectDetail(db: SQL, actor: Actor, projectId: string): Promise<ProjectDetail> {
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     const access = await projectAccess(tx, actor, projectId);
-    const row = (await tx<(ProjectDetail["project"] & Pick<ProjectDetail, "course" | "challenge">)[]>`SELECT p.id, p.title, p.summary, p.deliverable_url AS "deliverableUrl", p.status,
+    const row = (await tx<(ProjectDetail["project"] & Pick<ProjectDetail, "course" | "challenge">)[]>`SELECT p.id, p.title, p.summary, p.deliverable_url AS "deliverableUrl",
+        CASE WHEN f.id IS NULL THEN NULL ELSE json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) END AS "deliverableFile", p.status,
         p.first_submitted_at::text AS "firstSubmittedAt", p.submitted_at::text AS "submittedAt", p.showcased_at::text AS "showcasedAt", p.updated_at::text AS "updatedAt",
         json_build_object('id', c.id, 'name', c.name, 'className', cl.name) AS course,
         json_build_object('id', a.id, 'lessonId', a.lesson_id, 'title', a.title, 'instructions', a.instructions, 'dueAt', a.due_at,
           'closed', a.due_at IS NOT NULL AND clock_timestamp() >= a.due_at, 'teamMode', s.team_mode, 'maxTeamSize', s.max_team_size) AS challenge
       FROM projects p JOIN activities a ON a.id = p.activity_id JOIN challenge_settings s ON s.activity_id = a.id
-      JOIN courses c ON c.id = p.course_id JOIN classes cl ON cl.id = c.class_id
+      JOIN courses c ON c.id = p.course_id JOIN classes cl ON cl.id = c.class_id LEFT JOIN stored_files f ON f.id = p.deliverable_file_id AND f.course_id = p.course_id
       WHERE p.id = ${projectId}`)[0]!;
     const { course, challenge, ...project } = row;
     const members = await tx<ProjectMember[]>`SELECT u.id, u.display_name AS name FROM project_members pm JOIN users u ON u.id = pm.student_id
@@ -149,14 +151,32 @@ export async function projectDetail(db: SQL, actor: Actor, projectId: string): P
   });
 }
 
-export async function updateProject(db: SQL, actor: Actor, projectId: string, body: Record<string, unknown>, requestId: string) {
+export async function updateProject(db: SQL, storageRoot: string, actor: Actor, projectId: string, body: Record<string, unknown>, file: File | null, requestId: string) {
   const input = projectInput(body);
-  return db.begin(async tx => {
-    requireEditable(await projectAccess(tx, actor, projectId, true));
-    await tx`UPDATE projects SET title = ${input.title}, summary = ${input.summary}, deliverable_url = ${input.deliverableUrl}, updated_at = clock_timestamp()
-      WHERE id = ${projectId}`;
+  if (file && input.deliverableUrl) invalid("Pilih tautan atau berkas hasil karya, bukan keduanya.");
+  const upload = file ? await uploadInput(file) : null;
+  return withFileCleanup(storageRoot, upload, store => db.begin(async tx => {
+    const access = await projectAccess(tx, actor, projectId, true);
+    requireEditable(access);
+    const current = (await tx<{ fileId: string | null }[]>`SELECT deliverable_file_id AS "fileId" FROM projects WHERE id = ${projectId} FOR UPDATE`)[0];
+    if (!current) notFound();
+    const fileId = upload?.id ?? (Object.hasOwn(body, "deliverableUrl") ? null : current.fileId);
+    if (upload) await recordStoredFile(tx, access.courseId, actor.id, upload);
+    await tx`UPDATE projects SET title = ${input.title}, summary = ${input.summary}, deliverable_url = ${upload ? null : input.deliverableUrl},
+      deliverable_file_id = ${fileId === undefined ? null : fileId}, updated_at = clock_timestamp() WHERE id = ${projectId}`;
     await recordAudit(tx, actor.id, "project.updated", "projects", projectId, requestId);
+    await store();
     return { id: projectId };
+  }));
+}
+
+export async function projectFile(db: SQL, actor: Actor, projectId: string): Promise<import("../../shared/learning").StoredFile> {
+  return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
+    await projectAccess(tx, actor, projectId);
+    const file = (await tx<import("../../shared/learning").StoredFile[]>`SELECT f.id, f.original_name AS name, f.media_type AS "mediaType", f.size_bytes AS "sizeBytes"
+      FROM projects p JOIN stored_files f ON f.id = p.deliverable_file_id AND f.course_id = p.course_id WHERE p.id = ${projectId}`)[0];
+    if (!file) notFound();
+    return file;
   });
 }
 

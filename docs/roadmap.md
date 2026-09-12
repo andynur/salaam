@@ -33,6 +33,7 @@ Coding agents follow skill `deliver-phase`.
 | 23 | Question statistics | Delivered — [record](phases/23-question-statistics.md) |
 | 24 | Project task metadata | Delivered — [record](phases/24-project-task-metadata.md) |
 | 25 | Project task comments | Delivered — [record](phases/25-project-task-comments.md) |
+| 26 | Project file deliverables | In progress — [record](phases/26-project-file-deliverables.md) |
 
 ## Delivered
 
@@ -159,7 +160,7 @@ Boundaries section has the details.
 - **Phase 3:** proctoring; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns and attachments on cards; realtime board
-  sync; file deliverables; rubrics, peer review, and
+  sync; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
   penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;

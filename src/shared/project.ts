@@ -23,7 +23,7 @@ export interface ProjectTask { id: string; title: string; description: string; s
 export interface ProjectTaskComment { id: string; taskId: string; body: string; authorId: string; authorName: string; createdAt: string }
 export interface ProjectReview { id: string; decision: ReviewDecision; score: number | null; feedback: string; reviewerName: string; createdAt: string }
 export interface ProjectDetail {
-  project: { id: string; title: string; summary: string; deliverableUrl: string | null; status: ProjectStatus; firstSubmittedAt: string | null; submittedAt: string | null; showcasedAt: string | null; updatedAt: string };
+  project: { id: string; title: string; summary: string; deliverableUrl: string | null; deliverableFile: StoredFile | null; status: ProjectStatus; firstSubmittedAt: string | null; submittedAt: string | null; showcasedAt: string | null; updatedAt: string };
   course: { id: string; name: string; className: string };
   challenge: { id: string; lessonId: string; title: string; instructions: string; dueAt: string | null; closed: boolean; teamMode: TeamMode; maxTeamSize: number };
   members: ProjectMember[]; tasks: ProjectTask[]; reviews: ProjectReview[];
@@ -32,3 +32,4 @@ export interface ProjectDetail {
 }
 export interface ShowcaseItem { id: string; title: string; summary: string; deliverableUrl: string | null; courseName: string; className: string; challengeTitle: string; members: ProjectMember[]; showcasedAt: string; canOpen: boolean }
 export interface PortfolioEntry { id: string; projectId: string; projectTitle: string; summary: string; deliverableUrl: string | null; courseName: string; challengeTitle: string; reflection: string; score: number | null; members: ProjectMember[]; updatedAt: string; canOpen: boolean }
+import type { StoredFile } from "./learning";

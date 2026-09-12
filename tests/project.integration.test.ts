@@ -32,6 +32,12 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
   function request(path: string, cookie: string, body?: unknown, method = body === undefined ? "GET" : "POST") {
     return handle(new Request(`${config.baseUrl}${path}`, { method, headers: { cookie, origin: config.baseUrl, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), crypto.randomUUID());
   }
+  function uploadRequest(path: string, cookie: string, fields: Record<string, string>, file: File) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    form.set("file", file);
+    return handle(new Request(`${config.baseUrl}${path}`, { method: "PATCH", headers: { cookie, origin: config.baseUrl }, body: form }), crypto.randomUUID());
+  }
   const course = (courseId: string, suffix = "") => `/api/learning/courses/${courseId}${suffix ? `/${suffix}` : ""}`;
   const project = (suffix = "") => `/api/projects${suffix ? `/${suffix}` : ""}`;
   async function json<T = Record<string, unknown>>(response: Promise<Response>, status = 200): Promise<T> {
@@ -163,6 +169,15 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
     expect(await json<ProjectTaskComment[]>(request(project(`${projectId}/tasks/${one.id}/comments`), peer.cookie))).toEqual([comment]);
     expect((await request(project(`${projectId}/tasks/${one.id}/comments`), third.cookie)).status).toBe(404);
     expect((await request(project(`${projectId}/tasks/${one.id}/comments`), student.cookie, { body: " " })).status).toBe(400);
+    const bytes = new TextEncoder().encode("%PDF-1.7\nproject deliverable");
+    expect((await uploadRequest(project(projectId), student.cookie, { title: "Riset pengguna", summary: "Dengan berkas." }, new File([bytes], "hasil.pdf", { type: "application/pdf" }))).status).toBe(200);
+    const uploaded = await detail(projectId);
+    expect(uploaded.project).toMatchObject({ deliverableUrl: null, deliverableFile: { name: "hasil.pdf", mediaType: "application/pdf", sizeBytes: bytes.byteLength } });
+    const download = await request(project(`${projectId}/file`), student.cookie);
+    expect(download.status).toBe(200);
+    expect(download.headers.get("content-disposition")).toStartWith("attachment;");
+    expect(new Uint8Array(await download.arrayBuffer())).toEqual(bytes);
+    expect((await request(project(`${projectId}/file`), third.cookie)).status).toBe(404);
     expect((await request(project(`${projectId}/tasks`), student.cookie, { title: "x", assigneeId: third.id })).status).toBe(400);
     const move = (taskId: string, status: TaskStatus, position: number, version: number, cookie = student.cookie) => request(project(`${projectId}/tasks/${taskId}/move`), cookie, { status, position, version });
     expect(await json<unknown>(move(two.id, "in_progress", 0, 1))).toEqual({ id: two.id, version: 2, status: "in_progress", position: 0 });
