@@ -3,7 +3,7 @@ import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { calendarEntries, createEvent, eventDetail, updateEvent } from "../modules/calendar/service";
+import { academicCalendar, calendarEntries, createEvent, eventDetail, updateEvent } from "../modules/calendar/service";
 import { inbox, markRead, preferences, savePreferences } from "../modules/calendar/notifications";
 export function createCalendarHandler(db: SQL) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
@@ -11,6 +11,7 @@ export function createCalendarHandler(db: SQL) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
     try {
       if (method === "GET") {
+        if (path === "/api/calendar/academic") return Response.json(await academicCalendar(db, actor, url));
         if (path === "/api/calendar") return Response.json(await calendarEntries(db, actor, url));
         if (path === "/api/notifications") return Response.json(await inbox(db, actor, listInput(url).offset, url.searchParams.get("unread") === "true"));
         if (path === "/api/notifications/preferences") return Response.json(await preferences(db, actor));

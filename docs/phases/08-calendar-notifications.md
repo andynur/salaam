@@ -61,6 +61,10 @@ approved the [scope proposal](08-calendar-notifications-proposal.md) before impl
 - **UI:** calendar agenda, academic event detail/editor, archive confirmation, personal
   inbox with unread filter and delivery status, preference form, navigation and dashboard
   shortcuts. Existing loading, empty, error/retry, pending, and form primitives are reused.
+- **Annual academic calendar:** migration `0027_academic_calendar.sql` adds scoped date-range
+  events for one academic year. The Calendar screen now separates the live learning agenda
+  from a 12-month academic view with semester grouping, event tooltips, and administrator
+  filters for academic year and class. Demo seeding includes the 2026/2027 sample schedule.
 
 ## API additions
 
@@ -69,6 +73,7 @@ Mutations require the application Origin. Out-of-scope sources return 404.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/calendar?from=…&to=…&q=…&offset=…` | Scoped live agenda; exclusive upper date bound |
+| GET | `/api/calendar/academic?yearId=…&classId=…` | Scoped annual academic calendar and admin filter options |
 | GET | `/api/calendar/events/:id` | Current academic event detail |
 | POST | `/api/calendar/events` | Create event with `requestKey` |
 | PATCH | `/api/calendar/events/:id` | Versioned edit, or `action: "archive"` |

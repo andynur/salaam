@@ -12,6 +12,17 @@ export interface NotificationItem {
   id: string; kind: "reminder" | "level_up" | "checkin"; status: "pending" | "delivered" | "suppressed";
   title: string; href: string; scheduledAt: string; deliveredAt: string | null; readAt: string | null;
 }
+export type AcademicCalendarCategory = "academic" | "holiday" | "assessment" | "student" | "learning";
+export interface AcademicCalendarYear { id: string; name: string; startsOn: string; endsOn: string }
+export interface AcademicCalendarClass { id: string; name: string }
+export interface AcademicCalendarEvent {
+  id: string; academicYearId: string; classId: string | null; className: string | null;
+  title: string; description: string; category: AcademicCalendarCategory; startsOn: string; endsOn: string;
+}
+export interface AcademicCalendarData {
+  year: AcademicCalendarYear; years: AcademicCalendarYear[]; classes: AcademicCalendarClass[];
+  events: AcademicCalendarEvent[]; canManage: boolean;
+}
 export const calendarLabels: Record<CalendarKind, string> = {
   event: "Acara akademik", deadline: "Batas pengumpulan", assessment_open: "Asesmen dibuka", assessment_close: "Asesmen ditutup", session: "Sesi kelas",
 };
