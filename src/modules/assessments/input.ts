@@ -6,12 +6,13 @@ const twoDecimals = (value: number) => Math.abs(value * 100 - Math.round(value *
 
 export function questionInput(body: Record<string, unknown>) {
   const type = body.type;
-  if (type !== "single_choice" && type !== "multiple_choice" && type !== "true_false") invalid("Pilih jenis soal: pilihan ganda (satu atau banyak jawaban) atau benar/salah.");
+  if (type !== "single_choice" && type !== "multiple_choice" && type !== "true_false" && type !== "short_answer" && type !== "essay") invalid("Pilih jenis soal yang valid.");
   const prompt = textField(body, "prompt", 5000);
   const explanation = body.explanation ?? "";
   if (typeof explanation !== "string" || explanation.trim().length > 2000) invalid("Pembahasan maksimal 2000 karakter.");
   let options: QuestionOption[];
-  if (type === "true_false") options = [{ id: "a", text: "Benar" }, { id: "b", text: "Salah" }];
+  if (type === "short_answer" || type === "essay") options = [];
+  else if (type === "true_false") options = [{ id: "a", text: "Benar" }, { id: "b", text: "Salah" }];
   else {
     const values = body.options;
     if (!Array.isArray(values) || values.length < 2 || values.length > 10) invalid("Soal pilihan ganda membutuhkan 2–10 opsi.");
@@ -22,6 +23,7 @@ export function questionInput(body: Record<string, unknown>) {
     });
     if (new Set(options.map(option => option.text.toLowerCase())).size !== options.length) invalid("Setiap opsi harus berbeda.");
   }
+  if (type === "short_answer" || type === "essay") return { type: type as QuestionType, prompt, options, correct: [], explanation: explanation.trim() };
   const chosen = body.correct;
   if (!Array.isArray(chosen) || chosen.some(value => typeof value !== "string" || !options.some(option => option.id === value))) invalid("Pilih jawaban benar dari opsi yang tersedia.");
   const correct = [...new Set(chosen as string[])].sort();
@@ -74,14 +76,21 @@ export function itemsInput(body: Record<string, unknown>) {
 }
 export function answerInput(body: Record<string, unknown>) {
   const questionId = idField(body, "questionId");
-  const selected = body.selected;
+  const selected = body.selected ?? [];
   if (!Array.isArray(selected) || selected.length > 10 || selected.some(value => typeof value !== "string" || !optionIds.includes(value))) invalid("Jawaban tidak valid.");
+  const answerText = body.answerText ?? null;
+  if (answerText !== null && (typeof answerText !== "string" || answerText.trim().length > 20000)) invalid("Jawaban tertulis maksimal 20000 karakter.");
   const revision = body.revision;
   if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 1 || revision > 1000000) invalid("Revisi jawaban tidak valid.");
-  return { questionId, selected: [...new Set(selected as string[])].sort(), revision };
+  return { questionId, selected: [...new Set(selected as string[])].sort(), answerText: typeof answerText === "string" ? answerText.trim() : null, revision };
 }
 export function adjustmentInput(body: Record<string, unknown>) {
   const score = body.score;
   if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || !twoDecimals(score)) invalid("Nilai harus 0 atau lebih, maksimal dua desimal.");
   return { score, reason: textField(body, "reason", 2000) };
+}
+export function manualGradeInput(body: Record<string, unknown>) {
+  const score = body.score;
+  if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || !twoDecimals(score)) invalid("Nilai harus 0 atau lebih, maksimal dua desimal.");
+  return { score, feedback: textField(body, "feedback", 5000) };
 }

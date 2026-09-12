@@ -73,6 +73,7 @@ measured operational requirement exists.
 | `0002_academic_foundation` | `user_profiles`, `academic_years`, `terms`, `classes`, `class_members`, `subjects`, `courses`, `teaching_assignments` |
 | `0003_learning_core` | `course_modules`, `lessons`, `stored_files`, `lesson_materials`, `activities`, `submissions`, `submission_grades`, `lesson_completions` |
 | `0013_submission_lifecycle` | submission revision/status fields, `submission_returns`, `submission_deadline_exceptions` |
+| `0014_assessment_written_answers` | written question types, `attempt_answers.answer_text`, `attempt_question_grades` |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |

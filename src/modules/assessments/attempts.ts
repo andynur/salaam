@@ -19,7 +19,7 @@ function shuffled<T>(items: T[]) {
 
 // Choice answers are all-or-nothing: the sorted selection must equal the sorted key.
 async function finalizeAttempt(tx: SQL, attemptId: string, reason: "student" | "expired", requestId: string) {
-  await tx`UPDATE attempt_answers ans SET awarded = CASE WHEN ans.selected = q.correct THEN q.points ELSE 0 END
+  await tx`UPDATE attempt_answers ans SET awarded = CASE WHEN q.type IN ('short_answer', 'essay') THEN NULL WHEN ans.selected = q.correct THEN q.points ELSE 0 END
     FROM attempt_questions q WHERE q.attempt_id = ans.attempt_id AND q.question_id = ans.question_id AND ans.attempt_id = ${attemptId}`;
   const finalized = await tx<{ studentId: string; activityId: string; courseId: string }[]>`UPDATE attempts SET submission_reason = ${reason},
       submitted_at = CASE WHEN ${reason} = 'expired' THEN deadline_at ELSE clock_timestamp() END,
@@ -114,7 +114,8 @@ export async function attemptDetail(db: SQL, actor: Actor, courseId: string, att
     const resultsVisible = course.canManage || (submitted && (row.visibility === "after_submit" || (row.visibility === "after_close" && row.closed)));
     const scoreVisible = resultsVisible || (submitted && row.visibility === "score_only");
     const questions = await tx<AttemptQuestion[]>`SELECT q.question_id AS "questionId", q.position, q.type, q.prompt, q.options, q.points::float8 AS points,
-        q.correct, q.explanation, COALESCE(ans.selected, '[]'::jsonb) AS selected, COALESCE(ans.revision, 0) AS revision, ans.awarded::float8 AS awarded
+        q.correct, q.explanation, COALESCE(ans.selected, '[]'::jsonb) AS selected, ans.answer_text AS "answerText", COALESCE(ans.revision, 0) AS revision, ans.awarded::float8 AS awarded,
+        (SELECT json_build_object('id', g.id, 'score', g.score, 'feedback', g.feedback, 'createdAt', g.created_at::text) FROM attempt_question_grades g WHERE g.attempt_id = q.attempt_id AND g.question_id = q.question_id ORDER BY g.created_at DESC, g.id DESC LIMIT 1) AS "manualGrade"
       FROM attempt_questions q LEFT JOIN attempt_answers ans ON ans.attempt_id = q.attempt_id AND ans.question_id = q.question_id
       WHERE q.attempt_id = ${attemptId} ORDER BY q.position`;
     const { autoScore, adjustedScore, visibility, closed, visible, ...summary } = row;
@@ -123,7 +124,7 @@ export async function attemptDetail(db: SQL, actor: Actor, courseId: string, att
       score: scoreVisible ? adjustedScore ?? autoScore : null,
       questions: questions.map(question => resultsVisible
         ? { ...question, awarded: submitted ? question.awarded ?? 0 : null }
-        : { ...question, correct: null, explanation: null, awarded: null }),
+        : { ...question, correct: null, explanation: null, awarded: null, manualGrade: null }),
     };
   });
 }
@@ -149,15 +150,17 @@ export async function saveAnswer(db: SQL, actor: Actor, courseId: string, attemp
     const question = (await tx<{ type: QuestionType; options: QuestionOption[] }[]>`SELECT type, options FROM attempt_questions
       WHERE attempt_id = ${attemptId} AND question_id = ${input.questionId}`)[0];
     if (!question) notFound();
-    if (input.selected.some(id => !question.options.some(option => option.id === id)) || (question.type !== "multiple_choice" && input.selected.length > 1)) {
+    if (question.type === "short_answer" || question.type === "essay") {
+      if (input.selected.length || input.answerText === null) invalid("Jawaban tertulis tidak valid.");
+    } else if (input.answerText !== null || input.selected.some(id => !question.options.some(option => option.id === id)) || (question.type !== "multiple_choice" && input.selected.length > 1)) {
       invalid("Pilihan jawaban tidak sesuai dengan soal.");
     }
     // Autosave only moves forward; an older revision arriving late is ignored.
-    await tx`INSERT INTO attempt_answers (attempt_id, question_id, selected, revision) VALUES (${attemptId}, ${input.questionId}, ${JSON.stringify(input.selected)}::text::jsonb, ${input.revision})
-      ON CONFLICT (attempt_id, question_id) DO UPDATE SET selected = EXCLUDED.selected, revision = EXCLUDED.revision, saved_at = clock_timestamp()
+    await tx`INSERT INTO attempt_answers (attempt_id, question_id, selected, answer_text, revision) VALUES (${attemptId}, ${input.questionId}, ${JSON.stringify(input.selected)}::text::jsonb, ${input.answerText}, ${input.revision})
+      ON CONFLICT (attempt_id, question_id) DO UPDATE SET selected = EXCLUDED.selected, answer_text = EXCLUDED.answer_text, revision = EXCLUDED.revision, saved_at = clock_timestamp()
       WHERE attempt_answers.revision < EXCLUDED.revision`;
     const stored = (await tx<{ revision: number; selected: string[] }[]>`SELECT revision, selected FROM attempt_answers WHERE attempt_id = ${attemptId} AND question_id = ${input.questionId}`)[0]!;
-    return { questionId: input.questionId, revision: stored.revision, selected: stored.selected };
+    return { questionId: input.questionId, revision: stored.revision, selected: stored.selected, answerText: input.answerText };
   });
 }
 

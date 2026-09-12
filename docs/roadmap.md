@@ -23,6 +23,7 @@ Coding agents follow skill `deliver-phase`.
 | 13 | Academic operations | Delivered — [record](phases/13-academic-operations.md) |
 | 14 | Academic lifecycle | Delivered — [record](phases/14-academic-lifecycle.md) |
 | 15 | Submission lifecycle | In progress — [record](phases/15-submission-lifecycle.md) |
+| 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
 
 ## Delivered
 
@@ -46,9 +47,8 @@ grading, and student progress on the shared Activity Engine.
 ### Phase 3 — Assessment engine
 
 Question banks, quizzes and exams, attempts, timers, randomization, autosave, reconnect
-recovery, automatic scoring, and idempotent final submission. Delivered for single-choice,
-multiple-choice, and true/false questions; the product owner deferred essays, rubrics, and
-surveys.
+recovery, automatic scoring, idempotent final submission, and written-answer manual grading
+(Phase 16). Rubrics and surveys remain deferred.
 
 ### Phase 4 — Project learning
 
@@ -118,6 +118,12 @@ Assignment submissions can be returned with a reason, resubmitted as numbered re
 graded against the current revision. Teachers can grant student-specific deadline exceptions;
 all actions preserve history and are audited.
 
+### Phase 16 — Written assessment grading
+
+Quiz and exam question banks accept short-answer and essay questions. Answers are autosaved
+separately from choice selections, and teachers manually grade each written answer with
+append-only corrections.
+
 ## Planned
 
 ### Phase 12 and later
@@ -135,8 +141,8 @@ Boundaries section has the details.
   and academic archive states are delivered in Phase 14.
 - **Phase 2:** hard deletion and bulk reordering; moving materials between lessons; malware
   scanning and inline previews; rich text or Markdown.
-- **Phase 3:** essay and short-answer questions, manual grading, and rubrics; surveys and
-  questionnaires; partial credit and negative marking; time extensions and accommodations;
+- **Phase 3:** rubrics; surveys and questionnaires; partial credit and negative marking; time
+  extensions and accommodations;
   proctoring; question import, export, pools, and statistics; live monitoring over
   WebSocket.
 - **Phase 4:** student-formed teams; custom columns, labels, due dates, comments, and

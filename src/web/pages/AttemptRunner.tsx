@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttemptDetail, AttemptQuestion } from "../../shared/assessment";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
-import { errorMessage, formatDateTime, learningApi } from "../components/learning";
+import { errorMessage, Field, formatDateTime, learningApi, MutationForm } from "../components/learning";
 
-type Answer = { selected: string[]; revision: number };
+type Answer = { selected: string[]; answerText?: string | null; revision: number };
 type Sync = "saved" | "saving" | "offline" | "error";
 const syncLabels: Record<Sync, string> = { saved: "Semua jawaban tersimpan", saving: "Menyimpan…", offline: "Koneksi terputus. Jawaban disimpan di perangkat dan dikirim ulang otomatis.", error: "Sebagian jawaban ditolak server. Periksa pilihan Anda." };
 const storageKey = (attemptId: string) => `salaam:attempt:${attemptId}`;
@@ -23,7 +23,7 @@ function clock(milliseconds: number) {
 }
 const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { courseId: string; attemptId: string; timezone: string; onExpired: () => void }) {
+export function AttemptRunner({ courseId, attemptId, timezone, canManage, onExpired }: { courseId: string; attemptId: string; timezone: string; canManage: boolean; onExpired: () => void }) {
   const base = `${learningApi}/${courseId}/attempts/${attemptId}`;
   const [attempt, setAttempt] = useState<AttemptDetail | null>(null);
   const [error, setError] = useState("");
@@ -45,7 +45,7 @@ export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { co
       if (!detail.canAnswer) { pending.current = {}; if (detail.submittedAt) writePending(attemptId, {}); }
       setAnswers(Object.fromEntries(detail.questions.map(question => {
         const local = pending.current[question.questionId];
-        return [question.questionId, local && local.revision > question.revision ? local : { selected: question.selected, revision: question.revision }];
+        return [question.questionId, local && local.revision > question.revision ? local : { selected: question.selected, answerText: question.answerText, revision: question.revision }];
       })));
       setAttempt(detail);
       return detail;
@@ -119,12 +119,20 @@ export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { co
     writePending(attemptId, pending.current);
     void flush();
   }
+  function writeText(question: AttemptQuestion, answerText: string) {
+    const current = answers[question.questionId] ?? { selected: [], revision: 0 };
+    const next = { selected: [], answerText, revision: current.revision + 1 };
+    setAnswers(value => ({ ...value, [question.questionId]: next }));
+    pending.current[question.questionId] = next;
+    writePending(attemptId, pending.current);
+    void flush();
+  }
 
   const crumbs = [{ label: "Pembelajaran", href: "/learning" }, { label: "Course", href: `/learning/courses/${courseId}` }];
   if (error && !attempt) return <><PageHeader breadcrumbs={crumbs} title="Percobaan" /><ErrorState message={error} retry={() => void load()} /></>;
   if (!attempt) return <LoadingState />;
   const answering = attempt.canAnswer;
-  const answered = attempt.questions.filter(question => (answers[question.questionId]?.selected.length ?? 0) > 0).length;
+  const answered = attempt.questions.filter(question => (answers[question.questionId]?.selected.length ?? 0) > 0 || Boolean(answers[question.questionId]?.answerText?.trim())).length;
   const heading = answering ? "Kerjakan soal" : attempt.submittedAt ? "Hasil pengerjaan" : `Pengerjaan ${attempt.studentName}`;
   const summary = attempt.submittedAt
     ? `${attempt.studentName} · dikumpulkan ${formatDateTime(attempt.submittedAt, timezone)}${attempt.submissionReason === "expired" ? " (otomatis saat waktu habis)" : ""}.`
@@ -137,14 +145,18 @@ export function AttemptRunner({ courseId, attemptId, timezone, onExpired }: { co
       : <p className="learning-muted">{attempt.submittedAt ? "Nilai dan pembahasan akan tampil sesuai pengaturan guru." : "Nilai tersedia setelah attempt selesai."}</p>}</Card>}
     {answering && <div className="attempt-bar" role="status"><span role="timer" className={left !== null && left < 60000 ? "attempt-timer attempt-timer-low" : "attempt-timer"}>{left === null ? "Tanpa batas waktu" : `Sisa waktu ${clock(left)}`}</span><span>{answered} / {attempt.questions.length} dijawab</span><span className={`sync-status sync-${sync}`}>{syncLabels[sync]}</span></div>}
     <div className="attempt-questions">{attempt.questions.map((question, index) => {
-      const selected = answers[question.questionId]?.selected ?? [];
+      const answer = answers[question.questionId] ?? { selected: [], answerText: question.answerText, revision: question.revision };
+      const selected = answer.selected;
+      const written = question.type === "short_answer" || question.type === "essay";
       return <Card className="lesson-card attempt-question" key={question.questionId}><fieldset disabled={!answering || submitting}>
-        <legend><span className="eyebrow text-muted">SOAL {index + 1} · {question.points} POIN · {question.type === "multiple_choice" ? "PILIH SEMUA YANG BENAR" : "PILIH SATU"}</span><span className="learning-prose">{question.prompt}</span></legend>
-        {question.options.map(option => {
+        <legend><span className="eyebrow text-muted">SOAL {index + 1} · {question.points} POIN · {written ? question.type === "essay" ? "ESAI" : "JAWABAN SINGKAT" : question.type === "multiple_choice" ? "PILIH SEMUA YANG BENAR" : "PILIH SATU"}</span><span className="learning-prose">{question.prompt}</span></legend>
+        {written ? <textarea className="input field-wide" rows={7} value={answer.answerText ?? ""} onChange={event => writeText(question, event.target.value)} placeholder="Tulis jawaban Anda…" /> : question.options.map(option => {
           const mark = !answering && question.correct ? question.correct.includes(option.id) ? " option-correct" : selected.includes(option.id) ? " option-wrong" : "" : "";
           return <label className={`option-row${mark}`} key={option.id}><input type={question.type === "multiple_choice" ? "checkbox" : "radio"} name={`question-${question.questionId}`} checked={selected.includes(option.id)} onChange={() => choose(question, option.id)} /><span>{option.text}</span></label>;
         })}
         {question.awarded !== null && <p className="learning-muted">Poin: {question.awarded} / {question.points}</p>}
+        {question.manualGrade && <p className="learning-prose">Umpan balik guru: {question.manualGrade.feedback}</p>}
+        {canManage && attempt.submittedAt && written && <MutationForm path={`${base}/grade-question`} label={question.manualGrade ? "Simpan koreksi jawaban" : "Simpan nilai jawaban"} onExpired={onExpired} saved={() => void load()} body={form => ({ questionId: question.questionId, score: Number(form.get("score")), feedback: form.get("feedback"), previousGradeId: question.manualGrade?.id ?? null })}><Field name="score" label={`Nilai (0–${question.points})`} type="number" min={0} max={question.points} step="0.01" value={question.manualGrade?.score ?? question.awarded ?? ""} /><Field name="feedback" label="Umpan balik" area max={5000} value={question.manualGrade?.feedback} /></MutationForm>}
         {question.explanation && <p className="learning-prose attempt-explanation">{question.explanation}</p>}
       </fieldset></Card>;
     })}</div>

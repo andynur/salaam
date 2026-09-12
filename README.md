@@ -47,6 +47,7 @@ environment-specific validation.
 | 13 — Academic operations | Administrator CSV student import with preview and atomic enrollment, plus bounded recurring sessions with per-session roster snapshots and QR defaults | [Phase 13](docs/phases/13-academic-operations.md) |
 | 14 — Academic lifecycle | Profile editing, guarded role reassignment, class transfers with history, and reversible academic archive states | [Phase 14](docs/phases/14-academic-lifecycle.md) |
 | 15 — Submission lifecycle | Returned assignment work, numbered resubmissions, current-revision grading, and student-specific deadline exceptions | [Phase 15](docs/phases/15-submission-lifecycle.md) |
+| 16 — Written assessment grading | Short-answer and essay questions, autosaved written responses, and manual per-question grading | [Phase 16](docs/phases/16-written-assessment-grading.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

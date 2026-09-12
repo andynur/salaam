@@ -65,7 +65,7 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     { type: "multiple_choice", prompt: "Elemen semantik?", options: ["<header>", "<b>", "<main>"], correct: ["a", "c"] },
     { type: "true_false", prompt: "CSS adalah bahasa pemrograman.", correct: ["b"], explanation: "CSS adalah bahasa gaya." },
   ];
-  async function assessment(courseId: string, lessonId: string, settings: Record<string, unknown>, bodies = questionBodies, points = [2, 3, 1], publish = true) {
+  async function assessment(courseId: string, lessonId: string, settings: Record<string, unknown>, bodies: Record<string, unknown>[] = questionBodies, points = [2, 3, 1], publish = true) {
     const questionIds = [];
     for (const body of bodies) questionIds.push((await json<{ id: string }>(post(courseId, "questions", body), 201)).id);
     const id = (await json<{ id: string }>(post(courseId, "assessments", { lessonId, kind: "quiz", title: "Quiz HTML", instructions: "Kerjakan.", ...settings }), 201)).id;
@@ -76,6 +76,8 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
   const start = (courseId: string, id: string, cookie = student) => request(path(courseId, `assessments/${id}/attempts`), cookie, {});
   const answer = (courseId: string, attemptId: string, questionId: string, selected: string[], revision: number, cookie = student) =>
     post(courseId, `attempts/${attemptId}/answers`, { questionId, selected, revision }, cookie);
+  const writtenAnswer = (courseId: string, attemptId: string, questionId: string, answerText: string, revision: number, cookie = student) =>
+    post(courseId, `attempts/${attemptId}/answers`, { questionId, answerText, revision }, cookie);
   const detail = (courseId: string, attemptId: string, cookie = student) => json<AttemptDetail>(request(path(courseId, `attempts/${attemptId}`), cookie));
 
   beforeAll(async () => {
@@ -137,8 +139,8 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     expect(open.questions.every(question => question.correct === null && question.explanation === null && question.selected.length === 0)).toBe(true);
     expect(open.score).toBeNull();
     const [single, multiple, trueFalse] = q.questionIds as [string, string, string];
-    expect(await json<unknown>(answer(f.courseId, first.id, single, ["b"], 2))).toEqual({ questionId: single, revision: 2, selected: ["b"] });
-    expect(await json<unknown>(answer(f.courseId, first.id, single, ["a"], 1))).toEqual({ questionId: single, revision: 2, selected: ["b"] });
+    expect(await json<unknown>(answer(f.courseId, first.id, single, ["b"], 2))).toEqual({ questionId: single, revision: 2, selected: ["b"], answerText: null });
+    expect(await json<unknown>(answer(f.courseId, first.id, single, ["a"], 1))).toEqual({ questionId: single, revision: 2, selected: ["b"], answerText: null });
     await json(answer(f.courseId, first.id, multiple, ["c", "a"], 1));
     await json(answer(f.courseId, first.id, trueFalse, ["a"], 1));
     expect((await answer(f.courseId, first.id, single, ["a", "b"], 3)).status).toBe(400);
@@ -163,6 +165,30 @@ describe.skipIf(!url)("Phase 3 assessment engine (isolated PostgreSQL schema)", 
     const after = await json<CourseDetail>(request(path(f.courseId), student));
     expect(after.assessments.find(item => item.id === q.id)?.attempts.map(attempt => attempt.score)).toEqual([5, 0]);
     expect(after.progress).toMatchObject({ activities: 1, submitted: 1, graded: 1 });
+  });
+
+  test("written answers are autosaved, hidden until submitted, and manually graded with stale-write protection", async () => {
+    const f = await course();
+    const q = await assessment(f.courseId, f.lessonId, {}, [
+      { type: "short_answer", prompt: "Sebutkan satu tag semantik." },
+      { type: "essay", prompt: "Jelaskan manfaat HTML semantik." },
+    ], [2, 5]);
+    const attempt = await json<{ id: string }>(start(f.courseId, q.id), 201);
+    const [short, essay] = q.questionIds;
+    expect((await writtenAnswer(f.courseId, attempt.id, short!, "<main>", 1)).status).toBe(200);
+    expect((await writtenAnswer(f.courseId, attempt.id, essay!, "Membantu struktur dan aksesibilitas.", 1)).status).toBe(200);
+    const open = await detail(f.courseId, attempt.id);
+    expect(open.questions.find(question => question.type === "short_answer")).toMatchObject({ answerText: "<main>" });
+    expect(open.questions.find(question => question.type === "essay")).toMatchObject({ answerText: "Membantu struktur dan aksesibilitas." });
+    await json(post(f.courseId, `attempts/${attempt.id}/submit`, {}, student));
+    const before = await detail(f.courseId, attempt.id);
+    expect(before.score).toBe(0);
+    const grade = await json<{ id: string }>(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", previousGradeId: null }));
+    expect((await json<AttemptDetail>(request(path(f.courseId, `attempts/${attempt.id}`), student))).score).toBe(4.5);
+    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 4.5, feedback: "Penjelasan sudah jelas.", previousGradeId: null })).status).toBe(200);
+    expect((await post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", previousGradeId: null })).status).toBe(409);
+    await json(post(f.courseId, `attempts/${attempt.id}/grade-question`, { questionId: essay, score: 5, feedback: "Revisi.", previousGradeId: grade.id }));
+    expect((await detail(f.courseId, attempt.id, student)).questions.find(question => question.questionId === essay)).toMatchObject({ awarded: 5, manualGrade: { score: 5, feedback: "Revisi." } });
   });
 
   test("exam windows and deadlines use server time; expired attempts finalize with saved answers", async () => {

@@ -1,14 +1,13 @@
 import { expect, test } from "bun:test";
-import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, questionInput, settingsInput } from "../src/modules/assessments/input";
+import { adjustmentInput, answerInput, assessmentKindInput, itemsInput, manualGradeInput, questionInput, settingsInput } from "../src/modules/assessments/input";
 
-test("questions support single choice, multiple choice and true/false with valid answer keys", () => {
+test("questions support choice and written answers with valid answer keys", () => {
   expect(questionInput({ type: "single_choice", prompt: " 2 + 2? ", options: ["3", " 4 "], correct: ["b"] })).toEqual({
     type: "single_choice", prompt: "2 + 2?", options: [{ id: "a", text: "3" }, { id: "b", text: "4" }], correct: ["b"], explanation: "",
   });
   expect(questionInput({ type: "multiple_choice", prompt: "Bilangan prima", options: ["2", "3", "4"], correct: ["b", "a", "b"] }).correct).toEqual(["a", "b"]);
   expect(questionInput({ type: "true_false", prompt: "HTML bahasa markup", options: ["ignored"], correct: ["a"], explanation: "Benar." }).options).toEqual([{ id: "a", text: "Benar" }, { id: "b", text: "Salah" }]);
   for (const body of [
-    { type: "essay", prompt: "Jelaskan", correct: ["a"] },
     { type: "single_choice", prompt: " ", options: ["a", "b"], correct: ["a"] },
     { type: "single_choice", prompt: "Q", options: ["Only"], correct: ["a"] },
     { type: "single_choice", prompt: "Q", options: Array.from({ length: 11 }, (_, index) => `O${index}`), correct: ["a"] },
@@ -19,6 +18,8 @@ test("questions support single choice, multiple choice and true/false with valid
     { type: "true_false", prompt: "Q", correct: "a" },
     { type: "single_choice", prompt: "Q", options: ["A", 2], correct: ["a"] },
   ]) expect(() => questionInput(body)).toThrow();
+  expect(questionInput({ type: "essay", prompt: "Jelaskan alasanmu" }).options).toEqual([]);
+  expect(questionInput({ type: "short_answer", prompt: "Sebutkan ibu kota" }).correct).toEqual([]);
 });
 test("quiz and exam settings enforce windows, limits and exam integrity rules", () => {
   expect(assessmentKindInput({ kind: "exam" })).toBe("exam");
@@ -41,8 +42,10 @@ test("assessment items, autosaved answers and score adjustments are strictly bou
   for (const items of [[], [{ questionId, points: 0 }], [{ questionId, points: 1.001 }], [{ questionId, points: 1 }, { questionId, points: 2 }], [{ questionId: "bad", points: 1 }], "x"]) {
     expect(() => itemsInput({ items })).toThrow();
   }
-  expect(answerInput({ questionId, selected: ["c", "a", "c"], revision: 3 })).toEqual({ questionId, selected: ["a", "c"], revision: 3 });
+  expect(answerInput({ questionId, selected: ["c", "a", "c"], revision: 3 })).toEqual({ questionId, selected: ["a", "c"], answerText: null, revision: 3 });
   expect(answerInput({ questionId, selected: [], revision: 1 }).selected).toEqual([]);
+  expect(answerInput({ questionId, answerText: " Jawaban tertulis ", revision: 2 })).toMatchObject({ answerText: "Jawaban tertulis" });
+  expect(manualGradeInput({ score: 4.5, feedback: "Argumen cukup kuat." })).toEqual({ score: 4.5, feedback: "Argumen cukup kuat." });
   for (const body of [{ questionId, selected: ["z"], revision: 1 }, { questionId, selected: "a", revision: 1 }, { questionId, selected: ["a"], revision: 0 }, { questionId, selected: ["a"], revision: 1.5 }]) {
     expect(() => answerInput(body)).toThrow();
   }

@@ -7,7 +7,7 @@ import { Field, MutationForm, Pager, Search, Status, deviceTimezone, errorMessag
 
 type Common = { courseId: string; timezone: string; onExpired: () => void };
 const kindLabels: Record<AssessmentKind, string> = { quiz: "Quiz", exam: "Ujian" };
-const typeLabels: Record<QuestionType, string> = { single_choice: "Pilihan ganda · satu jawaban", multiple_choice: "Pilihan ganda · banyak jawaban", true_false: "Benar/Salah" };
+const typeLabels: Record<QuestionType, string> = { single_choice: "Pilihan ganda · satu jawaban", multiple_choice: "Pilihan ganda · banyak jawaban", true_false: "Benar/Salah", short_answer: "Jawaban singkat", essay: "Esai" };
 const visibilityLabels: Record<ResultsVisibility, string> = { after_submit: "Nilai & pembahasan setelah dikumpulkan", after_close: "Nilai & pembahasan setelah ditutup", score_only: "Hanya nilai setelah dikumpulkan", hidden: "Disembunyikan dari santri" };
 const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -156,13 +156,13 @@ function QuestionEditor({ courseId, value, close, saved, onExpired }: { courseId
   const lines = type === "true_false" ? ["Benar", "Salah"] : optionsText.split("\n").map(line => line.trim()).filter(Boolean).slice(0, 10);
   return <Card className="admin-form-card"><div className="learning-row"><h2>{value ? "Edit soal" : "Tambah soal"}</h2><Button className="button-secondary button-small" onClick={close}>Batal</Button></div>
     <MutationForm path={`${learningApi}/${courseId}/questions${value ? `/${value.id}` : ""}`} method={value ? "PATCH" : "POST"} label="Simpan soal" onExpired={onExpired} saved={saved}
-      body={form => ({ type, prompt: form.get("prompt"), explanation: form.get("explanation"), options: type === "true_false" ? undefined : lines, correct: form.getAll("correct") })}>
+      body={form => ({ type, prompt: form.get("prompt"), explanation: form.get("explanation"), options: type === "true_false" || type === "short_answer" || type === "essay" ? undefined : lines, correct: type === "short_answer" || type === "essay" ? [] : form.getAll("correct") })}>
       <label className="learning-field"><span>Jenis soal</span><select className="input" value={type} onChange={event => setType(event.target.value as QuestionType)}>{Object.entries(typeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <Field name="prompt" label="Pertanyaan" area max={5000} value={value?.prompt} />
-      {type !== "true_false" && <label className="learning-field field-wide"><span>Opsi jawaban (satu per baris, 2–10 opsi)</span><textarea className="input" rows={5} value={optionsText} onChange={event => setOptionsText(event.target.value)} required /></label>}
-      <fieldset className="field-wide correct-options"><legend>{type === "multiple_choice" ? "Tandai semua jawaban benar" : "Pilih jawaban benar"}</legend>
+      {type !== "true_false" && type !== "short_answer" && type !== "essay" && <label className="learning-field field-wide"><span>Opsi jawaban (satu per baris, 2–10 opsi)</span><textarea className="input" rows={5} value={optionsText} onChange={event => setOptionsText(event.target.value)} required /></label>}
+      {type !== "short_answer" && type !== "essay" && <fieldset className="field-wide correct-options"><legend>{type === "multiple_choice" ? "Tandai semua jawaban benar" : "Pilih jawaban benar"}</legend>
         {lines.length < 2 ? <p className="learning-muted">Tulis minimal dua opsi.</p> : lines.map((line, index) => <label className="submission-confirm" key={`${type}-${index}-${line}`}><input type={type === "multiple_choice" ? "checkbox" : "radio"} name="correct" value={optionIds[index]} defaultChecked={value?.type === type && value.correct.includes(optionIds[index]!)} required={type !== "multiple_choice"} /> {line}</label>)}
-      </fieldset>
+      </fieldset>}
       <Field name="explanation" label="Pembahasan (opsional, tampil sesuai pengaturan hasil)" area required={false} max={2000} value={value?.explanation} />
     </MutationForm>
   </Card>;

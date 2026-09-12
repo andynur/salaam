@@ -4,7 +4,7 @@ import { HttpError } from "../../core/errors";
 import { idField, invalid } from "../../core/validation";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
-import { adjustmentInput } from "./input";
+import { adjustmentInput, manualGradeInput } from "./input";
 import { finalizeExpired } from "./attempts";
 import type { AttemptRow, ScoreAdjustment } from "../../shared/assessment";
 
@@ -52,5 +52,29 @@ export async function adjustmentHistory(db: SQL, actor: Actor, courseId: string,
     return tx<ScoreAdjustment[]>`SELECT adj.id, adj.score::float8 AS score, adj.reason, u.display_name AS "graderName", adj.created_at AS "createdAt"
       FROM attempt_score_adjustments adj JOIN users u ON u.id = adj.grader_id
       WHERE adj.attempt_id = ${attemptId} ORDER BY adj.created_at DESC, adj.id DESC LIMIT 51 OFFSET ${offset}`;
+  });
+}
+
+export async function gradeWrittenAnswer(db: SQL, actor: Actor, courseId: string, attemptId: string, questionId: string, body: Record<string, unknown>, requestId: string) {
+  const { score, feedback } = manualGradeInput(body);
+  const previousGradeId = body.previousGradeId === null ? null : idField(body, "previousGradeId");
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const [answer] = await tx<{ studentId: string; points: number; type: string; submitted: boolean }[]>`SELECT t.student_id AS "studentId", q.points::float8 AS points, q.type, t.submitted_at IS NOT NULL AS submitted
+      FROM attempts t JOIN attempt_questions q ON q.attempt_id = t.id JOIN activities a ON a.id = t.activity_id
+      LEFT JOIN attempt_answers ans ON ans.attempt_id = q.attempt_id AND ans.question_id = q.question_id
+      WHERE t.id = ${attemptId} AND q.question_id = ${questionId} AND a.course_id = ${courseId} FOR UPDATE OF t`;
+    if (!answer) notFound();
+    if (!answer.submitted) throw new HttpError(409, "ATTEMPT_OPEN", "Jawaban hanya dapat dinilai setelah attempt selesai.");
+    if (answer.type !== "short_answer" && answer.type !== "essay") throw new HttpError(409, "NOT_WRITTEN", "Soal pilihan tidak memerlukan penilaian manual.");
+    if (score > answer.points) invalid(`Nilai maksimal ${answer.points}.`);
+    const latest = (await tx<{ id: string; score: number; feedback: string }[]>`SELECT id, score::float8 AS score, feedback FROM attempt_question_grades WHERE attempt_id = ${attemptId} AND question_id = ${questionId} ORDER BY created_at DESC, id DESC LIMIT 1`)[0];
+    if (latest && latest.score === score && latest.feedback === feedback) return { id: latest.id };
+    if ((latest?.id ?? null) !== previousGradeId) throw new HttpError(409, "GRADE_CHANGED", "Nilai sudah diperbarui. Muat ulang sebelum menilai kembali.");
+    const [grade] = await tx`INSERT INTO attempt_question_grades (attempt_id, question_id, grader_id, score, feedback) VALUES (${attemptId}, ${questionId}, ${actor.id}, ${score}, ${feedback}) RETURNING id`;
+    await tx`UPDATE attempt_answers SET awarded = ${score} WHERE attempt_id = ${attemptId} AND question_id = ${questionId}`;
+    await tx`UPDATE attempts SET score = (SELECT COALESCE(sum(awarded), 0) FROM attempt_answers WHERE attempt_id = ${attemptId}) WHERE id = ${attemptId}`;
+    await recordAudit(tx, actor.id, "assessment.answer.graded", "attempts", attemptId, requestId);
+    return grade!;
   });
 }

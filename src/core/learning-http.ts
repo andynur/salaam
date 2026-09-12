@@ -10,7 +10,7 @@ import { grantDeadlineException, gradeHistory, gradeSubmission, listSubmissions,
 import { archiveQuestion, listQuestions, saveQuestion } from "../modules/assessments/questions";
 import { saveAssessment, setAssessmentItems } from "../modules/assessments/service";
 import { attemptDetail, saveAnswer, startAttempt, submitAttempt } from "../modules/assessments/attempts";
-import { adjustmentHistory, adjustScore, listAttempts } from "../modules/assessments/grading";
+import { adjustmentHistory, adjustScore, gradeWrittenAnswer, listAttempts } from "../modules/assessments/grading";
 import { saveChallenge } from "../modules/projects/challenges";
 import { createProject } from "../modules/projects/service";
 
@@ -86,6 +86,9 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           result = await submitAttempt(db, actor, courseId, id, requestId);
         } else if (itemAction && resource === "attempts" && action === "adjust") {
           result = await adjustScore(db, actor, courseId, id, body, requestId);
+        } else if (itemAction && resource === "attempts" && action === "grade-question") {
+          const questionId = idField(body, "questionId");
+          result = await gradeWrittenAnswer(db, actor, courseId, id, questionId, body, requestId);
         } else if (itemAction && resource === "challenges" && action === "projects") {
           const project = await createProject(db, actor, courseId, id, body, requestId);
           return Response.json(project, { status: project.resumed ? 200 : 201 });

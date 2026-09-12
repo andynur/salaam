@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { Actor } from "../../core/permissions";
 import { uploadTypes } from "../../shared/learning";
 import type { Activity, CourseDetail, CourseModule, Grade, LearningCourse, Lesson, Material, Page, Progress, StoredFile, Submission } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
@@ -15,9 +16,9 @@ const fileSize = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFi
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word.charAt(0)).join("").toUpperCase();
 function FileLink({ href, file }: { href: string; file: StoredFile }) { return <a className="material-link" href={href}>Unduh {file.name} ({fileSize(file.sizeBytes)}) ↓</a>; }
 
-export function Learning({ timezone, onExpired }: Common) {
+export function Learning({ actor, timezone, onExpired }: Common & { actor: Actor }) {
   const attempt = location.pathname.match(/^\/learning\/courses\/([0-9a-f-]+)\/attempts\/([0-9a-f-]+)$/i);
-  if (attempt) return <AttemptRunner key={attempt[2]} courseId={attempt[1]!} attemptId={attempt[2]!} timezone={timezone} onExpired={onExpired} />;
+  if (attempt) return <AttemptRunner key={attempt[2]} courseId={attempt[1]!} attemptId={attempt[2]!} timezone={timezone} canManage={actor.permissions.includes("learning.manage")} onExpired={onExpired} />;
   const courseId = location.pathname.match(/^\/learning\/courses\/([0-9a-f-]+)$/i)?.[1];
   const query = new URLSearchParams(location.search);
   if (courseId) return <CourseWorkspace key={courseId} courseId={courseId} initialLesson={query.get("lesson") ?? ""} initialReview={query.get("review") ?? ""} timezone={timezone} onExpired={onExpired} />;
