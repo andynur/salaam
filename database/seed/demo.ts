@@ -1,8 +1,20 @@
 // Realistic demo dataset for local development and product walkthroughs. It fills every
-// table delivered through Phase 4 (identity, academic foundation, learning core, assessment
-// engine, project learning) with data shaped like a real HSI Boarding School term in
-// progress: some lessons taught, some still in draft, a closed exam, an open quiz, an
-// overdue assignment, an upcoming one, and capstone projects at every review stage.
+// table delivered through Phase 9 (identity, academic foundation, learning core, assessment
+// engine, project learning, gamification, attendance, QR check-in, calendar and
+// notifications; reporting derives from all of them) with data shaped like a real HSI
+// Boarding School term in progress: some lessons taught, some still in draft, a closed exam,
+// an open quiz, an overdue assignment, one due tomorrow, capstone projects at every review
+// stage, eight weeks of recorded attendance, a class running right now with QR check-in
+// open, a school calendar, and an inbox produced by the real notification worker.
+//
+// Every walkthrough role has something to look at: an administrator sees accounts, academic
+// structure, reward rules, the audit log and the cross-course reports; a teacher sees
+// grading, attendance, QR, the leaderboard and their own course reports; a santri sees
+// lessons, an open quiz, a deadline due tomorrow, XP, badges, attendance and notifications.
+//
+// Synthetic history is audited under `demo_seed.*` event names so the audit log never claims
+// that a real request happened; events written by the application's own code paths, such as
+// badge awards, keep their real names.
 //
 // The JavaScript course curriculum follows the table of contents of the handbook
 // "Modern JavaScript Programming" (tmp/Modern Javascript Programming.md): four parts,
@@ -15,6 +27,9 @@ import { loadConfig } from "../../src/core/config";
 import { connectDatabase } from "../../src/core/database/connection";
 import { hashPassword } from "../../src/core/auth/password";
 import { recordAudit } from "../../src/core/audit/repository";
+import { awardProjectApproval, awardXp } from "../../src/modules/gamification/awards";
+import { enqueueCheckin } from "../../src/modules/calendar/notifications";
+import { notificationTick } from "../../src/modules/calendar/worker";
 
 const config = loadConfig();
 if (config.environment !== "development") throw new Error("Demo seed is development-only.");
@@ -48,14 +63,44 @@ function shuffle<T>(items: readonly T[]): T[] {
 
 const NOW = new Date();
 const days = (offset: number) => new Date(NOW.getTime() + offset * 86400000);
+const hours = (offset: number) => new Date(NOW.getTime() + offset * 3600000);
 const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
+// School hours are quoted in WIB (UTC+7); everything stored stays a UTC instant.
+function wib(dayOffset: number, hour: number, minute = 0) {
+  const at = days(dayOffset);
+  at.setUTCHours(hour - 7, minute, 0, 0);
+  return at;
+}
+// A plausible school hour that still falls inside the notification worker's 24-hour reminder
+// window, whichever time of day the seed happens to run. Falls back to a bare offset so the
+// reminder demo never depends on the wall clock.
+function withinReminderWindow(...hoursOfDay: number[]) {
+  for (const day of [0, 1]) {
+    for (const hour of hoursOfDay) {
+      const at = wib(day, hour);
+      const ahead = at.getTime() - NOW.getTime();
+      if (ahead > 2 * 3600000 && ahead < 23 * 3600000) return at;
+    }
+  }
+  return hours(12);
+}
+// Attendance mix for one santri: the more diligent, the more often present.
+function attendanceStatus(skill: number) {
+  const roll = random();
+  if (roll < 0.78 + skill * 0.17) return "present";
+  if (roll < 0.90 + skill * 0.06) return "late";
+  if (roll < 0.95) return "sick";
+  if (roll < 0.98) return "excused";
+  return "absent";
+}
+const sha256 = (value: string) => new Bun.CryptoHasher("sha256").update(value).digest("hex");
 
 // ---------------------------------------------------------------------------------------
 // People
 // ---------------------------------------------------------------------------------------
 const TEACHERS = [
-  { name: "Ahmad Zaki Mubarok", email: "ahmad.zaki@hsiboardingschool.sch.id", identifier: "GRU2026001" },
-  { name: "Siti Nur Hasanah", email: "siti.hasanah@hsiboardingschool.sch.id", identifier: "GRU2026002" },
+  { name: "Ahmad Zaki Mubarok", email: "ahmad.zaki@hsibs.my.id", identifier: "GRU2026001" },
+  { name: "Siti Nur Hasanah", email: "siti.hasanah@hsibs.my.id", identifier: "GRU2026002" },
 ];
 const FIRST_NAMES = [
   "Ahmad", "Muhammad", "Abdullah", "Yusuf", "Ibrahim", "Hamzah", "Zaid", "Umar", "Ali", "Bilal",
@@ -75,7 +120,7 @@ const STUDENTS = Array.from({ length: CLASS_NAMES.length * STUDENTS_PER_CLASS },
   const slug = `${first}.${last}`.toLowerCase().replace(/[^a-z.]/g, "");
   return {
     name,
-    email: `${slug}${i + 1}@santri.hsiboardingschool.sch.id`,
+    email: `${slug}${i + 1}@hsibs.my.id`,
     identifier: `2026${String(classIndex + 1).padStart(2, "0")}${String((i % STUDENTS_PER_CLASS) + 1).padStart(3, "0")}`,
     classIndex,
     skill: 0.4 + random() * 0.55, // per-student ability, drives realistic quiz/exam variance
@@ -354,6 +399,7 @@ async function main() {
       const userId = user!.id;
       await tx`INSERT INTO user_roles (user_id, role_id) VALUES (${userId}, ${roleId(role)})`;
       await tx`INSERT INTO user_profiles (user_id, role_id, identifier) VALUES (${userId}, ${roleId(role)}, ${person.identifier})`;
+      await recordAudit(tx, null, "demo_seed.user_created", "users", userId, requestId());
       return userId;
     }
 
@@ -363,7 +409,6 @@ async function main() {
 
     const studentIds: string[] = [];
     for (const student of STUDENTS) studentIds.push(await createPerson(student, "student"));
-    await recordAudit(tx, mainTeacherId, "demo_seed.identity_created", "users", mainTeacherId, requestId());
 
     // --- Academic foundation -----------------------------------------------------------
     const [year] = await tx<{ id: string }[]>`INSERT INTO academic_years (name, starts_on, ends_on)
@@ -390,19 +435,23 @@ async function main() {
     const subjectId = subject!.id;
 
     // --- One course per class, all following the handbook curriculum -------------------
-    const courses: { id: string; classIndex: number; studentIds: string[] }[] = [];
+    // Ahmad teaches X RPL 1 and X RPL 2, Siti teaches X RPL 2 and XI RPL 1: one shared course
+    // and one course each, so scoped reports and leaderboards differ per teacher.
+    const courses: { id: string; classIndex: number; teacherId: string; studentIds: string[] }[] = [];
     for (let classIndex = 0; classIndex < CLASS_NAMES.length; classIndex++) {
       const [course] = await tx<{ id: string }[]>`INSERT INTO courses (name, academic_year_id, term_id, class_id, subject_id, published)
         VALUES (${`Pemrograman JavaScript – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termId}, ${classIds[classIndex]}, ${subjectId}, true) RETURNING id`;
-      await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${mainTeacherId})`;
-      if (classIndex === 2) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${coTeacherId})`;
+      const teacherId = classIndex === 2 ? coTeacherId : mainTeacherId;
+      await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${teacherId})`;
+      if (classIndex === 1) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${coTeacherId})`;
       const classStudentIds = STUDENTS.filter(s => s.classIndex === classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
-      courses.push({ id: course!.id, classIndex, studentIds: classStudentIds });
-      await recordAudit(tx, mainTeacherId, "demo_seed.course_created", "courses", course!.id, requestId());
+      courses.push({ id: course!.id, classIndex, teacherId, studentIds: classStudentIds });
+      await recordAudit(tx, teacherId, "demo_seed.course_created", "courses", course!.id, requestId());
     }
 
     // --- Modules, lessons, materials, activities, assessments, projects, per course ----
     for (const course of courses) {
+      const teacherId = course.teacherId;
       const moduleIds: string[] = [];
       for (let part = 0; part < PART_TITLES.length; part++) {
         const [module] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
@@ -438,7 +487,7 @@ async function main() {
           if (!lesson.published) continue;
           const recency = 1 - chapterNumber / 22; // later chapters completed less often
           if (chance(Math.min(0.97, Math.max(0.15, recency * (0.5 + student.skill))))) {
-            const completedAt = days(-int(1, 55));
+            const completedAt = wib(-int(1, 55), int(8, 20), int(0, 59));
             await tx`INSERT INTO lesson_completions (lesson_id, student_id, completed_at) VALUES (${lesson.id}, ${studentId}, ${completedAt})`;
           }
         }
@@ -450,15 +499,19 @@ async function main() {
         VALUES (${course.id}, ${anchor(10)}, 'assignment', 'Tugas 1: Variabel & Tipe Data',
           'Buat file variabel-siswa.js yang mendeklarasikan variabel untuk nama, umur, dan status aktif menggunakan let/const yang tepat, lalu cetak tipe setiap variabel menggunakan typeof.',
           ${days(-20)}, true) RETURNING id`;
+      // Due tonight and closing tomorrow: both land inside the reminder window, so santri who
+      // have not finished get a notice and those who have do not.
+      const dueSoon = withinReminderWindow(21, 23);
+      const closesSoon = withinReminderWindow(22, 20);
       const [assignment2] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at, published)
         VALUES (${course.id}, ${anchor(16)}, 'assignment', 'Tugas 2: Function & Array',
           'Buat function hitungRataRata(nilai) yang menerima array nilai siswa dan mengembalikan rata-ratanya menggunakan method reduce.',
-          ${days(5)}, true) RETURNING id`;
+          ${dueSoon}, true) RETURNING id`;
       const [quiz] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
         VALUES (${course.id}, ${anchor(20)}, 'quiz', 'Kuis Dasar JavaScript',
           'Kerjakan kuis pilihan ganda meliputi tipe data, operator, percabangan, perulangan, function, array, dan object.', true) RETURNING id`;
       await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility)
-        VALUES (${quiz!.id}, 'quiz', ${days(-20)}, ${days(-6)}, 20, 2, true, true, 'after_submit')`;
+        VALUES (${quiz!.id}, 'quiz', ${days(-20)}, ${closesSoon}, 20, 2, true, true, 'after_submit')`;
       const [exam] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
         VALUES (${course.id}, ${anchor(20)}, 'exam', 'Ujian Tengah Semester',
           'Ujian tengah semester mencakup seluruh materi Bagian I dan Bagian II. Kerjakan dalam satu kali kesempatan sebelum waktu habis.', true) RETURNING id`;
@@ -468,7 +521,7 @@ async function main() {
         VALUES (${course.id}, ${anchor(38)}, 'challenge', 'Capstone Project: Aplikasi Web untuk Kehidupan Santri',
           'Bekerja dalam tim 2–3 orang membangun aplikasi web interaktif (DOM, array/object, dan penyimpanan lokal) yang bermanfaat bagi kegiatan santri sehari-hari. Kelola pekerjaan tim melalui papan Kanban dan ajukan untuk direview.', true) RETURNING id`;
       await tx`INSERT INTO challenge_settings (activity_id, team_mode, max_team_size) VALUES (${challenge!.id}, 'team', 3)`;
-      await recordAudit(tx, mainTeacherId, "demo_seed.activity_published", "activities", challenge!.id, requestId());
+      await recordAudit(tx, teacherId, "demo_seed.activity_published", "activities", challenge!.id, requestId());
 
       // --- Question bank -------------------------------------------------------------
       const questionIds: { id: string; correctIds: string[] }[] = [];
@@ -476,7 +529,7 @@ async function main() {
         const options = q.options.map((text, i) => ({ id: OPTION_IDS[i]!, text }));
         const correct = q.correctIndexes.map(i => OPTION_IDS[i]!).sort();
         const [row] = await tx<{ id: string }[]>`INSERT INTO questions (course_id, type, prompt, options, correct, explanation, created_by)
-          VALUES (${course.id}, ${q.type}, ${q.prompt}, ${JSON.stringify(options)}::text::jsonb, ${JSON.stringify(correct)}::text::jsonb, ${q.explanation}, ${mainTeacherId})
+          VALUES (${course.id}, ${q.type}, ${q.prompt}, ${JSON.stringify(options)}::text::jsonb, ${JSON.stringify(correct)}::text::jsonb, ${q.explanation}, ${teacherId})
           RETURNING id`;
         questionIds.push({ id: row!.id, correctIds: correct });
       }
@@ -522,6 +575,8 @@ async function main() {
 
       for (const studentId of course.studentIds) {
         const student = STUDENTS[studentIds.indexOf(studentId)]!;
+        // Seeded attempts sit in the first weeks of the still-open quiz window; each santri
+        // keeps one of the two allowed attempts for a live walkthrough.
         if (chance(0.8)) await runAttempt(quiz!.id, quizQuestions, { id: studentId, skill: student.skill }, days(-20), 20, days(-6), true);
         if (chance(0.9)) await runAttempt(exam!.id, examQuestions, { id: studentId, skill: student.skill * 0.95 }, days(-25), 60, days(-24), true);
       }
@@ -536,7 +591,7 @@ async function main() {
       ];
       for (const [activity, submitRate, gradeRate, dueAt] of [
         [assignment1!, 0.85, 0.9, days(-20)],
-        [assignment2!, 0.3, 0.15, days(5)],
+        [assignment2!, 0.3, 0.15, dueSoon],
       ] as const) {
         for (const studentId of course.studentIds) {
           if (!chance(submitRate)) continue;
@@ -547,7 +602,10 @@ async function main() {
             RETURNING id`;
           if (chance(gradeRate)) {
             const score = int(65, 100);
-            await tx`INSERT INTO submission_grades (submission_id, grader_id, score, feedback) VALUES (${submission!.id}, ${mainTeacherId}, ${score}, ${pick(feedbackPool)})`;
+            const gradedAt = new Date(Math.min(submittedAt.getTime() + int(1, 5) * 86400000, hours(-2).getTime()));
+            await tx`INSERT INTO submission_grades (submission_id, grader_id, score, feedback, created_at)
+              VALUES (${submission!.id}, ${teacherId}, ${score}, ${pick(feedbackPool)}, ${gradedAt})`;
+            await recordAudit(tx, teacherId, "demo_seed.submission_graded", "submissions", submission!.id, requestId());
           }
         }
       }
@@ -574,7 +632,7 @@ async function main() {
           VALUES (${challenge!.id}, ${course.id}, ${pick(projectTitles)},
             'Aplikasi web sederhana yang dibangun sebagai capstone project menggunakan HTML, CSS, dan JavaScript murni.',
             ${submitted ? "https://github.com/hsi-santri/capstone-demo" : null}, ${status}, ${firstSubmittedAt}, ${submittedAt},
-            ${showcase ? days(-2) : null}, ${showcase ? mainTeacherId : null}, ${members[0]}) RETURNING id`;
+            ${showcase ? days(-2) : null}, ${showcase ? teacherId : null}, ${members[0]}) RETURNING id`;
         for (const memberId of members) await tx`INSERT INTO project_members (project_id, activity_id, student_id) VALUES (${project!.id}, ${challenge!.id}, ${memberId})`;
 
         const cardDefs: { title: string; status: "todo" | "in_progress" | "review" | "done" }[] = [
@@ -589,28 +647,250 @@ async function main() {
             VALUES (${project!.id}, ${cardDefs[i]!.title}, ${cardDefs[i]!.status}, ${i}, ${pick(members)}, ${members[0]})`;
         }
 
+        const reviewedAt = submittedAt ? new Date(Math.min(submittedAt.getTime() + int(1, 4) * 86400000, hours(-3).getTime())) : null;
         if (status === "changes_requested") {
-          await tx`INSERT INTO project_reviews (project_id, reviewer_id, decision, feedback)
-            VALUES (${project!.id}, ${mainTeacherId}, 'changes_requested', 'Sudah bagus, tetapi mohon perbaiki responsivitas tampilan pada layar kecil dan tambahkan validasi input sebelum diajukan ulang.')`;
+          await tx`INSERT INTO project_reviews (project_id, reviewer_id, decision, feedback, created_at)
+            VALUES (${project!.id}, ${teacherId}, 'changes_requested', 'Sudah bagus, tetapi mohon perbaiki responsivitas tampilan pada layar kecil dan tambahkan validasi input sebelum diajukan ulang.', ${reviewedAt})`;
         } else if (status === "approved") {
           const score = int(78, 96);
-          await tx`INSERT INTO project_reviews (project_id, reviewer_id, decision, score, feedback)
-            VALUES (${project!.id}, ${mainTeacherId}, 'approved', ${score}, 'Project selesai dengan baik, fungsional, dan bermanfaat. Selamat!')`;
+          await tx`INSERT INTO project_reviews (project_id, reviewer_id, decision, score, feedback, created_at)
+            VALUES (${project!.id}, ${teacherId}, 'approved', ${score}, 'Project selesai dengan baik, fungsional, dan bermanfaat. Selamat!', ${reviewedAt})`;
           for (const memberId of members) {
             await tx`INSERT INTO portfolio_entries (project_id, student_id, reflection)
               VALUES (${project!.id}, ${memberId}, 'Project ini mengajarkan saya cara bekerja sama dalam tim, membagi tugas lewat papan Kanban, dan menyelesaikan aplikasi nyata dari awal hingga direview oleh pembimbing.')`;
           }
-          if (showcase) await recordAudit(tx, mainTeacherId, "demo_seed.project_showcased", "projects", project!.id, requestId());
+          if (showcase) await recordAudit(tx, teacherId, "demo_seed.project_showcased", "projects", project!.id, requestId());
         }
       }
+
+      // --- Classroom sessions, attendance, and QR check-in -----------------------------
+      // Written the way the application writes it: a roster snapshot per session, an
+      // append-only attendance chain whose newest row wins, lifecycle events carrying the
+      // version they produced, and a live QR window on the class running right now.
+      const roster = await tx<{ id: string; name: string; identifier: string | null }[]>`SELECT u.id, u.display_name AS name,
+          (SELECT p.identifier FROM user_profiles p JOIN roles r ON r.id = p.role_id WHERE p.user_id = u.id AND r.key = 'student') AS identifier
+        FROM class_members m JOIN users u ON u.id = m.student_id
+        WHERE m.class_id = ${classIds[course.classIndex]} AND u.is_active ORDER BY u.id`;
+      interface SeededRecord { studentId: string; recordId: string; status: string }
+      async function seedSession(title: string, startsAt: Date, endsAt: Date, kind: "closed" | "cancelled" | "open" | "scheduled", note: string) {
+        const requestKey = crypto.randomUUID();
+        const payload = JSON.stringify({ courseId: course.id, title, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), requestKey, note });
+        const reason = kind === "cancelled" ? "Guru berhalangan hadir; materi digabungkan ke pertemuan berikutnya." : "";
+        const [session] = await tx<{ id: string }[]>`INSERT INTO classroom_sessions
+            (course_id, title, starts_at, ends_at, status, note, reason, created_by, request_key, creation_payload, created_at, updated_at)
+          VALUES (${course.id}, ${title}, ${startsAt}, ${endsAt}, ${kind}, ${note}, ${reason}, ${teacherId}, ${requestKey},
+            ${payload}::text::jsonb, ${new Date(startsAt.getTime() - 7 * 86400000)}, ${startsAt}) RETURNING id`;
+        const sessionId = session!.id;
+        for (const student of roster) {
+          await tx`INSERT INTO classroom_roster (session_id, student_id, student_name, identifier)
+            VALUES (${sessionId}, ${student.id}, ${student.name}, ${student.identifier})`;
+        }
+        // The session version counts every change: each lifecycle action and each recorded
+        // or corrected attendance row, exactly as the routes increment it.
+        let version = 1;
+        const records: SeededRecord[] = [];
+        const lifecycle = async (action: string, at: Date, why: string) => {
+          version += 1;
+          await tx`INSERT INTO classroom_session_events (session_id, actor_id, version, action, reason, note, created_at)
+            VALUES (${sessionId}, ${teacherId}, ${version}, ${action}, ${why}, ${note}, ${at})`;
+        };
+        if (kind === "cancelled") await lifecycle("cancel", new Date(startsAt.getTime() - 86400000), reason);
+        if (kind === "closed" || kind === "open") {
+          await lifecycle("open", startsAt, "");
+          for (const student of roster) {
+            // A session still running is only partly filled in, like a real classroom.
+            if (kind === "open" && chance(0.3)) continue;
+            const status = attendanceStatus(STUDENTS[studentIds.indexOf(student.id)]!.skill);
+            const recordedAt = new Date(Math.min(startsAt.getTime() + int(2, 25) * 60000, NOW.getTime()));
+            const note = status === "sick" ? "Ada surat izin sakit dari musyrif asrama."
+              : status === "excused" ? "Izin mengikuti kegiatan organisasi santri." : "";
+            version += 1;
+            const [record] = await tx<{ id: string }[]>`INSERT INTO attendance_records (session_id, student_id, status, note, recorded_by, previous_id, created_at)
+              VALUES (${sessionId}, ${student.id}, ${status}, ${note}, ${teacherId}, NULL, ${recordedAt}) RETURNING id`;
+            let recordId = record!.id, latest = status;
+            if (kind === "closed" && status === "absent" && chance(0.45)) {
+              version += 1;
+              const [correction] = await tx<{ id: string }[]>`INSERT INTO attendance_records (session_id, student_id, status, note, recorded_by, previous_id, created_at)
+                VALUES (${sessionId}, ${student.id}, 'excused', 'Koreksi: santri mewakili sekolah pada lomba tingkat kabupaten.', ${teacherId}, ${recordId},
+                  ${new Date(recordedAt.getTime() + 3 * 3600000)}) RETURNING id`;
+              recordId = correction!.id;
+              latest = "excused";
+              await recordAudit(tx, teacherId, "demo_seed.attendance_corrected", "attendance_records", recordId, requestId());
+            }
+            records.push({ studentId: student.id, recordId, status: latest });
+          }
+          if (kind === "closed") {
+            await lifecycle("close", endsAt, "");
+            await recordAudit(tx, teacherId, "demo_seed.session_closed", "classroom_sessions", sessionId, requestId());
+          }
+        }
+        await tx`UPDATE classroom_sessions SET version = ${version} WHERE id = ${sessionId}`;
+        return { id: sessionId, startsAt, records };
+      }
+
+      // Only code digests are stored, so a seeded code can never be presented: the live
+      // window issues a fresh code as soon as a teacher opens the QR display.
+      async function seedCheckins(session: { id: string; records: SeededRecord[] }, status: "open" | "stopped", openedAt: Date, lateAfter: Date) {
+        const operation = JSON.stringify({ action: status === "open" ? "start" : "stop", rotateSeconds: 30, lateAfter: lateAfter.toISOString() });
+        await tx`INSERT INTO attendance_checkin_windows (session_id, status, rotate_seconds, late_after, opened_by, last_operation, created_at, updated_at)
+          VALUES (${session.id}, ${status}, 30, ${lateAfter}, ${teacherId}, ${operation}::text::jsonb, ${openedAt}, ${openedAt})`;
+        const [code] = await tx<{ id: string }[]>`INSERT INTO attendance_checkin_codes (session_id, code_hash, issued_by, issued_at, expires_at)
+          VALUES (${session.id}, ${sha256(crypto.randomUUID())}, ${teacherId}, ${openedAt}, ${new Date(openedAt.getTime() + 30000)}) RETURNING id`;
+        for (const record of session.records.filter(r => r.status === "present" || r.status === "late").slice(0, 6)) {
+          await tx`INSERT INTO attendance_checkins (session_id, student_id, code_id, record_id, status, created_at)
+            VALUES (${session.id}, ${record.studentId}, ${code!.id}, ${record.recordId}, ${record.status}, ${new Date(openedAt.getTime() + int(10, 240) * 1000)})`;
+        }
+        if (status === "open") await enqueueCheckin(tx, session.id);
+      }
+
+      const meetHour = 7 + course.classIndex;
+      const closed: { id: string; startsAt: Date; records: SeededRecord[] }[] = [];
+      for (let week = 0; week < 8; week++) {
+        const startsAt = wib(-56 + week * 7, meetHour);
+        closed.push(await seedSession(`Pertemuan ${week + 1} – ${CHAPTERS[week * 2]!.title}`, startsAt, new Date(startsAt.getTime() + 90 * 60000),
+          "closed", "Materi tersampaikan sesuai rencana pembelajaran."));
+      }
+      const cancelledAt = wib(-7, meetHour);
+      await seedSession("Pertemuan 9 – Praktik Mandiri", cancelledAt, new Date(cancelledAt.getTime() + 90 * 60000), "cancelled", "");
+      // The class started a moment ago and its late threshold is still ahead, so a santri who
+      // checks in during a walkthrough is marked present rather than late.
+      const liveAt = hours(-0.35 - course.classIndex * 0.2);
+      const live = await seedSession(`Pertemuan 10 – ${CHAPTERS[16]!.title}`, liveAt, new Date(liveAt.getTime() + 90 * 60000),
+        "open", "Sesi sedang berjalan; absensi QR ditampilkan di layar kelas.");
+      // The next meeting sits inside the worker's 24-hour window, so it produces reminders.
+      const nextAt = withinReminderWindow(meetHour);
+      await seedSession("Pertemuan 11 – Review dan Latihan Soal", nextAt, new Date(nextAt.getTime() + 90 * 60000), "scheduled", "");
+      await seedCheckins(live, "open", new Date(liveAt.getTime() + 2 * 60000), new Date(liveAt.getTime() + 45 * 60000));
+      for (const session of closed.slice(-2)) {
+        await seedCheckins(session, "stopped", new Date(session.startsAt.getTime() + 2 * 60000), new Date(session.startsAt.getTime() + 15 * 60000));
+      }
+      await recordAudit(tx, teacherId, "demo_seed.checkin_started", "attendance_checkin_windows", live.id, requestId());
+    }
+
+    // --- Gamification: XP and badges through the application's own award path -----------
+    // Calling awardXp keeps the ledger, the badge thresholds, and the level-up notices
+    // identical to what a real term would have produced, including its idempotency: a
+    // repeated attempt or a regrade adds nothing. Awards run oldest first so levels rise in
+    // order, then every entry is moved back to the event that earned it.
+    const awardRequest = requestId();
+    const awards: { at: string; run: () => Promise<unknown> }[] = [];
+    for (const row of await tx<{ studentId: string; lessonId: string; courseId: string; at: string }[]>`
+      SELECT lc.student_id AS "studentId", lc.lesson_id AS "lessonId", l.course_id AS "courseId",
+        to_char(lc.completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at
+      FROM lesson_completions lc JOIN lessons l ON l.id = lc.lesson_id`) {
+      awards.push({ at: row.at, run: () => awardXp(tx, row.studentId, "lesson.completed", "lessons", row.lessonId, row.courseId, awardRequest) });
+    }
+    for (const row of await tx<{ studentId: string; submissionId: string; courseId: string; at: string }[]>`
+      SELECT s.student_id AS "studentId", s.id AS "submissionId", a.course_id AS "courseId",
+        to_char(g.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at
+      FROM submissions s JOIN activities a ON a.id = s.activity_id
+      JOIN LATERAL (SELECT sg.created_at FROM submission_grades sg WHERE sg.submission_id = s.id ORDER BY sg.created_at DESC, sg.id DESC LIMIT 1) g ON true`) {
+      awards.push({ at: row.at, run: () => awardXp(tx, row.studentId, "assignment.graded", "submissions", row.submissionId, row.courseId, awardRequest) });
+    }
+    for (const row of await tx<{ studentId: string; activityId: string; courseId: string; at: string }[]>`
+      SELECT t.student_id AS "studentId", t.activity_id AS "activityId", a.course_id AS "courseId",
+        to_char(min(t.submitted_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at
+      FROM attempts t JOIN activities a ON a.id = t.activity_id WHERE t.submitted_at IS NOT NULL
+      GROUP BY t.student_id, t.activity_id, a.course_id`) {
+      awards.push({ at: row.at, run: () => awardXp(tx, row.studentId, "assessment.completed", "activities", row.activityId, row.courseId, awardRequest) });
+    }
+    for (const row of await tx<{ projectId: string; courseId: string; at: string }[]>`
+      SELECT p.id AS "projectId", p.course_id AS "courseId",
+        to_char(max(r.created_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at
+      FROM projects p JOIN project_reviews r ON r.project_id = p.id AND r.decision = 'approved'
+      WHERE p.status = 'approved' GROUP BY p.id, p.course_id`) {
+      awards.push({ at: row.at, run: () => awardProjectApproval(tx, row.projectId, row.courseId, awardRequest) });
+    }
+    awards.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+    for (const award of awards) await award.run();
+
+    // Backdate the ledger to its sources. Levels and badges are derived from totals, so
+    // moving the dates changes only the story the growth timeline tells.
+    await tx`UPDATE xp_entries x SET awarded_at = lc.completed_at FROM lesson_completions lc
+      WHERE x.source_type = 'lessons' AND lc.lesson_id = x.source_id AND lc.student_id = x.student_id`;
+    await tx`UPDATE xp_entries x SET awarded_at = g.created_at
+      FROM (SELECT DISTINCT ON (submission_id) submission_id, created_at FROM submission_grades ORDER BY submission_id, created_at DESC, id DESC) g
+      WHERE x.source_type = 'submissions' AND g.submission_id = x.source_id`;
+    await tx`UPDATE xp_entries x SET awarded_at = t.at
+      FROM (SELECT student_id, activity_id, min(submitted_at) AS at FROM attempts WHERE submitted_at IS NOT NULL GROUP BY student_id, activity_id) t
+      WHERE x.source_type = 'activities' AND t.activity_id = x.source_id AND t.student_id = x.student_id`;
+    await tx`UPDATE xp_entries x SET awarded_at = r.at
+      FROM (SELECT project_id, max(created_at) AS at FROM project_reviews WHERE decision = 'approved' GROUP BY project_id) r
+      WHERE x.source_type = 'projects' AND r.project_id = x.source_id`;
+    // A badge was earned at the entry that first met its threshold, not at the end of seeding.
+    await tx`WITH ledger AS (
+        SELECT student_id, awarded_at, sum(points) OVER w AS xp_total,
+          count(*) FILTER (WHERE rule_key = 'lesson.completed') OVER w AS lessons_completed,
+          count(*) FILTER (WHERE rule_key = 'assignment.graded') OVER w AS assignments_graded,
+          count(*) FILTER (WHERE rule_key = 'assessment.completed') OVER w AS assessments_completed,
+          count(*) FILTER (WHERE rule_key = 'project.approved') OVER w AS projects_approved
+        FROM xp_entries WINDOW w AS (PARTITION BY student_id ORDER BY awarded_at, id)
+      )
+      UPDATE badge_awards ba SET awarded_at = COALESCE((SELECT min(l.awarded_at) FROM ledger l JOIN badges b ON b.id = ba.badge_id
+        WHERE l.student_id = ba.student_id AND b.threshold <= CASE b.criterion
+          WHEN 'xp_total' THEN l.xp_total WHEN 'lessons_completed' THEN l.lessons_completed
+          WHEN 'assignments_graded' THEN l.assignments_graded WHEN 'assessments_completed' THEN l.assessments_completed
+          ELSE l.projects_approved END), ba.awarded_at)`;
+
+    // --- Academic calendar ---------------------------------------------------------------
+    // The demo seeds no administrator, so school-wide events are attributed to a teacher.
+    // Only capabilities decide who may edit them, so an administrator still gets the full
+    // manage flow and a santri still sees them read-only.
+    async function seedEvent(title: string, description: string, startsAt: Date, endsAt: Date, courseId: string | null, archived = false) {
+      const operation = JSON.stringify({ title, description, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), courseId });
+      const [row] = await tx<{ id: string }[]>`INSERT INTO academic_events
+          (course_id, title, description, starts_at, ends_at, created_by, request_key, last_operation, archived_at, created_at)
+        VALUES (${courseId}, ${title}, ${description}, ${startsAt}, ${endsAt}, ${mainTeacherId}, ${crypto.randomUUID()}, ${operation}::text::jsonb,
+          ${archived ? days(-3) : null}, ${new Date(Math.min(startsAt.getTime() - 10 * 86400000, days(-1).getTime()))}) RETURNING id`;
+      await recordAudit(tx, mainTeacherId, "demo_seed.event_created", "academic_events", row!.id, requestId());
+    }
+    await seedEvent("Upacara Pembukaan Semester Ganjil", "Seluruh santri dan guru berkumpul di lapangan utama pukul 07.00 WIB.", wib(-55, 7), wib(-55, 9), null);
+    await seedEvent("Pekan Olahraga Santri", "Pertandingan antarkelas sepanjang pekan; kegiatan belajar diliburkan.", wib(-20, 7), wib(-16, 17), null);
+    await seedEvent("Studi Banding ke Kampus IT", "Diarsipkan sementara sambil menunggu jadwal baru dari yayasan.", wib(-10, 7), wib(-10, 15), null, true);
+    // Starts inside the reminder window, so every role receives an event reminder.
+    const meetingAt = withinReminderWindow(19, 9);
+    await seedEvent("Rapat Wali Santri Semester Ganjil", "Penyampaian laporan perkembangan santri kepada wali santri di aula.",
+      meetingAt, new Date(meetingAt.getTime() + 2 * 3600000), null);
+    await seedEvent("Praktikum Bersama: Debugging JavaScript", "Praktikum tambahan di laboratorium komputer untuk kelas ini.", wib(3, 13), wib(3, 15), courses[0]!.id);
+    await seedEvent("Libur Maulid Nabi", "Tidak ada kegiatan belajar mengajar.", wib(30, 0), wib(30, 23), null);
+    await seedEvent("Ujian Akhir Semester Ganjil", "Pekan ujian akhir semester untuk seluruh tingkat.", wib(80, 7), wib(87, 12), null);
+
+    // A few santri have tuned their notifications, so the preference form starts from a
+    // saved state and the worker has something to suppress rather than deliver.
+    for (let index = 0; index < 6; index++) {
+      await tx`INSERT INTO notification_preferences (user_id, reminders, level_up, checkin, updated_at)
+        VALUES (${studentIds[studentIds.length - 1 - index]}, ${index !== 0}, ${index !== 1}, ${index !== 2}, ${days(-int(2, 20))})`;
     }
   });
+
+  // The application's own worker fills the inbox: reminders for work still outstanding,
+  // level-up notices for the XP just awarded, and the QR notice for the class running now.
+  // Running it here is the same tick the server would run at startup, only sooner.
+  let generated = 0, delivered = 0, suppressed = 0;
+  for (let tick = 0; tick < 20; tick++) {
+    const result = await notificationTick(db);
+    generated += result.generated;
+    delivered += result.delivered;
+    suppressed += result.suppressed;
+    if (!result.generated && !result.delivered && !result.suppressed) break;
+  }
+  // Part of the inbox has already been read, so the unread filter shows a real difference.
+  await db`UPDATE notifications SET read_at = clock_timestamp()
+    WHERE status = 'delivered' AND read_at IS NULL AND left(md5(id::text), 1) IN ('0', '1', '2', '3', '4')`;
+  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number }[]>`SELECT
+    (SELECT COALESCE(sum(points), 0)::int FROM xp_entries) AS xp, (SELECT count(*)::int FROM badge_awards) AS badges,
+    (SELECT count(*)::int FROM classroom_sessions) AS sessions, (SELECT count(*)::int FROM attendance_records) AS records,
+    (SELECT count(*)::int FROM academic_events) AS events`;
 
   console.log("Demo data seeded.");
   console.log(`- Academic year: ${DEMO_ACADEMIC_YEAR}, classes: ${CLASS_NAMES.join(", ")}`);
   console.log(`- Teachers: ${TEACHERS.map(t => t.email).join(", ")}`);
   console.log(`- Students: ${STUDENTS.length} accounts (e.g. ${STUDENTS[0]!.email})`);
   console.log(`- Shared demo password: ${DEMO_PASSWORD}`);
+  console.log(`- Gamification: ${totals!.xp} XP awarded, ${totals!.badges} badges earned`);
+  console.log(`- Attendance: ${totals!.sessions} classroom sessions, ${totals!.records} attendance rows, QR check-in open on the session running now`);
+  console.log(`- Calendar: ${totals!.events} academic events; notifications ${generated} generated, ${delivered} delivered, ${suppressed} suppressed by preference`);
+  console.log("- Reports derive from the data above; an administrator sees every course, a teacher only the ones they teach.");
   console.log("Bootstrap an administrator separately with `bun run db:bootstrap-admin` if one does not exist yet.");
 }
 

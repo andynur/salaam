@@ -147,10 +147,7 @@ administrator through the administration UI.
 
 ## Demo dataset
 
-To explore or demo SALAAM with data that looks like a real term in progress — one academic
-year, three classes, two teachers, 36 students, a full JavaScript course following the
-"Modern JavaScript Programming" handbook curriculum, graded and ungraded assignments, a
-closed exam, an open quiz, and capstone projects at every review stage — run against a
+To explore or demo SALAAM with data that looks like a real term in progress, run against a
 freshly migrated, empty development database:
 
 ```sh
@@ -158,11 +155,29 @@ bun run db:migrate
 bun run db:seed:demo
 ```
 
-The script prints the shared demo password on success; every seeded account uses it. It is
-development-only, refuses to run twice against the same database (reset with
-`bun run db:migrate:reset` first), and runs in a single transaction so a failure leaves no
-partial data. It does not create an administrator; run `bun run db:bootstrap-admin` (or
-`db:seed`) separately.
+The dataset covers every delivered phase, so each role has something to work with:
+
+| Role | What the demo shows |
+| --- | --- |
+| Administrator | 38 accounts and role profiles, one academic year with two terms, three classes, three courses, reward rules and the badge catalogue, an audit log, and cross-course reports with CSV exports |
+| Teacher | A full JavaScript course following the "Modern JavaScript Programming" curriculum, submissions waiting to be graded, a closed exam and an open quiz, capstone projects at every review stage, eight weeks of recorded attendance, a class running right now with QR check-in open, and the class leaderboard |
+| Santri | Lessons taught and still to come, an assignment due tonight, an open quiz, XP and badges earned over the term, attendance history, an agenda, and an inbox of delivered reminders |
+
+Two teachers hold overlapping but different scopes — Ahmad teaches X RPL 1 and X RPL 2,
+Siti teaches X RPL 2 and XI RPL 1 — so scoped reports and leaderboards differ per teacher
+and from what an administrator sees. Accounts use the `@hsibs.my.id` domain and the script
+prints the shared demo password on success; every seeded account uses it.
+
+Timings are relative to the moment you seed: the running class, the deadline, the quiz
+window, and the next meeting all fall inside the notification worker's 24-hour reminder
+window, and the seed runs that worker once so the inbox is not empty. Synthetic history is
+audited under `demo_seed.*` event names so the audit log never claims a real request
+happened.
+
+The script is development-only, refuses to run twice against the same database (reset with
+`bun run db:migrate:reset` first), and writes its dataset in a single transaction so a
+failure leaves no partial data. It does not create an administrator; run
+`bun run db:bootstrap-admin` (or `db:seed`) separately.
 
 ## Database migrations
 

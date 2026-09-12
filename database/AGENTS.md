@@ -21,6 +21,8 @@ Use skill `add-migration` for the step-by-step procedure.
   `role_permissions`.
 - Seeds: `seed/admin.ts` creates a development-only admin; `seed/bootstrap-admin.ts` creates
   the first admin in any environment and refuses when one exists; `seed/demo.ts` fills a
-  freshly migrated development database with a full realistic demo dataset (identity through
-  Phase 4 project learning) and refuses if it already ran. See the README's "Demo dataset"
+  freshly migrated development database with a full realistic demo dataset covering every
+  delivered phase, and refuses if it already ran. It reuses the application's own award and
+  notification code rather than writing derived rows by hand, and audits synthetic history
+  under `demo_seed.*` event names. See the README's "Demo dataset"
   section.
