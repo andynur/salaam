@@ -64,6 +64,8 @@ during implementation and are recorded here.
 - **Visibility.** A manager sees the window settings and the tally. A santri sees only
   whether check-in is open and their own status and timestamp, never the class tally or a
   classmate's row.
+- **Breakdown.** A manager now sees the session QR breakdown (scanned, present, late, and
+  unscanned) derived from `attendance_checkins`, plus the per-roster scan status and time.
 - **Limits.** Ten-character codes from a 32-symbol alphabet that excludes I, L, O, and U;
   4 KiB check-in request bodies; 15–300 second rotation; 2,000 codes per window.
 - **Locking.** Window changes lock the course and session rows exclusively, matching the
@@ -182,7 +184,8 @@ Phase 7 does not include:
 - Calendar entries and notifications for an opened window (Phase 8).
 - Cross-course QR reporting and exports (Phase 9).
 - Geofencing, device binding, proctoring, and biometric identification.
-- Recurring windows, bulk check-in import, and roster changes after session creation.
+- Recurring windows and bulk check-in import remain deferred. Roster changes after session
+  creation are delivered in Phase 28; the manager QR breakdown is delivered in Phase 29.
 
 A displayed code is a proof of presence, not proof of a person: a santri in the room can
 photograph the code and send it to an absent classmate inside the rotation interval.

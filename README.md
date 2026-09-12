@@ -60,6 +60,7 @@ environment-specific validation.
 | 26 — Project file deliverables | Private uploaded project deliverables with secure downloads | [Phase 26](docs/phases/26-project-file-deliverables.md) |
 | 27 — Reporting trends | Twelve-week scoped attendance and learning activity trends | [Phase 27](docs/phases/27-report-trends.md) |
 | 28 — Attendance roster adjustments | Version-checked session and future-series roster changes with preserved attendance history | [Phase 28](docs/phases/28-attendance-roster-adjustments.md) |
+| 29 — QR attendance breakdown | Manager QR scan status and derived per-session breakdown | [Phase 29](docs/phases/29-qr-attendance-breakdown.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

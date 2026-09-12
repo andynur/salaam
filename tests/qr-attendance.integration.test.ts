@@ -163,7 +163,9 @@ describe.skipIf(!url)("Phase 7 QR attendance (isolated PostgreSQL schema)", () =
     const personal = await detail(f.path, people.student.cookie);
     expect(personal.checkin.me.status).toBe("present");
     expect(personal.counts.present).toBe(1);
-    expect((await detail(f.path)).checkin.window.checkedIn).toBe(1);
+    const manager = await detail(f.path);
+    expect(manager.checkin.window.checkedIn).toBe(1);
+    expect(manager.qrBreakdown).toEqual({ scanned: 1, present: 1, late: 0, unscanned: 1 });
     expect((await db`SELECT count(*)::int AS total FROM xp_entries`)[0]!.total).toBe(0);
     expect((await db`SELECT event FROM audit_logs a JOIN attendance_records r ON r.id = a.resource_id WHERE a.event = 'classroom.attendance.checked_in' AND r.session_id = ${f.id}`)).toHaveLength(1);
   });
@@ -233,6 +235,7 @@ describe.skipIf(!url)("Phase 7 QR attendance (isolated PostgreSQL schema)", () =
     expect(performance.now() - started).toBeLessThan(15000);
     expect((await db`SELECT count(*)::int AS total FROM attendance_checkins WHERE session_id = ${f.id}`)[0]!.total).toBe(125);
     expect((await detail(f.path)).counts).toMatchObject({ total: 125, unrecorded: 0, present: 125 });
+    expect((await detail(f.path)).qrBreakdown).toEqual({ scanned: 125, present: 125, late: 0, unscanned: 0 });
     // A duplicate burst from one santri still produces exactly one record.
     const again = await Promise.all(Array.from({ length: 5 }, () => checkin(f.path, code, cookies[0]!)));
     expect(again.every(response => [201, 409].includes(response.status))).toBe(true);

@@ -5,9 +5,10 @@ export const sessionLabels = { scheduled: "Terjadwal", open: "Berlangsung", clos
 export type SessionStatus = keyof typeof sessionLabels;
 export interface Meeting { id: string; courseId: string; title: string; startsAt: string; endsAt: string; status: SessionStatus; version: number; note: string | null; reason: string | null; seriesId?: string | null; occurrenceIndex?: number | null }
 export interface MeetingSeriesInput { title: string; startsAt: string; endsAt: string; intervalDays: number; occurrenceCount: number; note: string; qrRotateSeconds: number; qrLateAfterMinutes: number | null; requestKey: string }
-export interface AttendanceRow { studentId: string; studentName: string; identifier: string | null; recordId: string | null; status: AttendanceStatus | null; note: string | null; recordedAt: string | null }
+export interface AttendanceRow { studentId: string; studentName: string; identifier: string | null; recordId: string | null; status: AttendanceStatus | null; note: string | null; recordedAt: string | null; checkinStatus?: "present" | "late" | null; checkedInAt?: string | null }
 export interface AttendanceCounts { total: number; unrecorded: number; present: number; late: number; excused: number; sick: number; absent: number }
-export interface MeetingDetail { course: LearningCourse; session: Meeting; counts: AttendanceCounts; roster: Page<AttendanceRow>; checkin: CheckinState }
+export interface QrBreakdown { scanned: number; present: number; late: number; unscanned: number }
+export interface MeetingDetail { course: LearningCourse; session: Meeting; counts: AttendanceCounts; qrBreakdown: QrBreakdown; roster: Page<AttendanceRow>; checkin: CheckinState }
 export interface RosterOption { studentId: string; studentName: string; identifier: string | null }
 export interface AttendanceReport extends AttendanceCounts { studentId: string; studentName: string; closed: number; attended: number; rate: number | null }
 export interface SessionEvent { id: string; sessionId: string; actorId: string; actorName: string; version: number; action: string; reason: string; note: string; createdAt: string }

@@ -6,7 +6,7 @@ import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
 import { attendanceInput, bulkAttendanceInput, meetingInput, meetingSeriesInput, operationInput, rosterAdjustmentInput } from "./input";
 import { checkinState } from "./checkin";
-import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, RosterOption, SessionEvent } from "../../shared/attendance";
+import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, QrBreakdown, RosterOption, SessionEvent } from "../../shared/attendance";
 export const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
 export function page<T>(rows: T[], offset: number) { return { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null }; }
 export async function sessionRow(tx: SQL, courseId: string, sessionId: string, lock: boolean | "share" = false) {
@@ -87,9 +87,11 @@ export async function meetingDetail(db: SQL, actor: Actor, courseId: string, ses
       session.note = null; session.reason = null;
     }
     const rows = await tx<AttendanceRow[]>`SELECT r.student_id AS "studentId", r.student_name AS "studentName", r.identifier,
-      a.id AS "recordId", a.status, CASE WHEN ${course.canManage} THEN a.note END AS note, a.created_at::text AS "recordedAt"
+      a.id AS "recordId", a.status, CASE WHEN ${course.canManage} THEN a.note END AS note, a.created_at::text AS "recordedAt",
+      CASE WHEN ${course.canManage} THEN c.status END AS "checkinStatus", CASE WHEN ${course.canManage} THEN c.created_at::text END AS "checkedInAt"
       FROM classroom_roster r LEFT JOIN attendance_records a ON a.session_id = r.session_id AND a.student_id = r.student_id
         AND NOT EXISTS (SELECT 1 FROM attendance_records child WHERE child.previous_id = a.id)
+      LEFT JOIN attendance_checkins c ON c.session_id = r.session_id AND c.student_id = r.student_id
       WHERE r.session_id = ${sessionId} AND r.removed_at IS NULL AND (${course.canManage} OR r.student_id = ${actor.id})
         AND (r.student_name ILIKE ${pattern} OR r.identifier ILIKE ${pattern})
       ORDER BY r.student_name, r.student_id LIMIT 51 OFFSET ${offset}`;
@@ -99,7 +101,13 @@ export async function meetingDetail(db: SQL, actor: Actor, courseId: string, ses
       FROM classroom_roster r LEFT JOIN attendance_records a ON a.session_id = r.session_id AND a.student_id = r.student_id
         AND NOT EXISTS (SELECT 1 FROM attendance_records child WHERE child.previous_id = a.id)
       WHERE r.session_id = ${sessionId} AND r.removed_at IS NULL AND (${course.canManage} OR r.student_id = ${actor.id})`;
-    return { course, session, roster: page(rows, offset), counts: counts!, checkin: await checkinState(tx, actor, sessionId, course.canManage) };
+    const [qrBreakdown] = await tx<QrBreakdown[]>`SELECT count(c.*)::int AS scanned,
+      count(c.*) FILTER (WHERE c.status = 'present')::int AS present,
+      count(c.*) FILTER (WHERE c.status = 'late')::int AS late,
+      (count(r.*) - count(c.*))::int AS unscanned FROM classroom_roster r
+      LEFT JOIN attendance_checkins c ON c.session_id = r.session_id AND c.student_id = r.student_id
+      WHERE r.session_id = ${sessionId} AND r.removed_at IS NULL AND (${course.canManage} OR r.student_id = ${actor.id})`;
+    return { course, session, roster: page(rows, offset), counts: counts!, qrBreakdown: qrBreakdown!, checkin: await checkinState(tx, actor, sessionId, course.canManage) };
   });
 }
 export async function rosterOptions(db: SQL, actor: Actor, courseId: string, sessionId: string): Promise<RosterOption[]> {
