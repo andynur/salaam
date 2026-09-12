@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { taskStatuses, type ProjectDetail, type ProjectTask, type ReviewDecision, type TaskStatus } from "../../shared/project";
+import { taskStatuses, type ProjectDetail, type ProjectTask, type ProjectTaskComment, type ReviewDecision, type TaskStatus } from "../../shared/project";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Icon } from "../components/icons";
-import { Field, errorMessage, formatDateTime, fromLocalInput, toLocalInput } from "../components/learning";
+import { Field, errorMessage, formatDateTime, fromLocalInput, toLocalInput, useData } from "../components/learning";
 import { AvatarStack, MemberPicker, ProjectStatusBadge, initials, jsonRequest, projectsApi, taskStatusLabels } from "../components/projects";
 
 type Run = (path: string, body: unknown, done: string, method?: string) => Promise<boolean>;
@@ -80,7 +80,7 @@ export function ProjectDetailPage({ projectId, timezone, onExpired }: { projectI
   </>;
 }
 
-function Board({ data, pending, run, timezone }: Common) {
+function Board({ data, pending, run, timezone, onExpired }: Common) {
   const [editing, setEditing] = useState("");
   const [adding, setAdding] = useState<TaskStatus | null>(null);
   const [dragging, setDragging] = useState("");
@@ -112,7 +112,7 @@ function Board({ data, pending, run, timezone }: Common) {
   const dragOver = (event: DragEvent, status: TaskStatus) => { if (dragging) { event.preventDefault(); setDropTarget(status); } };
   return <>
     <p className="visually-hidden" role="status">{announcement}</p>
-    {selected && <TaskEditor key={`${selected.id}-${selected.version}`} task={selected} data={data} pending={pending} run={run} timezone={timezone} close={() => setEditing("")} />}
+    {selected && <TaskEditor key={`${selected.id}-${selected.version}`} task={selected} data={data} pending={pending} run={run} timezone={timezone} onExpired={onExpired} close={() => setEditing("")} />}
     {editable && <p className="learning-muted board-hint">Seret kartu antarkolom, atau gunakan tombol panah pada kartu. Klik judul kartu untuk mengubah detail dan penanggung jawab.</p>}
     <div className="board" role="region" aria-label="Board Kanban" tabIndex={0}>
       {columns.map(({ status, tasks }, columnIndex) => {
@@ -167,9 +167,12 @@ function QuickAdd({ status, pending, run, close }: { status: TaskStatus; pending
   </form>;
 }
 
-function TaskEditor({ task, data, pending, run, timezone, close }: { task: ProjectTask; data: ProjectDetail; pending: boolean; run: Run; timezone: string; close: () => void }) {
+function TaskEditor({ task, data, pending, run, timezone, onExpired, close }: { task: ProjectTask; data: ProjectDetail; pending: boolean; run: Run; timezone: string; onExpired: () => void; close: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
   const editable = data.canEdit;
+  const [commentRevision, setCommentRevision] = useState(0);
+  const [commentError, setCommentError] = useState("");
+  const comments = useData<ProjectTaskComment[]>(`${projectsApi}/${data.project.id}/tasks/${task.id}/comments`, onExpired, commentRevision);
   useEffect(() => {
     panel.current?.scrollIntoView({ block: "nearest" });
     panel.current?.querySelector<HTMLElement>(editable ? "input[name=title]" : "button")?.focus();
@@ -193,6 +196,10 @@ function TaskEditor({ task, data, pending, run, timezone, close }: { task: Proje
       {editable && <div className="form-actions"><Button type="submit">Simpan kartu</Button><Button type="button" className="button-secondary" onClick={archive}><Icon name="archive" />Arsipkan</Button></div>}
     </fieldset></form>
     <p className="learning-muted task-editor-meta">Kolom {taskStatusLabels[task.status]} · diperbarui {formatDateTime(task.updatedAt, timezone)}</p>
+    <section className="task-comments" aria-labelledby={`comments-${task.id}`}><h3 id={`comments-${task.id}`}>Komentar</h3>
+      {comments.error ? <ErrorState message={comments.error} retry={comments.retry} /> : !comments.data ? <LoadingState /> : !comments.data.length ? <p className="learning-muted">Belum ada komentar.</p> : comments.data.map(comment => <article className="comment-entry" key={comment.id}><p>{comment.body}</p><small>{comment.authorName} · {formatDateTime(comment.createdAt, timezone)}</small></article>)}
+      {editable && <form className="learning-form" onSubmit={async event => { event.preventDefault(); setCommentError(""); const form = new FormData(event.currentTarget); try { await api(`${projectsApi}/${data.project.id}/tasks/${task.id}/comments`, jsonRequest({ body: form.get("body") })); event.currentTarget.reset(); setCommentRevision(value => value + 1); } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setCommentError(errorMessage(cause)); } }}><Field name="body" label="Tambahkan komentar" area max={2000} required /><div className="form-actions"><Button type="submit" disabled={pending}>Kirim komentar</Button></div>{commentError && <ErrorState message={commentError} />}</form>}
+    </section>
   </Card></div>;
 }
 

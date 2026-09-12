@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { challengeInput, memberIdsInput, moveInput, projectFilters, projectInput, reflectionInput, reviewInput, showcaseInput, taskInput } from "../src/modules/projects/input";
+import { challengeInput, commentInput, memberIdsInput, moveInput, projectFilters, projectInput, reflectionInput, reviewInput, showcaseInput, taskInput } from "../src/modules/projects/input";
 
 test("challenges are individual or team-based with bounded team sizes and deadlines", () => {
   expect(challengeInput({ title: " Poster ", instructions: "Buat poster", teamMode: "individual" })).toEqual({ title: "Poster", instructions: "Buat poster", dueAt: null, teamMode: "individual", maxTeamSize: 1 });
@@ -54,6 +54,9 @@ test("team members, cards, moves and reviews are strictly validated", () => {
   expect(() => showcaseInput({ showcased: "yes" })).toThrow();
   expect(reflectionInput({ reflection: " Saya belajar kerja tim. " })).toBe("Saya belajar kerja tim.");
   expect(() => reflectionInput({ reflection: "" })).toThrow();
+  expect(commentInput({ body: " Catatan tim " })).toBe("Catatan tim");
+  expect(() => commentInput({ body: " " })).toThrow();
+  expect(() => commentInput({ body: "x".repeat(2001) })).toThrow();
 });
 
 test("project list filters accept known statuses and challenge IDs only", () => {

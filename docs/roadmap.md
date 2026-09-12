@@ -25,13 +25,14 @@ Coding agents follow skill `deliver-phase`.
 | 15 | Submission lifecycle | Delivered — [record](phases/15-submission-lifecycle.md) |
 | 16 | Written assessment grading | Delivered — [record](phases/16-written-assessment-grading.md) |
 | 17 | Assessment rubrics | Delivered — [record](phases/17-assessment-rubrics.md) |
-| 18 | Surveys and questionnaires | In progress — [record](phases/18-surveys-questionnaires.md) |
-| 19 | Assessment marking | In progress — [record](phases/19-assessment-marking.md) |
-| 20 | Assessment accommodations | In progress — [record](phases/20-assessment-accommodations.md) |
-| 21 | Question bank import and export | In progress — [record](phases/21-question-import-export.md) |
-| 22 | Assessment question pools | In progress — [record](phases/22-assessment-question-pools.md) |
-| 23 | Question statistics | In progress — [record](phases/23-question-statistics.md) |
-| 24 | Project task metadata | In progress — [record](phases/24-project-task-metadata.md) |
+| 18 | Surveys and questionnaires | Delivered — [record](phases/18-surveys-questionnaires.md) |
+| 19 | Assessment marking | Delivered — [record](phases/19-assessment-marking.md) |
+| 20 | Assessment accommodations | Delivered — [record](phases/20-assessment-accommodations.md) |
+| 21 | Question bank import and export | Delivered — [record](phases/21-question-import-export.md) |
+| 22 | Assessment question pools | Delivered — [record](phases/22-assessment-question-pools.md) |
+| 23 | Question statistics | Delivered — [record](phases/23-question-statistics.md) |
+| 24 | Project task metadata | Delivered — [record](phases/24-project-task-metadata.md) |
+| 25 | Project task comments | In progress — [record](phases/25-project-task-comments.md) |
 
 ## Delivered
 
@@ -157,8 +158,8 @@ Boundaries section has the details.
   scanning and inline previews; rich text or Markdown.
 - **Phase 3:** proctoring; live monitoring over
   WebSocket.
-- **Phase 4:** student-formed teams; custom columns, comments, and
-  attachments on cards; realtime board sync; file deliverables; rubrics, peer review, and
+- **Phase 4:** student-formed teams; custom columns and attachments on cards; realtime board
+  sync; file deliverables; rubrics, peer review, and
   multiple reviewers; portfolio browsing, public pages, and export; project templates.
 - **Phase 5–7:** XP for attendance (deferred pending a correction/reversal policy); XP decay,
   penalties, and manual grants; streaks, seasons, and resets; student-visible leaderboards;

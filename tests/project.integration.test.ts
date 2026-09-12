@@ -13,7 +13,7 @@ import { learningTasks } from "../src/modules/learning/dashboard";
 import { createTask, moveTask } from "../src/modules/projects/board";
 import type { AcademicResource } from "../src/shared/foundation";
 import type { CourseDetail, Page } from "../src/shared/learning";
-import type { PortfolioEntry, ProjectDetail, ProjectRow, ShowcaseItem, TaskStatus } from "../src/shared/project";
+import type { PortfolioEntry, ProjectDetail, ProjectRow, ProjectTaskComment, ShowcaseItem, TaskStatus } from "../src/shared/project";
 
 const url = process.env.TEST_DATABASE_URL;
 describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", () => {
@@ -158,6 +158,11 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
     const one = await card("Riset kebutuhan", { assigneeId: peer.id, dueAt: "2026-10-01T10:00:00Z", labels: [" UI ", "Backend"] });
     const two = await card("Desain halaman");
     const three = await card("Tulis konten", {}, teacher.cookie);
+    const comment = await json<ProjectTaskComment>(request(project(`${projectId}/tasks/${one.id}/comments`), student.cookie, { body: "  Catatan kebutuhan  " }), 201);
+    expect(comment).toMatchObject({ taskId: one.id, body: "Catatan kebutuhan", authorId: student.id, authorName: "student" });
+    expect(await json<ProjectTaskComment[]>(request(project(`${projectId}/tasks/${one.id}/comments`), peer.cookie))).toEqual([comment]);
+    expect((await request(project(`${projectId}/tasks/${one.id}/comments`), third.cookie)).status).toBe(404);
+    expect((await request(project(`${projectId}/tasks/${one.id}/comments`), student.cookie, { body: " " })).status).toBe(400);
     expect((await request(project(`${projectId}/tasks`), student.cookie, { title: "x", assigneeId: third.id })).status).toBe(400);
     const move = (taskId: string, status: TaskStatus, position: number, version: number, cookie = student.cookie) => request(project(`${projectId}/tasks/${taskId}/move`), cookie, { status, position, version });
     expect(await json<unknown>(move(two.id, "in_progress", 0, 1))).toEqual({ id: two.id, version: 2, status: "in_progress", position: 0 });

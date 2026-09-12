@@ -83,6 +83,9 @@ export function showcaseInput(body: Record<string, unknown>) {
 export function reflectionInput(body: Record<string, unknown>) {
   return textField(body, "reflection", 5000);
 }
+export function commentInput(body: Record<string, unknown>) {
+  return textField(body, "body", 2000);
+}
 export function projectFilters(url: URL) {
   const status = url.searchParams.get("status") || null;
   if (status !== null && !projectStatuses.includes(status as ProjectStatus)) invalid("Filter status tidak valid.");

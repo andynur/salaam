@@ -512,6 +512,11 @@
   .board-quick-actions { display: flex; gap: 8px; }
   .task-editor { margin-bottom: 16px; }
   .task-editor-meta { margin-top: 12px; }
+  .task-comments { display: grid; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+  .task-comments h3 { font-size: 15px; }
+  .comment-entry { padding: 10px 12px; border-radius: 6px; background: var(--color-background); }
+  .comment-entry p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .comment-entry small { display: block; margin-top: 6px; color: var(--color-muted); font-size: 12px; }
 
   .project-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 16px; align-items: start; }
   .project-main, .project-side { display: grid; gap: 16px; min-width: 0; }

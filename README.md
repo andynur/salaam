@@ -56,6 +56,7 @@ environment-specific validation.
 | 22 — Assessment question pools | Random, snapshotted question selection with deterministic scoring | [Phase 22](docs/phases/22-assessment-question-pools.md) |
 | 23 — Question statistics | Derived question-bank usage, response, and automatic correctness metrics | [Phase 23](docs/phases/23-question-statistics.md) |
 | 24 — Project task metadata | Bounded labels and optional card-level deadlines | [Phase 24](docs/phases/24-project-task-metadata.md) |
+| 25 — Project task comments | Member-visible append-only notes on project cards | [Phase 25](docs/phases/25-project-task-comments.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

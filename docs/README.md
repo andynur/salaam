@@ -47,6 +47,7 @@ workflow.
 | 22 — Assessment question pools | [phases/22-assessment-question-pools.md](phases/22-assessment-question-pools.md) |
 | 23 — Question statistics | [phases/23-question-statistics.md](phases/23-question-statistics.md) |
 | 24 — Project task metadata | [phases/24-project-task-metadata.md](phases/24-project-task-metadata.md) |
+| 25 — Project task comments | [phases/25-project-task-comments.md](phases/25-project-task-comments.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

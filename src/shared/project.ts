@@ -20,6 +20,7 @@ export interface ProjectRow {
   teamMode: TeamMode; dueAt: string | null; members: ProjectMember[]; taskCount: number; doneCount: number; showcased: boolean; updatedAt: string;
 }
 export interface ProjectTask { id: string; title: string; description: string; status: TaskStatus; position: number; assigneeId: string | null; assigneeName: string | null; dueAt: string | null; labels: string[]; version: number; updatedAt: string }
+export interface ProjectTaskComment { id: string; taskId: string; body: string; authorId: string; authorName: string; createdAt: string }
 export interface ProjectReview { id: string; decision: ReviewDecision; score: number | null; feedback: string; reviewerName: string; createdAt: string }
 export interface ProjectDetail {
   project: { id: string; title: string; summary: string; deliverableUrl: string | null; status: ProjectStatus; firstSubmittedAt: string | null; submittedAt: string | null; showcasedAt: string | null; updatedAt: string };

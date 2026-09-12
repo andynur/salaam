@@ -5,6 +5,7 @@ import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
 import { listProjects, projectDetail, reviewProject, setProjectMembers, showcaseProject, submitProject, updateProject } from "../modules/projects/service";
 import { archiveTask, createTask, moveTask, updateTask } from "../modules/projects/board";
+import { createTaskComment, listTaskComments } from "../modules/projects/comments";
 import { archivePortfolio, listPortfolio, listShowcase, savePortfolio } from "../modules/projects/portfolio";
 import { projectFilters } from "../modules/projects/input";
 
@@ -29,6 +30,7 @@ export function createProjectHandler(db: SQL) {
         if (parts.length === 1 && first === "showcase") return Response.json(page(await listShowcase(db, actor, pattern, offset), offset));
         if (parts.length === 1 && first === "portfolio") return Response.json(page(await listPortfolio(db, actor, offset), offset));
         if (parts.length === 1) return Response.json(await projectDetail(db, actor, idField({ id: first }, "id")));
+        if (parts.length === 4 && resource === "tasks" && taskIdFrom(parts)) return Response.json(await listTaskComments(db, actor, idField({ id: first }, "id"), taskIdFrom(parts)!));
         throw routeNotFound();
       }
       if ((request.method === "POST" || request.method === "PATCH") && first) {
@@ -48,6 +50,7 @@ export function createProjectHandler(db: SQL) {
         } else if (parts.length === 3 && resource === "portfolio" && item === "archive") {
           return Response.json(await archivePortfolio(db, actor, id, body, requestId));
         } else if (parts.length === 4 && taskId) {
+          if (resource === "tasks" && action === "comments") return Response.json(await createTaskComment(db, actor, id, taskId, body), { status: 201 });
           if (action === "move") return Response.json(await moveTask(db, actor, id, taskId, body));
           if (action === "archive") return Response.json(await archiveTask(db, actor, id, taskId, body));
         }
@@ -57,4 +60,6 @@ export function createProjectHandler(db: SQL) {
     } catch (error) { databaseInputError(error); }
   };
 }
+
+function taskIdFrom(parts: string[]) { return parts[1] === "tasks" && parts[2] && parts[3] === "comments" ? idField({ id: parts[2] }, "id") : null; }
 export type ProjectHandler = ReturnType<typeof createProjectHandler>;
