@@ -69,3 +69,16 @@ export function checkinCodeInput(body: Record<string, unknown>) {
   if (!checkinCodePattern.test(code)) invalid("Kode absensi tidak valid.");
   return code;
 }
+export function checkinImportInput(body: Record<string, unknown>) {
+  const requestKey = idField(body, "requestKey");
+  if (!Array.isArray(body.rows) || body.rows.length < 1 || body.rows.length > 500) invalid("Import scan harus berisi 1–500 baris.");
+  const rows = body.rows.map((value, index) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) invalid(`Baris scan ke-${index + 1} tidak valid.`);
+    const row = value as Record<string, unknown>;
+    const scannedAt = timestampInput(row, "scannedAt", "Waktu scan");
+    if (!scannedAt) invalid(`Baris scan ke-${index + 1}: waktu scan wajib diisi.`);
+    return { studentId: idField(row, "studentId").toLowerCase(), code: checkinCodeInput(row), scannedAt };
+  });
+  if (new Set(rows.map(row => row.studentId)).size !== rows.length) invalid("Setiap santri hanya boleh muncul sekali dalam satu import.");
+  return { requestKey: requestKey.toLowerCase(), rows };
+}

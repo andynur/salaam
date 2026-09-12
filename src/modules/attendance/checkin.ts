@@ -5,7 +5,7 @@ import { requirePermission } from "../../core/permissions";
 import { HttpError } from "../../core/errors";
 import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
-import { checkinCodeInput, checkinWindowInput } from "./input";
+import { checkinCodeInput, checkinImportInput, checkinWindowInput } from "./input";
 import { sessionRow } from "./service";
 import { checkinAlphabet, checkinCodeLength, type CheckinCode, type CheckinState, type CheckinWindow } from "../../shared/attendance";
 // A window may issue many codes; the cap bounds an abandoned display that keeps rotating.
@@ -16,7 +16,7 @@ function generateCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(checkinCodeLength));
   return Array.from(bytes, byte => checkinAlphabet[byte & 31]).join("");
 }
-function hashCode(code: string) { return new Bun.CryptoHasher("sha256").update(code).digest("hex"); }
+export function hashCheckinCode(code: string) { return new Bun.CryptoHasher("sha256").update(code).digest("hex"); }
 export async function checkinState(tx: SQL, actor: Actor, sessionId: string, canManage: boolean): Promise<CheckinState> {
   const [window] = await tx<CheckinWindow[]>`SELECT w.status, w.rotate_seconds AS "rotateSeconds", w.late_after::text AS "lateAfter",
     (SELECT count(*)::int FROM attendance_checkins c WHERE c.session_id = w.session_id) AS "checkedIn"
@@ -69,7 +69,7 @@ export async function issueCheckinCode(db: SQL, actor: Actor, courseId: string, 
       WHERE session_id = ${sessionId} AND expires_at > clock_timestamp()`;
     const code = generateCode();
     const [row] = await tx<{ expiresAt: string }[]>`INSERT INTO attendance_checkin_codes (session_id, code_hash, issued_by, expires_at)
-      VALUES (${sessionId}, ${hashCode(code)}, ${actor.id}, clock_timestamp() + make_interval(secs => ${window.rotateSeconds + graceSeconds}))
+      VALUES (${sessionId}, ${hashCheckinCode(code)}, ${actor.id}, clock_timestamp() + make_interval(secs => ${window.rotateSeconds + graceSeconds}))
       RETURNING expires_at::text AS "expiresAt"`;
     // The plaintext is returned once, here. Only its digest is stored.
     return { code, expiresAt: row!.expiresAt, rotateSeconds: window.rotateSeconds };
@@ -90,7 +90,7 @@ export async function submitCheckin(db: SQL, actor: Actor, courseId: string, ses
     if (done) return done;
     const window = await openWindow(tx, courseId, sessionId);
     const [valid] = await tx<{ id: string }[]>`SELECT id FROM attendance_checkin_codes
-      WHERE session_id = ${sessionId} AND code_hash = ${hashCode(code)} AND expires_at > clock_timestamp()`;
+      WHERE session_id = ${sessionId} AND code_hash = ${hashCheckinCode(code)} AND expires_at > clock_timestamp()`;
     if (!valid) throw new HttpError(409, "INVALID_CODE", "Kode absensi sudah berganti atau salah. Pindai kode terbaru di kelas.");
     if ((await tx`SELECT 1 FROM attendance_records WHERE session_id = ${sessionId} AND student_id = ${actor.id} LIMIT 1`).length) {
       throw new HttpError(409, "ATTENDANCE_RECORDED", "Kehadiran Anda sudah dicatat guru.");
@@ -105,5 +105,40 @@ export async function submitCheckin(db: SQL, actor: Actor, courseId: string, ses
       VALUES (${sessionId}, ${actor.id}, ${valid.id}, ${record!.id}, ${record!.status}) RETURNING created_at::text AS "createdAt"`;
     await recordAudit(tx, actor.id, "classroom.attendance.checked_in", "attendance_records", record!.id, requestId);
     return { status: record!.status, createdAt: entry!.createdAt };
+  });
+}
+export async function importCheckins(db: SQL, actor: Actor, courseId: string, sessionId: string, body: Record<string, unknown>, requestId: string) {
+  requirePermission(actor, "learning.manage");
+  const input = checkinImportInput(body);
+  const payloadHash = new Bun.CryptoHasher("sha256").update(JSON.stringify(input.rows)).digest("hex");
+  return db.begin(async tx => {
+    await courseAccess(tx, actor, courseId, "manage", true);
+    const session = await sessionRow(tx, courseId, sessionId, true);
+    const [existing] = await tx<{ id: string; payloadHash: string; importedCount: number }[]>`SELECT id, payload_hash AS "payloadHash", imported_count AS "importedCount" FROM attendance_checkin_imports WHERE session_id = ${sessionId} AND request_key = ${input.requestKey} FOR UPDATE`;
+    if (existing) {
+      if (existing.payloadHash !== payloadHash) throw new HttpError(409, "STALE_ATTENDANCE", "Kunci import sudah digunakan untuk data berbeda.");
+      return { importId: existing.id, imported: existing.importedCount };
+    }
+    if (session.status === "cancelled") throw new HttpError(409, "SESSION_CANCELLED", "Sesi dibatalkan.");
+    // Imported scanner clocks may differ slightly from the application host; keep a
+    // narrow five-second skew while still rejecting genuinely future-dated scans.
+    const now = new Date(Date.now() + 5000).toISOString();
+    for (const row of input.rows) {
+      if (row.scannedAt > now) throw new HttpError(400, "FUTURE_SCAN", "Waktu scan tidak boleh melewati waktu server.");
+      const [roster] = await tx`SELECT 1 FROM classroom_roster WHERE session_id = ${sessionId} AND student_id = ${row.studentId} AND removed_at IS NULL`;
+      if (!roster) notFound();
+      const [code] = await tx<{ id: string; lateAfter: string | null }[]>`SELECT c.id, w.late_after::text AS "lateAfter" FROM attendance_checkin_codes c JOIN attendance_checkin_windows w ON w.session_id = c.session_id
+        WHERE c.session_id = ${sessionId} AND c.code_hash = ${hashCheckinCode(row.code)} AND c.issued_at <= ${row.scannedAt}::timestamptz AND c.expires_at >= ${row.scannedAt}::timestamptz`;
+      if (!code) throw new HttpError(409, "INVALID_IMPORTED_CODE", "Ada kode import yang tidak pernah berlaku untuk waktu scan.");
+      const [done] = await tx`SELECT 1 FROM attendance_checkins WHERE session_id = ${sessionId} AND student_id = ${row.studentId}`;
+      if (done) throw new HttpError(409, "DUPLICATE_CHECKIN", "Santri sudah memiliki check-in pada sesi ini.");
+      const [record] = await tx<{ id: string }[]>`INSERT INTO attendance_records (session_id, student_id, status, recorded_by, created_at)
+        VALUES (${sessionId}, ${row.studentId}, CASE WHEN ${code.lateAfter}::timestamptz IS NOT NULL AND ${row.scannedAt}::timestamptz > ${code.lateAfter}::timestamptz THEN 'late' ELSE 'present' END, ${actor.id}, ${row.scannedAt}) RETURNING id`;
+      await tx`INSERT INTO attendance_checkins (session_id, student_id, code_id, record_id, status, created_at)
+        SELECT ${sessionId}, ${row.studentId}, ${code.id}, ${record!.id}, a.status, ${row.scannedAt} FROM attendance_records a WHERE a.id = ${record!.id}`;
+    }
+    const [batch] = await tx<{ id: string }[]>`INSERT INTO attendance_checkin_imports (session_id, request_key, payload_hash, imported_count, created_by) VALUES (${sessionId}, ${input.requestKey}, ${payloadHash}, ${input.rows.length}, ${actor.id}) RETURNING id`;
+    await recordAudit(tx, actor.id, "classroom.attendance.checkin_imported", "attendance_checkin_imports", batch!.id, requestId);
+    return { importId: batch!.id, imported: input.rows.length };
   });
 }

@@ -83,6 +83,7 @@ measured operational requirement exists.
 | `0022_project_task_comments` | Append-only project task comments with project-scoped access |
 | `0023_project_file_deliverables` | Optional course-scoped uploaded project deliverables |
 | `0024_attendance_roster_adjustments` | Soft removal and audit-safe roster changes for classroom sessions |
+| `0025_attendance_checkin_imports` | Idempotency records for verified offline QR scan imports |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |

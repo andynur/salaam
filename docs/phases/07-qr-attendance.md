@@ -184,8 +184,8 @@ Phase 7 does not include:
 - Calendar entries and notifications for an opened window (Phase 8).
 - Cross-course QR reporting and exports (Phase 9).
 - Geofencing, device binding, proctoring, and biometric identification.
-- Recurring windows and bulk check-in import remain deferred. Roster changes after session
-  creation are delivered in Phase 28; the manager QR breakdown is delivered in Phase 29.
+- Recurring windows remain deferred. Roster changes after session creation are delivered in
+  Phase 28, the manager QR breakdown in Phase 29, and verified offline scan imports in Phase 30.
 
 A displayed code is a proof of presence, not proof of a person: a santri in the room can
 photograph the code and send it to an absent classmate inside the rotation interval.

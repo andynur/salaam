@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinWindowInput, meetingInput, meetingSeriesInput, operationInput, rosterAdjustmentInput } from "../src/modules/attendance/input";
+import { attendanceInput, bulkAttendanceInput, checkinCodeInput, checkinImportInput, checkinWindowInput, meetingInput, meetingSeriesInput, operationInput, rosterAdjustmentInput } from "../src/modules/attendance/input";
 const meeting = { title: "Pertemuan", startsAt: "2026-09-12T07:00:00.000Z", endsAt: "2026-09-12T08:00:00.000Z", requestKey: crypto.randomUUID() };
 test("meeting input bounds timestamps, duration, notes and retry identifiers", () => {
   expect(meetingInput(meeting).note).toBe("");
@@ -35,4 +35,10 @@ test("check-in window input bounds rotation and late thresholds", () => {
 test("check-in codes accept only the display alphabet at the exact length", () => {
   expect(checkinCodeInput({ code: "h7k2qm9xz4" })).toBe("H7K2QM9XZ4");
   for (const code of ["", "H7K2QM9XZ", "H7K2QM9XZ44", "H7K2QM9XZI", "H7K2QM9XZ-", "H7K2QM9XZU", 12345] as const) expect(() => checkinCodeInput({ code })).toThrow();
+});
+test("check-in import input requires bounded proof rows", () => {
+  const requestKey = crypto.randomUUID();
+  const row = { studentId: crypto.randomUUID(), code: "H7K2QM9XZ4", scannedAt: "2026-09-12T07:00:00.000Z" };
+  expect(checkinImportInput({ requestKey, rows: [row] }).rows).toHaveLength(1);
+  for (const rows of [[], [{ ...row, code: "bad" }], [{ ...row, scannedAt: "later" }], [{ ...row }, { ...row }]]) expect(() => checkinImportInput({ requestKey, rows })).toThrow();
 });

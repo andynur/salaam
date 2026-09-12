@@ -170,6 +170,20 @@ describe.skipIf(!url)("Phase 7 QR attendance (isolated PostgreSQL schema)", () =
     expect((await db`SELECT event FROM audit_logs a JOIN attendance_records r ON r.id = a.resource_id WHERE a.event = 'classroom.attendance.checked_in' AND r.session_id = ${f.id}`)).toHaveLength(1);
   });
 
+  test("manager check-in imports validate issued codes atomically and retry safely", async () => {
+    const f = await openMeeting();
+    await json(window_(f.path, { action: "start", rotateSeconds: 60 }));
+    const { code } = await json<{ code: string }>(issue(f.path));
+    const scannedAt = new Date(new Date((await db`SELECT issued_at::text AS value FROM attendance_checkin_codes WHERE session_id = ${f.id} ORDER BY issued_at DESC LIMIT 1`)[0]!.value).getTime() + 1000).toISOString();
+    const body = { requestKey: crypto.randomUUID(), rows: [people.student, people.peer].map(person => ({ studentId: person.id, code, scannedAt })) };
+    const imported = await json<{ importId: string; imported: number }>(request(`${f.path}/checkin/import`, people.teacher.cookie, body), 201);
+    expect(imported.imported).toBe(2);
+    expect(await json<{ importId: string; imported: number }>(request(`${f.path}/checkin/import`, people.teacher.cookie, body), 201)).toEqual(imported);
+    expect((await detail(f.path)).qrBreakdown).toEqual({ scanned: 2, present: 2, late: 0, unscanned: 0 });
+    expect((await request(`${f.path}/checkin/import`, people.teacher.cookie, { ...body, rows: [{ ...body.rows[0], studentId: people.student.id, code: "H7K2QM9XZ4" }] })).status).toBe(409);
+    expect((await request(`${f.path}/checkin/import`, people.student.cookie, body)).status).toBe(403);
+  });
+
   test("a late threshold uses the database clock", async () => {
     const f = await openMeeting();
     await json(window_(f.path, { action: "start", rotateSeconds: 60, lateAfter: "2020-01-01T00:00:00.000Z" }));

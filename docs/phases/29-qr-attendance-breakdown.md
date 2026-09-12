@@ -21,6 +21,6 @@
 
 ## Boundaries
 
-- Bulk import of QR scans remains separate until its proof-of-presence and provenance
-  contract is implemented; raw student/code CSVs must not manufacture QR proof.
+- Verified offline scan import is delivered in Phase 30; raw student/code data without an
+  issued-code and timestamp match must not manufacture QR proof.
 - No recurring QR windows, geofencing, device binding, or biometric identification is added.

@@ -37,6 +37,7 @@ Coding agents follow skill `deliver-phase`.
 | 27 | Reporting trends | Delivered — [record](phases/27-report-trends.md) |
 | 28 | Attendance roster adjustments | Delivered — [record](phases/28-attendance-roster-adjustments.md) |
 | 29 | QR attendance breakdown | Delivered — [record](phases/29-qr-attendance-breakdown.md) |
+| 30 | QR check-in import | Delivered — [record](phases/30-qr-checkin-import.md) |
 
 ## Delivered
 
@@ -172,8 +173,8 @@ Boundaries section has the details.
 - **Phase 6:** bulk import and recurring meetings are delivered in Phase 13. Roster adjustments
   after session creation are delivered in Phase 28. Exports and cross-course reports are
   delivered in Phase 9.
-- **Phase 7:** bulk check-in import remains deferred. The QR-specific breakdown is delivered
-  in Phase 29. Cross-course attendance reporting and exports are delivered in Phase 9.
+- **Phase 7:** the QR-specific breakdown is delivered in Phase 29 and verified offline scan
+  import in Phase 30. Cross-course attendance reporting and exports are delivered in Phase 9.
 - **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder
   lead times, notification attachments, and scheduled report delivery.
 - **Phase 9:** scheduled, emailed, or subscribed reports (delivery belongs to Phase 8); PDF

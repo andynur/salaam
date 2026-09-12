@@ -4,7 +4,7 @@ import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
 import { adjustRoster, attendanceReport, changeMeeting, createMeeting, createMeetingSeries, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, rosterOptions, sessionHistory } from "../modules/attendance/service";
-import { changeCheckinWindow, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
+import { changeCheckinWindow, importCheckins, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
 export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     requirePermission(actor, "learning.view");
@@ -20,6 +20,13 @@ export function createAttendanceHandler(db: SQL, changed: (courseId: string, ses
         return Response.json(result);
       }
       throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+    }
+    const importMatch = /^\/api\/attendance\/courses\/([^/]+)\/sessions\/([^/]+)\/checkin\/import$/.exec(url.pathname);
+    if (importMatch) {
+      if (request.method !== "POST") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+      const result = await importCheckins(db, actor, idField({ id: importMatch[1] }, "id").toLowerCase(), idField({ id: importMatch[2] }, "id").toLowerCase(), await jsonObject(request, 131072), requestId);
+      changed(idField({ id: importMatch[1] }, "id").toLowerCase(), idField({ id: importMatch[2] }, "id").toLowerCase());
+      return Response.json(result, { status: 201 });
     }
     const match = /^\/api\/attendance\/courses\/([^/]+)\/(sessions|report)(?:\/([^/]+)(?:\/attendance\/([^/]+)|\/(checkin)(\/codes)?|\/(history|bulk-attendance))?)?$/.exec(url.pathname);
     if (!match) throw new HttpError(404, "NOT_FOUND", "Halaman tidak ditemukan.");
