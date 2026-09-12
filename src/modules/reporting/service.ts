@@ -4,7 +4,7 @@ import { requirePermission } from "../../core/permissions";
 import { recordAudit } from "../../core/audit/repository";
 import type {
   AttendanceSummaryRow, AuditReportRow, CourseReportRow, FilterOption, OverviewSummary,
-  ProgressReportRow, ReportFilterOptions, ReportKind, ReportScope,
+  ProgressReportRow, ReportFilterOptions, ReportKind, ReportScope, ReportTrendPoint,
 } from "../../shared/reporting";
 
 // One export never streams a whole school: 5,000 rows covers a term for a class and keeps
@@ -90,6 +90,50 @@ export async function overview(db: SQL, actor: Actor | null, scope: ReportScope)
         (SELECT COALESCE(sum(x.points), 0)::int FROM xp_entries x JOIN scope s ON s.id = x.course_id) AS "xpAwarded"`;
     return rows[0]!;
   });
+}
+
+// Twelve complete calendar weeks in the school timezone make the trend comparable across
+// browser locales. Empty weeks remain in the result so a chart never implies missing data.
+export async function reportTrends(db: SQL, actor: Actor | null, scope: ReportScope, timezone: string): Promise<ReportTrendPoint[]> {
+  const { all } = reportActor(actor);
+  const me = actor!.id;
+  return db.begin(readOnly, async tx => tx<ReportTrendPoint[]>`WITH scope AS (
+      SELECT c.id, c.class_id, c.published FROM courses c
+      WHERE (${scope.yearId}::uuid IS NULL OR c.academic_year_id = ${scope.yearId}::uuid)
+        AND (${scope.termId}::uuid IS NULL OR c.term_id = ${scope.termId}::uuid)
+        AND (${scope.classId}::uuid IS NULL OR c.class_id = ${scope.classId}::uuid)
+        AND (${scope.courseId}::uuid IS NULL OR c.id = ${scope.courseId}::uuid)
+        AND (${all} OR EXISTS (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = c.id AND ta.teacher_id = ${me}))
+    ), weeks AS (
+      SELECT generate_series(
+        date_trunc('week', clock_timestamp() AT TIME ZONE ${timezone})::date - interval '11 weeks',
+        date_trunc('week', clock_timestamp() AT TIME ZONE ${timezone})::date,
+        interval '1 week'
+      )::date AS week
+    ), attendance AS (
+      SELECT date_trunc('week', cs.starts_at AT TIME ZONE ${timezone})::date AS week,
+        round(100.0 * count(*) FILTER (WHERE a.status IN ('present', 'late')) / nullif(count(*), 0), 1)::float AS rate
+      FROM classroom_sessions cs JOIN scope s ON s.id = cs.course_id
+      JOIN classroom_roster r ON r.session_id = cs.id
+      LEFT JOIN attendance_records a ON a.session_id = r.session_id AND a.student_id = r.student_id
+        AND NOT EXISTS (SELECT 1 FROM attendance_records child WHERE child.previous_id = a.id)
+      WHERE cs.status = 'closed'
+      GROUP BY 1
+    ), completions AS (
+      SELECT date_trunc('week', lc.completed_at AT TIME ZONE ${timezone})::date AS week, count(*)::int AS total
+      FROM lesson_completions lc JOIN lessons l ON l.id = lc.lesson_id JOIN course_modules m ON m.id = l.module_id JOIN scope s ON s.id = l.course_id
+      WHERE s.published AND m.published AND l.published AND m.archived_at IS NULL AND l.archived_at IS NULL
+      GROUP BY 1
+    ), submissions AS (
+      SELECT date_trunc('week', sub.submitted_at AT TIME ZONE ${timezone})::date AS week, count(*)::int AS total
+      FROM submissions sub JOIN activities a ON a.id = sub.activity_id JOIN scope s ON s.id = a.course_id
+      WHERE s.published AND a.published AND a.archived_at IS NULL AND sub.submitted_at IS NOT NULL
+      GROUP BY 1
+    )
+    SELECT to_char(w.week, 'YYYY-MM-DD') AS week, a.rate AS "attendanceRate",
+      COALESCE(c.total, 0)::int AS "lessonCompletions", COALESCE(s.total, 0)::int AS submissions
+    FROM weeks w LEFT JOIN attendance a ON a.week = w.week LEFT JOIN completions c ON c.week = w.week LEFT JOIN submissions s ON s.week = w.week
+    ORDER BY w.week`);
 }
 
 export async function courseReport(db: SQL, actor: Actor | null, scope: ReportScope, pattern: string, offset: number, limit = 51) {

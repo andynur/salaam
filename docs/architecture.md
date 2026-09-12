@@ -21,7 +21,7 @@ measured operational requirement exists.
 | `src/modules/projects` | Challenges, projects and teams, boards, reviews, showcase, portfolio |
 | `src/modules/attendance` | Meetings, recurring series, roster snapshots, attendance revisions, reports, QR check-in windows and codes |
 | `src/modules/gamification` | XP ledger and badge awards, reward rules, growth summaries, leaderboard |
-| `src/modules/reporting` | Cross-course report queries, filter parsing, CSV encoding |
+| `src/modules/reporting` | Cross-course report queries, trend derivation, filter parsing, CSV encoding |
 | `src/modules/coding` | External execution contract, policy limits, and fail-closed runner adapter |
 | `src/shared/` | Types used by both server and web |
 | `src/web/` | SPA: `main.tsx`, `layouts/`, `pages/`, `components/`, `lib/`, `styles/app.css` |
@@ -39,8 +39,7 @@ measured operational requirement exists.
 3. For `/api/learning/`, `/api/projects`, and `/api/admin/`, non-GET requests must pass
    `requireSameOrigin`. The handler resolves the session actor and calls the router.
 4. The router checks the base capability, splits the path, parses the body (`jsonObject`
-   with a 64 KiB limit for learning and projects, 16 KiB for attendance sessions, and 4 KiB elsewhere (QR check-in included); `multipartInput` only
-   for material uploads and assignment submissions), and calls a service inside
+   with a 64 KiB limit for learning and projects, 16 KiB for attendance sessions, and 4 KiB elsewhere (QR check-in included); `multipartInput` accepts material uploads, assignment submissions, and project deliverables), and calls a service inside
    `databaseInputError`, which turns constraint violations into 409 or 400.
 5. The service validates input with its module's `input.ts`, checks scope, and runs SQL in
    a transaction.

@@ -5,6 +5,7 @@ import { attendanceLabels } from "../../shared/attendance";
 import type {
   AttendanceSummaryRow, AuditReportRow, CourseReportRow, OverviewSummary,
   ProgressReportRow, ReportFilterOptions, ReportKind, ReportScope,
+  ReportTrendPoint,
 } from "../../shared/reporting";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { Pager, Search, formatDateTime, useData } from "../components/learning";
@@ -76,7 +77,27 @@ function Overview({ scope, onExpired }: { scope: ReportScope; onExpired: () => v
       <p className="card-hint">Dihitung dari data pembelajaran, penilaian, kehadiran, dan proyek dalam cakupan filter.</p>
       <ul className="report-metrics">{rates.map(rate => <li key={rate.label}><span className="summary-label">{rate.label}</span><strong>{rate.value}</strong></li>)}</ul>
     </Card>
+    <TrendChart scope={scope} onExpired={onExpired} />
   </>;
+}
+
+function TrendChart({ scope, onExpired }: { scope: ReportScope; onExpired: () => void }) {
+  const { data, error, retry } = useData<ReportTrendPoint[]>(`/api/reports/trends?${query(scope)}`, onExpired);
+  if (error) return <Card><ErrorState message={error} retry={retry} /></Card>;
+  if (!data) return <Card><LoadingState /></Card>;
+  const maxCount = Math.max(1, ...data.map(point => Math.max(point.lessonCompletions, point.submissions)));
+  return <Card className="report-trend-card">
+    <div className="card-heading"><h2>Tren 12 minggu</h2></div>
+    <p className="card-hint">Aktivitas yang tercatat per minggu dalam cakupan filter. Minggu tanpa aktivitas tetap ditampilkan.</p>
+    <div className="trend-legend" aria-hidden="true"><span><i className="trend-key trend-key-attendance" />Kehadiran</span><span><i className="trend-key trend-key-completion" />Lesson selesai</span><span><i className="trend-key trend-key-submission" />Tugas dikumpulkan</span></div>
+    <ol className="trend-chart" aria-label="Tren kehadiran, penyelesaian lesson, dan pengumpulan tugas selama 12 minggu">
+      {data.map(point => <li className="trend-week" key={point.week}>
+        <div className="trend-bars" aria-hidden="true"><span className="trend-bar trend-bar-attendance" style={{ height: `${point.attendanceRate ?? 0}%` }} /><span className="trend-bar trend-bar-completion" style={{ height: `${point.lessonCompletions / maxCount * 100}%` }} /><span className="trend-bar trend-bar-submission" style={{ height: `${point.submissions / maxCount * 100}%` }} /></div>
+        <strong>{point.week.slice(5)}</strong>
+        <small>{point.attendanceRate === null ? "—" : `${point.attendanceRate}%`} hadir · {point.lessonCompletions} lesson · {point.submissions} tugas</small>
+      </li>)}
+    </ol>
+  </Card>;
 }
 
 // Keyed by report kind at the call site: the table keeps one component instance per kind,

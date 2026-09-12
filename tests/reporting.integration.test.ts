@@ -12,7 +12,7 @@ import { bootstrapAdmin, createUser } from "../src/modules/users/service";
 import { createAcademic } from "../src/modules/academic/service";
 import type { AcademicResource } from "../src/shared/foundation";
 import type { Page } from "../src/shared/learning";
-import type { AttendanceSummaryRow, AuditReportRow, CourseReportRow, OverviewSummary, ProgressReportRow, ReportFilterOptions } from "../src/shared/reporting";
+import type { AttendanceSummaryRow, AuditReportRow, CourseReportRow, OverviewSummary, ProgressReportRow, ReportFilterOptions, ReportTrendPoint } from "../src/shared/reporting";
 
 const url = process.env.TEST_DATABASE_URL;
 describe.skipIf(!url)("Phase 9 reporting (isolated PostgreSQL schema)", () => {
@@ -114,7 +114,7 @@ describe.skipIf(!url)("Phase 9 reporting (isolated PostgreSQL schema)", () => {
   });
 
   test("reports need reports.view; santri and anonymous callers are refused", async () => {
-    for (const path of ["filters", "overview", "courses", "attendance", "progress", "courses.csv"]) {
+    for (const path of ["filters", "overview", "trends", "courses", "attendance", "progress", "courses.csv"]) {
       expect((await request(`/api/reports/${path}`, people.student.cookie)).status).toBe(403);
     }
     expect((await request("/api/reports/overview", "")).status).toBe(401);
@@ -149,6 +149,16 @@ describe.skipIf(!url)("Phase 9 reporting (isolated PostgreSQL schema)", () => {
     const filtered = await report<OverviewSummary>(`overview?classId=${otherClassId}`, adminCookie);
     expect(filtered).toMatchObject({ courses: 1, students: 1, sessions: 0, submissions: 0 });
     expect(filtered.attendanceRate).toBeNull();
+  });
+
+  test("trends preserve the twelve-week timeline and apply the same scope", async () => {
+    const all = await report<ReportTrendPoint[]>("trends", adminCookie);
+    expect(all).toHaveLength(12);
+    expect(all.every((point, index) => index === 0 || point.week > all[index - 1]!.week)).toBe(true);
+    expect(all[11]).toMatchObject({ attendanceRate: 50, lessonCompletions: 1, submissions: 1 });
+    const mine = await report<ReportTrendPoint[]>(`trends?classId=${otherClassId}`, adminCookie);
+    expect(mine).toHaveLength(12);
+    expect(mine.every(point => point.attendanceRate === null && point.lessonCompletions === 0 && point.submissions === 0)).toBe(true);
   });
 
   test("the course report pages, searches, and never leaves the actor's scope", async () => {

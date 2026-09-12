@@ -34,6 +34,7 @@ Coding agents follow skill `deliver-phase`.
 | 24 | Project task metadata | Delivered — [record](phases/24-project-task-metadata.md) |
 | 25 | Project task comments | Delivered — [record](phases/25-project-task-comments.md) |
 | 26 | Project file deliverables | Delivered — [record](phases/26-project-file-deliverables.md) |
+| 27 | Reporting trends | Delivered — [record](phases/27-report-trends.md) |
 
 ## Delivered
 
@@ -173,8 +174,8 @@ Boundaries section has the details.
   reporting and exports are delivered in Phase 9.
 - **Phase 8:** external delivery providers, calendar sync, recurring events, custom reminder
   lead times, notification attachments, and scheduled report delivery.
-- **Phase 9:** charts and trend lines; scheduled, emailed, or subscribed reports (delivery
-  belongs to Phase 8); PDF and spreadsheet exports; per-activity, per-question, and cohort
+- **Phase 9:** scheduled, emailed, or subscribed reports (delivery belongs to Phase 8); PDF
+  and spreadsheet exports; per-activity, per-question, and cohort
   analytics; saved report definitions and custom columns; an audit retention policy and
   exports beyond 5,000 rows.
 - **Operations:** school hardware/WLAN load testing, scheduled backup execution and alerting,

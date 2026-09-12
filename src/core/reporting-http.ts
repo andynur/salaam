@@ -2,7 +2,7 @@ import type { SQL } from "bun";
 import type { Actor } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, listInput } from "./validation";
-import { attendanceSummary, auditReport, courseReport, exportRowLimit, filterOptions, overview, page, progressReport, recordExport } from "../modules/reporting/service";
+import { attendanceSummary, auditReport, courseReport, exportRowLimit, filterOptions, overview, page, progressReport, reportTrends, recordExport } from "../modules/reporting/service";
 import { auditFilters, reportScope } from "../modules/reporting/input";
 import { csvResponse, type CsvValue } from "../modules/reporting/csv";
 import { attendanceLabels } from "../shared/attendance";
@@ -42,6 +42,7 @@ export function createReportingHandler(db: SQL, timezone: string) {
       if (!csv) {
         if (resource === "filters") return Response.json(await filterOptions(db, actor));
         if (resource === "overview") return Response.json(await overview(db, actor, reportScope(url)));
+        if (resource === "trends") return Response.json(await reportTrends(db, actor, reportScope(url), timezone));
       }
       if (!reportKinds.includes(name as ReportKind)) throw routeNotFound();
       const kind = name as ReportKind;

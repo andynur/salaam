@@ -19,6 +19,7 @@ export interface OverviewSummary {
   attempts: number; averageAttemptScore: number | null;
   projects: number; pendingReviews: number; xpAwarded: number;
 }
+export interface ReportTrendPoint { week: string; attendanceRate: number | null; lessonCompletions: number; submissions: number }
 export interface CourseReportRow {
   courseId: string; courseName: string; className: string; termName: string; subjectName: string; published: boolean;
   students: number; lessons: number; activities: number; sessions: number; attendanceRate: number | null;

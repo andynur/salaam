@@ -58,6 +58,7 @@ environment-specific validation.
 | 24 — Project task metadata | Bounded labels and optional card-level deadlines | [Phase 24](docs/phases/24-project-task-metadata.md) |
 | 25 — Project task comments | Member-visible append-only notes on project cards | [Phase 25](docs/phases/25-project-task-comments.md) |
 | 26 — Project file deliverables | Private uploaded project deliverables with secure downloads | [Phase 26](docs/phases/26-project-file-deliverables.md) |
+| 27 — Reporting trends | Twelve-week scoped attendance and learning activity trends | [Phase 27](docs/phases/27-report-trends.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational
