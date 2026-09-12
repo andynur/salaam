@@ -178,12 +178,6 @@ export async function changeMeeting(db: SQL, actor: Actor, courseId: string, ses
     const status = input.action === "open" || input.action === "reopen" ? "open" : input.action === "close" ? "closed" : input.action === "cancel" ? "cancelled" : session.status;
     await tx`UPDATE classroom_sessions SET status = ${status}, note = ${input.action === "note" ? input.note : session.note}, reason = ${input.reason}, version = version + 1,
       last_operation = ${operation}::text::jsonb, updated_at = clock_timestamp() WHERE id = ${sessionId}`;
-    if (input.action === "open") await tx`INSERT INTO attendance_checkin_windows (session_id, status, rotate_seconds, late_after, opened_by)
-      SELECT ${sessionId}, 'open', COALESCE(series.qr_rotate_seconds, 30),
-        CASE WHEN series.qr_late_after_minutes IS NULL THEN NULL ELSE session.starts_at + make_interval(mins => series.qr_late_after_minutes) END,
-        ${actor.id}
-      FROM classroom_sessions session LEFT JOIN classroom_meeting_series series ON series.id = session.series_id
-      WHERE session.id = ${sessionId} ON CONFLICT (session_id) DO UPDATE SET status = 'open', updated_at = clock_timestamp()`;
     await tx`INSERT INTO classroom_session_events (session_id, actor_id, version, action, reason, note) VALUES (${sessionId}, ${actor.id}, ${session.version + 1}, ${input.action}, ${input.reason}, ${input.action === "note" ? input.note : session.note})`;
     const event = { open: "opened", close: "closed", reopen: "reopened", cancel: "cancelled", note: "note_updated" }[input.action];
     await recordAudit(tx, actor.id, `classroom.session.${event}`, "classroom_sessions", sessionId, requestId);
