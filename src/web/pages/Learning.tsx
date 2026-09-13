@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import type { Actor } from "../../core/permissions";
 import { maxLessonContent, uploadTypes } from "../../shared/learning";
-import type { Activity, CourseDetail, CourseModule, Grade, LearningCourse, Lesson, Material, Page, Progress, StoredFile, Submission } from "../../shared/learning";
+import type { Activity, CourseDetail, CourseModule, Grade, Lesson, Material, Page, Progress, StoredFile, Submission } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
-import { Icon } from "../components/icons";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PersonName } from "../components/ui";
 import { Field, MutationForm, Pager, Search, Status, chosenFile, deviceTimezone, errorMessage as message, formatDateTime as date, fromLocalInput, learningApi as base, toLocalInput, useData } from "../components/learning";
+import { CourseCatalog } from "../components/courses";
 import { DocumentEditor, LessonCover, LessonShare, Markdown } from "../components/editor";
 import { LessonAssessments, QuestionBank } from "./AssessmentPanel";
 import { AttemptRunner } from "./AttemptRunner";
@@ -15,7 +15,6 @@ import { LessonSurveys } from "./SurveyPanel";
 type Common = { timezone: string; onExpired: () => void };
 const accept = Object.keys(uploadTypes).map(extension => `.${extension}`).join(",");
 const fileSize = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word.charAt(0)).join("").toUpperCase();
 function FileLink({ href, file }: { href: string; file: StoredFile }) { return <a className="material-link" href={href}>Unduh {file.name} ({fileSize(file.sizeBytes)}) ↓</a>; }
 
 export function Learning({ actor, timezone, onExpired }: Common & { actor: Actor }) {
@@ -27,14 +26,9 @@ export function Learning({ actor, timezone, onExpired }: Common & { actor: Actor
   return <CourseList onExpired={onExpired} />;
 }
 function CourseList({ onExpired }: Pick<Common, "onExpired">) {
-  const [offset, setOffset] = useState(0);
-  const [q, setQ] = useState("");
-  const { data, error, retry } = useData<Page<LearningCourse>>(`${base}?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired);
-  return <><PageHeader title="Pembelajaran" description="Materi, tugas, quiz, dan progres belajar dalam course Anda." />
-    <Card><div className="card-heading"><h2>Course Anda</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>
-      {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState icon="book" title="Belum ada course" description={q ? "Tidak ada hasil yang sesuai dengan pencarian." : "Course akan tampil setelah Anda terdaftar dan course dipublikasikan. Guru dapat membuka course yang ditugaskan."} /> : <div className="course-grid">{data.items.map(course => <a className="course-tile" href={`/learning/courses/${course.id}`} key={course.id}><div className="learning-row"><span className="course-avatar" aria-hidden="true">{initials(course.name)}</span><Status published={course.published} /></div><h3>{course.name}</h3><p>{course.className} · {course.term} · {course.year}</p><span className="course-open">{course.canManage ? "Kelola pembelajaran" : "Mulai belajar"}<Icon name="arrowRight" /></span></a>)}</div>}
-      {data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}
-    </Card></>;
+  return <div className="lesson-workspace"><PageHeader title="Pembelajaran" description="Materi, tugas, quiz, dan progres belajar dalam course Anda." />
+    <CourseCatalog endpoint={base} href={course => `/learning/courses/${course.id}`} openLabel={course => course.canManage ? "Kelola pembelajaran" : "Mulai belajar"} emptyIcon="book" stats emptyDescription="Course akan tampil setelah Anda terdaftar dan course dipublikasikan. Guru dapat membuka course yang ditugaskan." onExpired={onExpired} />
+  </div>;
 }
 
 type Editor = { resource: "modules"; value?: CourseModule } | { resource: "lessons"; parentId: string; value?: Lesson } | { resource: "materials"; parentId: string; value?: Material } | { resource: "activities"; parentId: string; value?: Activity };
@@ -87,7 +81,7 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
     {success && <p className="success-state" role="status">{success}</p>}{saveError && <ErrorState message={saveError} />}
     {data.progress && <ProgressSummary value={data.progress} />}
     <nav className="tabs" aria-label="Halaman course">{tabButton("content", "Materi & tugas")}{course.canManage && tabButton("questions", "Bank soal")}{course.canManage && tabButton("progress", "Progres santri")}</nav>
-    {tab === "progress" && course.canManage ? <ProgressTable courseId={courseId} onExpired={onExpired} /> : tab === "questions" && course.canManage ? <QuestionBank courseId={courseId} onExpired={onExpired} /> : <>
+    {tab === "progress" && course.canManage ? <ProgressTable courseId={courseId} classroom={course.className} onExpired={onExpired} /> : tab === "questions" && course.canManage ? <QuestionBank courseId={courseId} onExpired={onExpired} /> : <>
       {course.canManage && <div className="learning-toolbar"><Button onClick={() => setEditor({ resource: "modules" })}>Tambah modul</Button><p>Publikasikan setiap tingkat agar konten terlihat oleh santri.</p></div>}
       {editor && <ContentEditor key={`${editor.resource}-${editor.value?.id ?? ("parentId" in editor ? editor.parentId : "new")}`} editor={editor} modules={modules} courseId={courseId} onExpired={onExpired} close={() => setEditor(null)} saved={() => { setEditor(null); setSuccess("Konten berhasil disimpan."); changed(); }} />}
       {!modules.length ? <Card><EmptyState title="Belum ada modul" description={course.canManage ? "Tambahkan modul pertama untuk menyusun lesson dan tugas." : "Guru akan mempublikasikan modul pembelajaran di sini."} /></Card> : <div className="learning-layout">
@@ -119,7 +113,7 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
               {reviewId === activity.id && course.canManage && <SubmissionReview courseId={courseId} activity={activity} timezone={timezone} onExpired={onExpired} />}
             </article>)}{!activities.some(item => item.lessonId === lesson.id) && <p className="learning-muted">Belum ada tugas untuk lesson ini.</p>}
           </Card>
-          <LessonAssessments courseId={courseId} lessonId={lesson.id} assessments={data.assessments} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
+          <LessonAssessments courseId={courseId} classroom={course.className} lessonId={lesson.id} assessments={data.assessments} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
           <LessonChallenges courseId={courseId} lessonId={lesson.id} challenges={data.challenges} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} timezone={timezone} onExpired={onExpired} />
           <LessonSurveys courseId={courseId} lessonId={lesson.id} surveys={data.surveys} canManage={course.canManage} canParticipate={data.canParticipate} publishButton={publishButton} archiveButton={archiveButton} changed={changed} onExpired={onExpired} />
         </>}</div>
@@ -198,9 +192,9 @@ function HistoryRows({ courseId, submissionId, timezone, onExpired }: Common & {
 function ProgressSummary({ value }: { value: Progress }) {
   return <div className="learning-progress"><div><strong>{value.completed} / {value.lessons} lesson selesai</strong><progress aria-label="Progres lesson" max={value.lessons || 1} value={value.completed} /></div><span>{value.submitted} / {value.activities} aktivitas selesai</span><span>{value.graded} sudah dinilai</span></div>;
 }
-function ProgressTable({ courseId, onExpired }: { courseId: string; onExpired: () => void }) {
+function ProgressTable({ courseId, classroom, onExpired }: { courseId: string; classroom: string; onExpired: () => void }) {
   const [offset, setOffset] = useState(0);
   const [q, setQ] = useState("");
   const { data, error, retry } = useData<Page<Progress>>(`${base}/${courseId}/progress?${new URLSearchParams({ q, offset: String(offset) })}`, onExpired);
-  return <Card><div className="card-heading"><h2>Progres konten terbit</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>{error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada santri" description="Santri yang terdaftar di kelas akan muncul di sini." /> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Progres santri"><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Lesson selesai</th><th scope="col">Aktivitas selesai</th><th scope="col">Sudah dinilai</th></tr></thead><tbody>{data.items.map(row => <tr key={row.studentId}><td>{row.studentName}</td><td>{row.completed} / {row.lessons}</td><td>{row.submitted} / {row.activities}</td><td>{row.graded}</td></tr>)}</tbody></table></div>}{data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}</Card>;
+  return <Card><div className="card-heading"><h2>Progres konten terbit</h2><Search change={value => { setQ(value); setOffset(0); }} /></div>{error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada santri" description="Santri yang terdaftar di kelas akan muncul di sini." /> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Progres santri"><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Lesson selesai</th><th scope="col">Aktivitas selesai</th><th scope="col">Sudah dinilai</th></tr></thead><tbody>{data.items.map(row => <tr key={row.studentId}><td><PersonName name={row.studentName} classroom={classroom} /></td><td>{row.completed} / {row.lessons}</td><td>{row.submitted} / {row.activities}</td><td>{row.graded}</td></tr>)}</tbody></table></div>}{data && <Pager offset={offset} next={data.nextOffset} change={setOffset} />}</Card>;
 }

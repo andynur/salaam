@@ -1,12 +1,11 @@
 import { useState } from "react";
 import type { Page, Progress } from "../../shared/learning";
 import type { ProjectMember, ProjectStatus, TaskStatus } from "../../shared/project";
-import { ErrorState, LoadingState } from "./ui";
+import { ErrorState, LoadingState, initials } from "./ui";
 import { Pager, Search, learningApi, useData } from "./learning";
 
 export const projectsApi = "/api/projects";
 export const jsonRequest = (body: unknown, method = "POST"): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word.charAt(0)).join("").toUpperCase();
 export const projectStatusLabels: Record<ProjectStatus, { label: string; badge: string }> = {
   in_progress: { label: "Dikerjakan", badge: "" },
   submitted: { label: "Menunggu review", badge: "badge-discovery" },

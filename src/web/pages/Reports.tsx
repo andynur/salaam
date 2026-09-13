@@ -7,7 +7,7 @@ import type {
   ProgressReportRow, ReportFilterOptions, ReportKind, ReportScope,
   ReportTrendPoint,
 } from "../../shared/reporting";
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PersonName } from "../components/ui";
 import { Pager, Search, formatDateTime, useData } from "../components/learning";
 import { Icon, type IconName } from "../components/icons";
 
@@ -165,7 +165,7 @@ export function Reports({ actor, timezone, onExpired }: { actor: Actor; timezone
         search={value => reset(() => setQ(value))} keyOf={row => row.studentId} empty="Rekap muncul setelah sesi kelas dibuat dan kehadiran dicatat."
         headers={["Santri", "Kelas", "Sesi", "Belum tercatat", attendanceLabels.present, attendanceLabels.late, attendanceLabels.excused, attendanceLabels.sick, attendanceLabels.absent, "Kehadiran"]}
         row={row => <>
-          <td><strong className="table-link">{row.studentName}</strong><span className="table-sub">{row.identifier ?? "Tanpa NIS"} · {row.courses} course</span></td>
+          <td><PersonName name={row.studentName} classroom={row.className} sub={`${row.identifier ?? "Tanpa NIS"} · ${row.courses} course`} /></td>
           <td>{row.className}</td><td>{row.total}</td><td>{row.unrecorded}</td><td>{row.present}</td><td>{row.late}</td>
           <td>{row.excused}</td><td>{row.sick}</td><td>{row.absent}</td><td>{percent(row.rate)}</td>
         </>} />
@@ -174,7 +174,7 @@ export function Reports({ actor, timezone, onExpired }: { actor: Actor; timezone
         search={value => reset(() => setQ(value))} keyOf={row => `${row.studentId}-${row.className}`} empty="Kemajuan muncul setelah course terbit dan santri mulai belajar."
         headers={["Santri", "Kelas", "Pelajaran", "Tugas", "Dinilai", "Rata-rata nilai", "Kuis & ujian", "Rata-rata skor", "XP"]}
         row={row => <>
-          <td><strong className="table-link">{row.studentName}</strong><span className="table-sub">{row.identifier ?? "Tanpa NIS"} · {row.courses} course</span></td>
+          <td><PersonName name={row.studentName} classroom={row.className} sub={`${row.identifier ?? "Tanpa NIS"} · ${row.courses} course`} /></td>
           <td>{row.className}</td>
           <td>{row.completed}/{row.lessons} · {percent(row.lessonRate)}</td>
           <td>{row.submitted}/{row.activities}</td><td>{row.graded}</td><td>{score(row.averageScore)}</td>

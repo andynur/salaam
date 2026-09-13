@@ -4,6 +4,7 @@ import { attendanceLabels } from "../../shared/attendance";
 import { api, ApiError } from "../lib/api";
 import { encodeQr, qrPath } from "../lib/qr";
 import { Button, Card, ErrorState } from "./ui";
+import { Icon } from "./icons";
 import { errorMessage, Field, formatDateTime, fromLocalInput, MutationForm, toLocalInput } from "./learning";
 const scanIntervalMs = 400;
 // The scanned value is a presence code, never a credential: the browser still sends the
@@ -37,14 +38,15 @@ function CodeDisplay({ path, onExpired }: { path: string; onExpired: () => void 
   }, [path, onExpired]);
   if (error) return <ErrorState message={error} />;
   if (!code) return <p className="card-hint">Menyiapkan kode…</p>;
-  return <div className="checkin-display"><QrCode value={code.code} /><div><p className="checkin-code">{code.code}</p>
+  return <div className="checkin-display"><QrCode value={code.code} /><div className="checkin-code-panel"><p className="checkin-code">{code.code}</p>
+    <span className="checkin-countdown" aria-hidden="true"><span key={code.code} style={{ animationDuration: `${code.rotateSeconds}s` }} /></span>
     <p className="card-hint">Kode berganti tiap {code.rotateSeconds} detik. Santri memindai QR atau mengetik kode ini.</p></div></div>;
 }
 export function CheckinManager({ path, session, checkin, timezone, onExpired, saved }: { path: string; session: Meeting; checkin: CheckinState; timezone: string; onExpired: () => void; saved: () => void }) {
   const open = checkin.window?.status === "open";
   const rotateSeconds = checkin.window?.rotateSeconds ?? 30;
-  return <Card className="lesson-card"><div className="card-heading"><h2>Absensi QR</h2><span className="badge">{open ? `${checkin.window?.checkedIn ?? 0} santri memindai` : "Nonaktif"}</span></div>
-    {session.status !== "open" ? <p className="card-hint">Buka sesi kelas untuk menggunakan absensi QR.</p> : open ? <>
+  return <Card className="lesson-card"><div className="card-heading"><h2>Absensi QR</h2>{open ? <span className="live-status is-connected"><span className="live-dot" aria-hidden="true" />{checkin.window?.checkedIn ?? 0} santri memindai</span> : <span className="badge badge-draft">Nonaktif</span>}</div>
+    {session.status !== "open" ? <div className="checkin-idle"><span className="checkin-idle-icon" aria-hidden="true"><Icon name="qr" size={28} /></span><p className="card-hint">Buka sesi kelas di tab Kelola sesi untuk menggunakan absensi QR.</p></div> : open ? <>
       <CodeDisplay path={path} onExpired={onExpired} />
       {checkin.window?.lateAfter && <p className="card-hint">Pemindaian setelah {formatDateTime(checkin.window.lateAfter, timezone)} tercatat terlambat.</p>}
       <MutationForm path={`${path}/checkin`} method="PATCH" label="Hentikan absensi QR" onExpired={onExpired} saved={saved} body={() => ({ action: "stop", rotateSeconds })} />
@@ -107,11 +109,12 @@ export function CheckinStudent({ path, session, checkin, timezone, onExpired, sa
     finally { sending.current = false; setPending(false); }
   }, [path, onExpired, saved]);
   if (checkin.me) return <Card className="lesson-card"><div className="card-heading"><h2>Absensi QR</h2><span className="badge badge-success">{attendanceLabels[checkin.me.status]}</span></div>
-    <p className="card-hint">Kehadiran Anda tercatat pada {formatDateTime(checkin.me.createdAt, timezone)}. Perbaikan hanya dapat dilakukan guru.</p></Card>;
-  if (session.status !== "open" || checkin.window?.status !== "open") return null;
+    <div className="checkin-done"><span className="checkin-done-icon" aria-hidden="true"><Icon name="success" size={32} /></span><div><strong>Kehadiran tercatat</strong><p className="card-hint">Tercatat {attendanceLabels[checkin.me.status].toLowerCase()} pada {formatDateTime(checkin.me.createdAt, timezone)}. Perbaikan hanya dapat dilakukan guru.</p></div></div></Card>;
+  if (session.status !== "open" || checkin.window?.status !== "open") return <Card className="lesson-card"><div className="card-heading"><h2>Absensi QR</h2><span className="badge badge-draft">Belum dibuka</span></div>
+    <div className="checkin-idle"><span className="checkin-idle-icon" aria-hidden="true"><Icon name="qr" size={28} /></span><p className="card-hint">Absensi QR belum dibuka guru. Halaman ini diperbarui otomatis saat kode tersedia.</p></div></Card>;
   return <Card className="lesson-card"><div className="card-heading"><h2>Absensi QR</h2></div>
     <p className="card-hint">Pindai kode di layar kelas, atau ketik kodenya. Kode berganti tiap {checkin.window.rotateSeconds} detik.</p>
-    <div className="filter-bar"><Button aria-expanded={scanning} aria-controls="checkin-scanner" disabled={pending} onClick={() => { setScanning(!scanning); setError(""); }}>{scanning ? "Batal memindai" : "Pindai kode QR"}</Button></div>
+    <div className="filter-bar"><Button aria-expanded={scanning} aria-controls="checkin-scanner" disabled={pending} onClick={() => { setScanning(!scanning); setError(""); }}><Icon name={scanning ? "close" : "qr"} size={16} />{scanning ? "Batal memindai" : "Pindai kode QR"}</Button></div>
     {scanning && <div id="checkin-scanner"><Scanner onCode={code => void submit(code)} onClose={() => setScanning(false)} /></div>}
     <form className="learning-form" onSubmit={event => { event.preventDefault(); void submit(String(new FormData(event.currentTarget).get("code") ?? "").trim().toUpperCase()); }}>
       <fieldset className="admin-fields" disabled={pending}><Field label="Kode absensi" name="code" max={10} /><div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Mengirim…" : "Kirim kode"}</Button></div></fieldset>

@@ -1,27 +1,29 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import type { FoundationResource, RecordPage, RecordRow } from "../../shared/foundation";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PanelHeading, PersonName } from "../components/ui";
 import { Icon, type IconName } from "../components/icons";
+import { roleName, roleTone } from "../layouts/navigation";
+import { ClassTransfer } from "./AcademicOperations";
 
 type Field = { key: string; label: string; type?: string; max?: number; source?: FoundationResource; role?: string };
-type Definition = { title: string; action: string; description: string; columns: [string, string][]; fields: Field[] };
+type Definition = { title: string; action: string; description: string; icon: IconName; columns: [string, string][]; fields: Field[] };
 const name: Field = { key: "name", label: "Nama", max: 100 };
 const year: Field = { key: "yearId", label: "Tahun ajaran", source: "years" };
 const classField: Field = { key: "classId", label: "Kelas", source: "classes" };
 const dateFields: Field[] = [{ key: "startsOn", label: "Tanggal mulai", type: "date" }, { key: "endsOn", label: "Tanggal selesai", type: "date" }];
 const definitions: Record<FoundationResource, Definition> = {
-  users: { title: "Akun & profil", action: "Buat akun", description: "Daftarkan santri, guru, dan admin beserta nomor identitasnya.",
-    columns: [["name", "Nama"], ["email", "Email"], ["roles", "Role"], ["identifier", "Nomor identitas"], ["isActive", "Aktif"]],
+  users: { title: "Akun pengguna", action: "Buat akun", description: "Daftarkan santri, guru, asisten mentor, dan admin beserta nomor identitasnya.", icon: "users",
+    columns: [["name", "Nama"], ["email", "Email"], ["roles", "Role"], ["identifier", "Nomor identitas"], ["isActive", "Status"]],
     fields: [name, { key: "email", label: "Email", type: "email", max: 254 }, { key: "role", label: "Role", type: "role" }, { key: "identifier", label: "NIS / nomor pegawai", max: 50 }, { key: "password", label: "Kata sandi awal (12–128 karakter)", type: "password", max: 128 }] },
-  years: { title: "Tahun ajaran", action: "Tambah tahun ajaran", description: "Atur rentang tahun ajaran sebelum membuat semester dan kelas.", columns: [["name", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Arsip"]], fields: [name, ...dateFields] },
-  terms: { title: "Semester", action: "Tambah semester", description: "Tanggal semester harus berada di dalam rentang tahun ajaran.", columns: [["name", "Semester"], ["year", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Arsip"]], fields: [name, year, ...dateFields] },
-  classes: { title: "Kelas", action: "Tambah kelas", description: "Setiap kelas terikat pada satu tahun ajaran.", columns: [["name", "Kelas"], ["year", "Tahun ajaran"], ["archived", "Arsip"]], fields: [name, year] },
-  enrollments: { title: "Enrollment", action: "Enroll santri", description: "Daftarkan santri ke satu kelas per tahun ajaran.", columns: [["name", "Santri"], ["email", "Email"], ["class", "Kelas"], ["year", "Tahun ajaran"]], fields: [{ key: "studentId", label: "Santri", source: "users", role: "student" }, classField] },
-  subjects: { title: "Mata pelajaran", action: "Tambah mata pelajaran", description: "Buat katalog mata pelajaran sekolah dengan kode yang unik.", columns: [["code", "Kode"], ["name", "Mata pelajaran"]], fields: [{ key: "code", label: "Kode mata pelajaran", max: 30 }, name] },
-  courses: { title: "Course dasar", action: "Tambah course", description: "Hubungkan mata pelajaran, kelas, dan semester dalam tahun ajaran yang sama.", columns: [["name", "Course"], ["subject", "Mata pelajaran"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [name, { key: "subjectId", label: "Mata pelajaran", source: "subjects" }, classField, { key: "termId", label: "Semester", source: "terms" }] },
-  "teaching-assignments": { title: "Penugasan guru", action: "Assign guru", description: "Tugaskan guru aktif ke course yang sudah dibuat.", columns: [["name", "Guru"], ["course", "Course"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [{ key: "teacherId", label: "Guru", source: "users", role: "teacher" }, { key: "courseId", label: "Course", source: "courses" }] },
-  audit: { title: "Audit log", action: "", description: "Riwayat login, pembuatan akun, dan perubahan akademik. Waktu ditampilkan sesuai zona sekolah.", columns: [["createdAt", "Waktu"], ["actor", "Pelaku"], ["name", "Event"], ["resourceType", "Resource"], ["requestId", "Request ID"]], fields: [] },
+  years: { title: "Tahun ajaran", action: "Tambah tahun ajaran", description: "Atur rentang tahun ajaran sebelum membuat semester dan kelas.", icon: "calendar", columns: [["name", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Status"]], fields: [name, ...dateFields] },
+  terms: { title: "Semester", action: "Tambah semester", description: "Tanggal semester harus berada di dalam rentang tahun ajaran.", icon: "layers", columns: [["name", "Semester"], ["year", "Tahun ajaran"], ["startsOn", "Mulai"], ["endsOn", "Selesai"], ["archived", "Status"]], fields: [name, year, ...dateFields] },
+  classes: { title: "Kelas", action: "Tambah kelas", description: "Setiap kelas terikat pada satu tahun ajaran.", icon: "board", columns: [["name", "Kelas"], ["year", "Tahun ajaran"], ["archived", "Status"]], fields: [name, year] },
+  enrollments: { title: "Enrollment", action: "Enroll santri", description: "Daftarkan santri ke satu kelas per tahun ajaran.", icon: "attendance", columns: [["name", "Santri"], ["email", "Email"], ["class", "Kelas"], ["year", "Tahun ajaran"]], fields: [{ key: "studentId", label: "Santri", source: "users", role: "student" }, classField] },
+  subjects: { title: "Mata pelajaran", action: "Tambah mata pelajaran", description: "Buat katalog mata pelajaran sekolah dengan kode yang unik.", icon: "assignment", columns: [["code", "Kode"], ["name", "Mata pelajaran"]], fields: [{ key: "code", label: "Kode mata pelajaran", max: 30 }, name] },
+  courses: { title: "Course dasar", action: "Tambah course", description: "Hubungkan mata pelajaran, kelas, dan semester dalam tahun ajaran yang sama.", icon: "book", columns: [["name", "Course"], ["subject", "Mata pelajaran"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [name, { key: "subjectId", label: "Mata pelajaran", source: "subjects" }, classField, { key: "termId", label: "Semester", source: "terms" }] },
+  "teaching-assignments": { title: "Penugasan pembelajaran", action: "Tugaskan pendamping", description: "Tugaskan guru atau asisten mentor aktif ke course yang sudah dibuat.", icon: "pen", columns: [["name", "Pendamping"], ["course", "Course"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [{ key: "teacherId", label: "Guru atau asisten mentor", source: "users" }, { key: "courseId", label: "Course", source: "courses" }] },
+  audit: { title: "Audit log", action: "", description: "Riwayat login, pembuatan akun, dan perubahan akademik. Waktu ditampilkan sesuai zona sekolah.", icon: "shield", columns: [["createdAt", "Waktu"], ["actor", "Pelaku"], ["name", "Event"], ["resourceType", "Resource"], ["requestId", "Request ID"]], fields: [] },
 };
 // Every recorded event is "<category>.<action...>" (e.g. "gamification.badge.awarded").
 // The admin audit log groups by that prefix — a lozenge plus icon per category — and
@@ -39,6 +41,7 @@ const auditCategories: AuditCategory[] = [
   { id: "survey", label: "Survei", icon: "quiz", tone: "badge-draft" },
   { id: "calendar", label: "Kalender", icon: "calendar", tone: "badge" },
   { id: "club", label: "Klub", icon: "club", tone: "badge-discovery" },
+  { id: "curriculum", label: "Kurikulum", icon: "route", tone: "badge-success" },
   { id: "project", label: "Proyek", icon: "board", tone: "badge" },
   { id: "portfolio", label: "Portofolio", icon: "briefcase", tone: "badge-draft" },
   { id: "gamification", label: "Gamifikasi", icon: "star", tone: "badge-gold" },
@@ -58,6 +61,18 @@ function auditActionLabel(event: string) {
 function optionLabel(row: RecordRow) {
   return [row.name, row.email, row.code, row.class, row.term, row.year].filter(Boolean).join(" · ");
 }
+// Resources whose name column is a person, shown with <PersonName> like every other roster.
+const personResources = new Set<FoundationResource>(["users", "enrollments", "teaching-assignments"]);
+const dateOnly = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "UTC" });
+
+// Administration sections with more than one screen (Pengguna, Akademik) share one header and
+// switch screens with these tabs. Each tab keeps its own URL so reloads and search land on it.
+type AdminTab = { id: string; label: string; icon: IconName; href: string };
+function AdminTabs({ label, tabs, current, choose }: { label: string; tabs: AdminTab[]; current: string; choose: (id: string) => void }) {
+  return <nav className="tabs admin-tabs" aria-label={label}>{tabs.map(tab => <button type="button" key={tab.id} className={tab.id === current ? "tab-active" : ""} aria-current={tab.id === current ? "page" : undefined}
+    onClick={() => { history.replaceState(null, "", tab.href); choose(tab.id); }}><Icon name={tab.icon} />{tab.label}</button>)}</nav>;
+}
+
 export function Choice({ field, onExpired }: { field: Field; onExpired: () => void }) {
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
@@ -163,8 +178,8 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
     const form = new FormData(event.currentTarget);
     try {
       await api(`/api/admin/users/${editingUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), email: form.get("email"), identifier: form.get("identifier"), role: form.get("role"), isActive: form.get("isActive") === "on" }) });
-      setSuccess("Profil akun diperbarui."); setEditingUser(null); setRevision(value => value + 1);
-    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setSaveError(cause instanceof Error ? cause.message : "Profil tidak dapat diperbarui."); }
+      setSuccess("Akun diperbarui."); setEditingUser(null); setRevision(value => value + 1);
+    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setSaveError(cause instanceof Error ? cause.message : "Akun tidak dapat diperbarui."); }
     finally { saving.current = false; setPending(false); }
   }
   const archivable = ["years", "terms", "classes"].includes(resource);
@@ -178,14 +193,22 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   function display(row: RecordRow, key: string) {
     const value = row[key];
     if (key === "createdAt" && typeof value === "string") return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
+    if ((key === "startsOn" || key === "endsOn") && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return dateOnly.format(new Date(`${value}T00:00:00Z`));
     if (isAudit && key === "name" && typeof value === "string") {
       const category = auditCategoryOf(value);
       return <><span className={`badge ${category.tone}`} title={value}><Icon name={category.icon} size={12} />{category.label}</span>
         <div className="table-sub">{auditActionLabel(value)}</div></>;
     }
+    if (key === "name" && personResources.has(resource) && typeof value === "string") {
+      const role = resource === "users" ? String(row.roles ?? "") : resource === "teaching-assignments" ? "teacher" : "student";
+      return <PersonName name={value} role={role} classroom={resource === "enrollments" ? String(row.class ?? "") : null} />;
+    }
     if (isAudit && key === "actor") return value ?? <span className="learning-muted">Sistem</span>;
     // Resource type and id are one identity, the way the report's audit tab shows them.
     if (isAudit && key === "resourceType") return <>{value ?? "—"}{row.resourceId ? <span className="table-sub">{row.resourceId}</span> : null}</>;
+    if (key === "roles" && typeof value === "string") return <span className="badge-group">{value.split(",").map(role => role.trim()).filter(Boolean).map(role => <span key={role} className={`badge ${roleTone(role)}`}>{roleName(role)}</span>)}</span>;
+    if (key === "isActive") return <span className={`badge ${value === true ? "badge-success" : "badge-draft"}`}>{value === true ? "Aktif" : "Nonaktif"}</span>;
+    if (key === "archived") return value === true ? <span className="badge badge-draft"><Icon name="archive" size={12} />Diarsipkan</span> : <span className="badge badge-success">Aktif</span>;
     return typeof value === "boolean" ? <span className={`badge ${value ? "badge-success" : "badge-draft"}`}>{value ? "Ya" : "Tidak"}</span> : value ?? "—";
   }
   const canCreate = definition.fields.length > 0;
@@ -193,50 +216,94 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   function toggleCreate(open: boolean) { setCreating(open); setRecovery(null); setEditingUser(null); setSuccess(""); setSaveError(""); }
   function openRecovery(row: RecordRow) { setCreating(false); setEditingUser(null); setSuccess(""); setSaveError(""); setRecovery(row); }
   function openEdit(row: RecordRow) { setCreating(false); setRecovery(null); setSuccess(""); setSaveError(""); setEditingUser(row); }
+  const roleOptions = <><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></>;
   return <>
     <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title={title ?? definition.title} description={definition.description}
       actions={canCreate && <Button aria-expanded={creating} aria-controls="create-panel" className={creating ? "button-secondary" : ""} onClick={() => toggleCreate(!creating)}><Icon name={creating ? "close" : "plus"} />{creating ? "Tutup formulir" : definition.action}</Button>} />
     {tabs}
-    {isAudit && <Card className="report-filter-card"><div className="filter-bar report-filters">
-      <label className="report-filter"><span>Kategori</span>
-        <select className="input filter-select" value={category} onChange={event => { setCategory(event.target.value); setOffset(0); }}>
-          <option value="">Semua kategori</option>
-          {auditCategories.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-        </select></label>
-      <Button className="button-secondary button-small" onClick={() => { setCategory(""); setOffset(0); }}>Atur ulang</Button>
-    </div></Card>}
-    {canCreate && creating && <div id="create-panel" ref={panel}><Card className="admin-form-card"><h2>{definition.action}</h2>
+    {canCreate && creating && <div id="create-panel" ref={panel}><Card className="admin-form-card">
+      <PanelHeading title={definition.action} close={() => toggleCreate(false)} />
       <form key={formRevision} onSubmit={event => void submit(event)}><fieldset disabled={pending} className="admin-fields">
-        {definition.fields.map(field => <div className="admin-field" key={field.key}><label htmlFor={field.key}>{field.label}</label>{field.source ? <Choice field={field} onExpired={onExpired} /> : field.type === "role" ? <select className="input" id={field.key} name={field.key} required defaultValue="student"><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select> : <input className="input" id={field.key} name={field.key} type={field.type ?? "text"} required maxLength={field.max} minLength={field.type === "password" ? 12 : undefined} autoComplete={field.type === "password" ? "new-password" : "off"} {...(field.type === "date" ? { min: "1900-01-01", max: "2200-12-31" } : {})} />}</div>)}
+        {definition.fields.map(field => <div className="admin-field" key={field.key}><label htmlFor={field.key}>{field.label}</label>{field.source ? <Choice field={field} onExpired={onExpired} /> : field.type === "role" ? <select className="input" id={field.key} name={field.key} required defaultValue="student">{roleOptions}</select> : <input className="input" id={field.key} name={field.key} type={field.type ?? "text"} required maxLength={field.max} minLength={field.type === "password" ? 12 : undefined} autoComplete={field.type === "password" ? "new-password" : "off"} {...(field.type === "date" ? { min: "1900-01-01", max: "2200-12-31" } : {})} />}</div>)}
         <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : definition.action}</Button></div>
       </fieldset></form>
       {saveError && <ErrorState message={saveError} />}
     </Card></div>}
-    {recoverable && recovery && <div id="recovery-panel" ref={recoveryPanel}><Card className="admin-form-card"><h2>Atur ulang kata sandi</h2>
-      <p>Akun <strong>{recovery.name ?? recovery.email}</strong> ({recovery.email}). Semua sesi aktif akun ini langsung diakhiri, dan kata sandi baru harus disampaikan secara pribadi.</p>
+    {recoverable && recovery && <div id="recovery-panel" ref={recoveryPanel}><Card className="admin-form-card">
+      <PanelHeading title="Atur ulang kata sandi" close={() => setRecovery(null)}
+        description={<>Akun <strong>{recovery.name ?? recovery.email}</strong> ({recovery.email}). Semua sesi aktif akun ini langsung diakhiri; sampaikan kata sandi baru secara pribadi.</>} />
       <form onSubmit={event => void submitRecovery(event)}><fieldset disabled={pending} className="admin-fields">
         <div className="admin-field"><label htmlFor="recovery-password">Kata sandi baru (12–128 karakter)</label><input className="input" id="recovery-password" name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" /></div>
-        <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : "Atur ulang kata sandi"}</Button><Button type="button" className="button-secondary" disabled={pending} onClick={() => setRecovery(null)}>Batal</Button></div>
+        <div className="form-actions"><Button type="submit" disabled={pending}><Icon name="key" />{pending ? "Menyimpan…" : "Atur ulang kata sandi"}</Button><Button type="button" className="button-secondary" disabled={pending} onClick={() => setRecovery(null)}>Batal</Button></div>
       </fieldset></form>
       {saveError && <ErrorState message={saveError} />}
     </Card></div>}
-    {recoverable && editingUser && <div id="edit-user-panel" ref={editPanel}><Card className="admin-form-card"><h2>Edit profil akun</h2>
-      <form onSubmit={event => void submitUserEdit(event)}><fieldset disabled={pending} className="admin-fields"><div className="admin-field"><label htmlFor="edit-name">Nama</label><input className="input" id="edit-name" name="name" required maxLength={100} defaultValue={String(editingUser.name ?? "")} /></div><div className="admin-field"><label htmlFor="edit-email">Email</label><input className="input" id="edit-email" name="email" type="email" required maxLength={254} defaultValue={String(editingUser.email ?? "")} /></div><div className="admin-field"><label htmlFor="edit-identifier">NIS / nomor pegawai</label><input className="input" id="edit-identifier" name="identifier" required maxLength={50} defaultValue={String(editingUser.identifier ?? "").split(",")[0] ?? ""} /></div><div className="admin-field"><label htmlFor="edit-role">Role</label><select className="input" id="edit-role" name="role" defaultValue={String(editingUser.roles ?? "student").split(",")[0]}><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select></div><label className="admin-field"><span> </span><span><input type="checkbox" name="isActive" defaultChecked={editingUser.isActive === true} /> Akun aktif</span></label><div className="form-actions"><Button type="submit">Simpan profil</Button><Button type="button" className="button-secondary" onClick={() => setEditingUser(null)}>Batal</Button></div></fieldset></form>{saveError && <ErrorState message={saveError} />}
+    {recoverable && editingUser && <div id="edit-user-panel" ref={editPanel}><Card className="admin-form-card">
+      <PanelHeading title="Edit akun" description="Mengganti role, email, atau status akun mengakhiri semua sesi aktif akun tersebut." close={() => setEditingUser(null)} />
+      <form onSubmit={event => void submitUserEdit(event)}><fieldset disabled={pending} className="admin-fields">
+        <div className="admin-field"><label htmlFor="edit-name">Nama</label><input className="input" id="edit-name" name="name" required maxLength={100} defaultValue={String(editingUser.name ?? "")} /></div>
+        <div className="admin-field"><label htmlFor="edit-email">Email</label><input className="input" id="edit-email" name="email" type="email" required maxLength={254} defaultValue={String(editingUser.email ?? "")} /></div>
+        <div className="admin-field"><label htmlFor="edit-identifier">NIS / nomor pegawai</label><input className="input" id="edit-identifier" name="identifier" required maxLength={50} defaultValue={String(editingUser.identifier ?? "").split(",")[0] ?? ""} /></div>
+        <div className="admin-field"><label htmlFor="edit-role">Role</label><select className="input" id="edit-role" name="role" defaultValue={String(editingUser.roles ?? "student").split(",")[0]?.trim()}>{roleOptions}</select></div>
+        <label className="admin-check field-wide"><input type="checkbox" name="isActive" defaultChecked={editingUser.isActive === true} />Akun aktif</label>
+        <div className="form-actions"><Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : "Simpan akun"}</Button><Button type="button" className="button-secondary" disabled={pending} onClick={() => setEditingUser(null)}>Batal</Button></div>
+      </fieldset></form>
+      {saveError && <ErrorState message={saveError} />}
     </Card></div>}
     {success && <p className="success-state" role="status">{success}</p>}
-    <Card><div className="card-heading"><h2>Daftar {definition.title.toLowerCase()}</h2><form className="table-search" onSubmit={event => { event.preventDefault(); setSearch(q); setOffset(0); }}><input className="input" type="search" aria-label="Cari data" placeholder="Cari data…" maxLength={100} value={q} onChange={event => setQ(event.target.value)} /><Button className="button-secondary button-small" type="submit">Cari</Button></form></div>
-      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState title="Belum ada data" description={search ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} /> : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}{(recoverable || archivable) && <th scope="col">Aksi</th>}</tr></thead><tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}{(recoverable || archivable) && <td className="table-action">{recoverable && <><Button className="button-secondary button-small" aria-expanded={editingUser?.id === row.id} aria-controls="edit-user-panel" onClick={() => openEdit(row)}><Icon name="edit" />Edit</Button><Button className="button-secondary button-small" aria-expanded={recovery?.id === row.id} aria-controls="recovery-panel" onClick={() => openRecovery(row)}><Icon name="key" />Atur ulang sandi</Button></>}{archivable && <Button className="button-secondary button-small" onClick={() => void toggleArchive(row)}>{row.archived ? "Pulihkan" : "Arsipkan"}</Button>}</td>}</tr>)}</tbody></table></div>}
+    {!creating && !recovery && !editingUser && saveError && <ErrorState message={saveError} />}
+    <Card>
+      <div className="card-heading"><h2>Daftar {definition.title.toLowerCase()}</h2>
+        <div className="card-tools">
+          {isAudit && <select className="input filter-select" aria-label="Kategori event" value={category} onChange={event => { setCategory(event.target.value); setOffset(0); }}>
+            <option value="">Semua kategori</option>
+            {auditCategories.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>}
+          <form className="table-search" role="search" onSubmit={event => { event.preventDefault(); setSearch(q); setOffset(0); }}><input className="input" type="search" aria-label={`Cari ${definition.title.toLowerCase()}`} placeholder="Cari data…" maxLength={100} value={q} onChange={event => setQ(event.target.value)} /><Button className="button-secondary button-small" type="submit">Cari</Button></form>
+        </div>
+      </div>
+      {error ? <ErrorState message={error} retry={() => setRevision(value => value + 1)} /> : !page ? <LoadingState /> : !page.items.length ? <EmptyState icon={definition.icon} title="Belum ada data" description={search || category ? "Tidak ada hasil yang sesuai. Coba pencarian lain." : "Data yang sudah tercatat akan muncul di sini."} action={canCreate && !search && !creating && <Button onClick={() => toggleCreate(true)}><Icon name="plus" />{definition.action}</Button>} />
+        : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Tabel ${definition.title}`}><table className="data-table"><thead><tr>{definition.columns.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}{(recoverable || archivable) && <th scope="col">Aksi</th>}</tr></thead>
+          <tbody>{page.items.map(row => <tr key={row.id}>{definition.columns.map(([key]) => <td key={key}>{display(row, key)}</td>)}{(recoverable || archivable) && <td className="table-action"><div className="table-actions">
+            {recoverable && <><Button className="button-secondary button-small" aria-expanded={editingUser?.id === row.id} aria-controls="edit-user-panel" onClick={() => openEdit(row)}><Icon name="edit" />Edit</Button><Button className="button-secondary button-small" aria-expanded={recovery?.id === row.id} aria-controls="recovery-panel" onClick={() => openRecovery(row)}><Icon name="key" />Atur ulang sandi</Button></>}
+            {archivable && <Button className="button-secondary button-small" onClick={() => void toggleArchive(row)}><Icon name={row.archived ? "refresh" : "archive"} />{row.archived ? "Pulihkan" : "Arsipkan"}</Button>}
+          </div></td>}</tr>)}</tbody></table></div>}
       <div className="table-pagination"><span>{page ? `${page.items.length ? offset + 1 : 0}–${offset + page.items.length} ditampilkan` : "Memuat…"}</span><div><Button className="button-secondary button-small" disabled={!page || offset === 0} onClick={() => setOffset(offset - 50)}>Sebelumnya</Button><Button className="button-secondary button-small" disabled={!page || page.nextOffset === null} onClick={() => setOffset(page!.nextOffset!)}>Berikutnya</Button></div></div>
     </Card>
   </>;
 }
-export function AcademicFoundation({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
-  const [resource, setResource] = useState<FoundationResource>("years");
-  const tabs = <nav className="tabs" aria-label="Administrasi akademik">{Object.entries(definitions).filter(([key]) => key !== "users" && key !== "audit").map(([key, definition]) => <button key={key} className={resource === key ? "tab-active" : ""} aria-current={resource === key ? "page" : undefined} onClick={() => setResource(key as FoundationResource)}>{definition.title}</button>)}</nav>;
-  return <Foundation key={resource} resource={resource} title="Akademik" tabs={tabs} timezone={timezone} onExpired={onExpired} />;
+
+const userTabs: AdminTab[] = [
+  { id: "accounts", label: "Akun", icon: "users", href: "/admin/users" },
+  { id: "import", label: "Import santri", icon: "upload", href: "/admin/import" },
+];
+// Administrasi → Pengguna: the account list and the student CSV import.
+export function UsersAdmin({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
+  const [tab, setTab] = useState(() => location.pathname === "/admin/import" ? "import" : "accounts");
+  const tabs = <AdminTabs label="Pengguna" tabs={userTabs} current={tab} choose={setTab} />;
+  return tab === "import" ? <StudentImport tabs={tabs} onExpired={onExpired} /> : <Foundation resource="users" title="Pengguna" tabs={tabs} timezone={timezone} onExpired={onExpired} />;
 }
 
-type ImportPreview = { mode: "preview"; rows: { row: number; email: string; identifier: string; errors: string[]; action: string }[] };
+const academicResources = ["years", "terms", "classes", "enrollments", "subjects", "courses", "teaching-assignments"] as const;
+const academicTabs: AdminTab[] = academicResources.flatMap(key => {
+  const tab: AdminTab = { id: key, label: definitions[key].title, icon: definitions[key].icon, href: `/admin/academic?tab=${key}` };
+  return key === "enrollments" ? [tab, { id: "transfers", label: "Transfer kelas", icon: "transfer", href: "/admin/transfers" }] : [tab];
+});
+function initialAcademicTab() {
+  if (location.pathname === "/admin/transfers") return "transfers";
+  const tab = new URLSearchParams(location.search).get("tab");
+  return academicResources.find(key => key === tab) ?? "years";
+}
+// Administrasi → Akademik: the academic reference data and class transfers.
+export function AcademicFoundation({ timezone, onExpired }: { timezone: string; onExpired: () => void }) {
+  const [tab, setTab] = useState<string>(initialAcademicTab);
+  const tabs = <AdminTabs label="Administrasi akademik" tabs={academicTabs} current={tab} choose={setTab} />;
+  return tab === "transfers" ? <ClassTransfer tabs={tabs} onExpired={onExpired} /> : <Foundation key={tab} resource={tab as FoundationResource} title="Akademik" tabs={tabs} timezone={timezone} onExpired={onExpired} />;
+}
+
+type ImportRow = { row: number; email: string; identifier: string; errors: string[]; action: string };
+type ImportResult = { mode: "preview" | "commit"; rows: ImportRow[]; created?: number; enrolled?: number; skipped?: number };
+const csvHeader = "nama,email,identifier,password";
 function parseCsv(value: string) {
   const lines: string[][] = [];
   let row: string[] = []; let cell = ""; let quoted = false;
@@ -248,30 +315,66 @@ function parseCsv(value: string) {
     else cell += char;
   }
   if (cell || row.length) { row.push(cell.trim()); if (row.some(Boolean)) lines.push(row); }
-  if (!lines.length || lines[0]!.map(header => header.toLowerCase()).join(",") !== "nama,email,identifier,password") throw new Error("Header harus: nama,email,identifier,password");
+  if (!lines.length || lines[0]!.map(header => header.toLowerCase()).join(",") !== csvHeader) throw new Error(`Header harus: ${csvHeader}`);
   return lines.slice(1).map(columns => ({ name: columns[0] ?? "", email: columns[1] ?? "", identifier: columns[2] ?? "", password: columns[3] ?? "" }));
 }
-export function StudentImport({ onExpired }: { onExpired: () => void }) {
-  const [csv, setCsv] = useState("nama,email,identifier,password\n");
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+function importOutcome(row: ImportRow) {
+  return row.errors.length ? { label: "Perlu diperbaiki", tone: "badge-danger" } : row.action === "skip" ? { label: "Sudah terdaftar", tone: "badge-draft" }
+    : row.action === "enroll" ? { label: "Tambahkan ke kelas", tone: "" } : { label: "Akun baru", tone: "badge-success" };
+}
+// The "Import santri" tab of Administrasi → Pengguna: preview first, then an atomic save of the
+// previewed rows into the class that was chosen for the preview.
+export function StudentImport({ tabs, onExpired }: { tabs?: ReactNode; onExpired: () => void }) {
+  const [csv, setCsv] = useState(`${csvHeader}\n`);
+  const [preview, setPreview] = useState<{ classId: string; rows: ImportRow[] } | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  async function submit(event: FormEvent<HTMLFormElement>, mode: "preview" | "commit") {
-    event.preventDefault(); setError(""); setMessage(""); setPending(true);
+  const [formKey, setFormKey] = useState(0);
+  const saving = useRef(false);
+  async function send(mode: "preview" | "commit", classId: string) {
+    if (saving.current) return;
+    setError(""); setMessage("");
+    let rows: ReturnType<typeof parseCsv>;
+    try { rows = parseCsv(csv); } catch (cause) { setError(cause instanceof Error ? cause.message : "CSV tidak dapat dibaca."); return; }
+    saving.current = true; setPending(true);
     try {
-      const form = new FormData(event.currentTarget);
-      const rows = parseCsv(csv);
-      const result = await api<ImportPreview & { created?: number; enrolled?: number; skipped?: number }>("/api/admin/imports/students", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, classId: form.get("classId"), rows }) });
-      if (mode === "preview") setPreview(result);
-      else { setMessage(`${result.created} akun dibuat, ${result.enrolled} enrollment diproses, ${result.skipped} baris sudah ada.`); setPreview(null); }
+      const result = await api<ImportResult>("/api/admin/imports/students", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, classId, rows }) });
+      if (mode === "preview") setPreview({ classId, rows: result.rows });
+      else { setMessage(`Import selesai: ${result.created ?? 0} akun dibuat, ${result.enrolled ?? 0} enrollment diproses, ${result.skipped ?? 0} baris sudah terdaftar.`); setPreview(null); setCsv(`${csvHeader}\n`); setFormKey(value => value + 1); }
     } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setError(cause instanceof Error ? cause.message : "Import tidak dapat diproses."); }
-    finally { setPending(false); }
+    finally { saving.current = false; setPending(false); }
   }
+  function readFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 256 * 1024) { setError("Ukuran berkas CSV maksimal 256 KB."); return; }
+    void file.text().then(text => { setCsv(text); setPreview(null); setError(""); }, () => setError("Berkas CSV tidak dapat dibaca."));
+  }
+  const counts = (preview?.rows ?? []).reduce<Record<string, number>>((all, row) => { const { label } = importOutcome(row); all[label] = (all[label] ?? 0) + 1; return all; }, {});
   const hasErrors = preview?.rows.some(row => row.errors.length) ?? false;
-  return <div className="lesson-workspace"><PageHeader breadcrumbs={[{ label: "Administrasi" }]} title="Import santri" description="Validasi CSV terlebih dahulu, lalu simpan akun dan enrollment secara atomik." />
-    <Card className="admin-form-card"><form onSubmit={event => void submit(event, "preview")}><fieldset disabled={pending} className="admin-fields"><div className="admin-field"><label htmlFor="import-class">Kelas tujuan</label><Choice field={classField} onExpired={onExpired} /></div><div className="admin-field"><label htmlFor="student-csv">CSV santri</label><textarea className="input" id="student-csv" rows={12} value={csv} onChange={event => setCsv(event.target.value)} spellCheck={false} aria-describedby="student-csv-help" /></div><p id="student-csv-help" className="card-hint">Format wajib: nama,email,identifier,password. Maksimal 500 baris. Kata sandi awal harus 12–128 karakter.</p><div className="form-actions"><Button type="submit">{pending ? "Memeriksa…" : "Preview validasi"}</Button></div></fieldset></form></Card>
-    {error && <ErrorState message={error} />}{message && <p className="success-state" role="status">{message}</p>}
-    {preview && <Card><div className="card-heading"><h2>Hasil validasi</h2><span>{preview.rows.length} baris</span></div><div className="table-scroll"><table className="data-table"><thead><tr><th>Baris</th><th>Email</th><th>Identifier</th><th>Hasil</th></tr></thead><tbody>{preview.rows.map(row => <tr key={row.row}><td>{row.row}</td><td>{row.email || "—"}</td><td>{row.identifier || "—"}</td><td>{row.errors.length ? row.errors.join(" ") : row.action === "skip" ? "Sudah terdaftar" : row.action === "enroll" ? "Tambahkan ke kelas" : "Akan dibuat"}</td></tr>)}</tbody></table></div>{!hasErrors && <form onSubmit={event => void submit(event, "commit")}><input type="hidden" name="classId" value={(document.querySelector("#classId") as HTMLSelectElement | null)?.value ?? ""} /><div className="form-actions"><Button type="submit" disabled={pending}>Simpan import</Button></div></form>}</Card>}
-  </div>;
+  return <>
+    <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title="Pengguna" description="Validasi CSV terlebih dahulu, lalu simpan akun dan enrollment sekaligus." />
+    {tabs}
+    <Card className="admin-form-card">
+      <PanelHeading title="Import santri dari CSV" description={<>Header wajib <code>{csvHeader}</code>. Maksimal 500 baris; kata sandi awal 12–128 karakter.</>} />
+      <form key={formKey} onChange={event => { if ((event.target as HTMLElement).getAttribute("name") === "classId") setPreview(null); }} onSubmit={event => { event.preventDefault(); void send("preview", String(new FormData(event.currentTarget).get("classId") ?? "")); }}>
+        <fieldset disabled={pending} className="admin-fields">
+          <div className="admin-field"><label htmlFor="classId">Kelas tujuan</label><Choice field={classField} onExpired={onExpired} /></div>
+          <div className="admin-field"><label htmlFor="student-csv-file">Berkas CSV (opsional)</label><input className="input" id="student-csv-file" type="file" accept=".csv,text/csv" onChange={readFile} /></div>
+          <div className="admin-field field-wide"><label htmlFor="student-csv">Isi CSV</label><textarea className="input admin-code" id="student-csv" rows={10} value={csv} onChange={event => { setCsv(event.target.value); setPreview(null); }} spellCheck={false} /></div>
+          <div className="form-actions"><Button type="submit" disabled={pending}><Icon name="check" />{pending && !preview ? "Memeriksa…" : "Periksa CSV"}</Button></div>
+        </fieldset>
+      </form>
+      {error && <ErrorState message={error} />}
+    </Card>
+    {message && <p className="success-state" role="status">{message}</p>}
+    {preview && <Card>
+      <div className="card-heading"><h2>Hasil validasi</h2><span className="badge-group">{Object.entries(counts).map(([label, count]) => <span key={label} className={`badge ${importOutcome(preview.rows.find(row => importOutcome(row).label === label)!).tone}`}>{count} {label.toLowerCase()}</span>)}</span></div>
+      {!preview.rows.length ? <EmptyState icon="upload" title="CSV belum berisi baris" description="Tambahkan minimal satu baris santri di bawah header." /> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Hasil validasi import"><table className="data-table"><thead><tr><th scope="col">Baris</th><th scope="col">Email</th><th scope="col">Identifier</th><th scope="col">Hasil</th></tr></thead>
+        <tbody>{preview.rows.map(row => { const outcome = importOutcome(row); return <tr key={row.row}><td>{row.row}</td><td>{row.email || "—"}</td><td>{row.identifier || "—"}</td><td><span className={`badge ${outcome.tone}`}>{outcome.label}</span>{row.errors.length > 0 && <span className="table-sub">{row.errors.join(" ")}</span>}</td></tr>; })}</tbody></table></div>}
+      <div className="admin-result-footer">{hasErrors || !preview.rows.length ? <p className="info-state">Perbaiki CSV, lalu periksa ulang sebelum menyimpan.</p>
+        : <><Button disabled={pending} onClick={() => void send("commit", preview.classId)}>{pending ? "Menyimpan…" : `Simpan ${preview.rows.length} baris`}</Button><Button className="button-secondary" disabled={pending} onClick={() => setPreview(null)}>Batal</Button></>}</div>
+    </Card>}
+  </>;
 }

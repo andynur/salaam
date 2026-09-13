@@ -5,7 +5,7 @@ import type { ProjectRow } from "../../shared/project";
 import { sessionLabels } from "../../shared/attendance";
 import { clubFlow, clubGroupCapacity, clubGroupLevelValues, clubGroupLevels, clubRoleLabels, clubRoles, maxClubGoals, maxClubTracks, type ClubChallengeRow, type ClubCourseRow, type ClubDetail, type ClubGroupRow, type ClubMeetingRow, type ClubPerson, type ClubProgressRow, type ClubRole, type ClubSummary, type ClubTrack } from "../../shared/club";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PersonName } from "../components/ui";
 import { Icon, type IconName } from "../components/icons";
 import { Field, MutationForm, Pager, Search, Status, errorMessage, formatDateTime, learningApi, useData } from "../components/learning";
 import { projectStatuses } from "../../shared/project";
@@ -215,7 +215,7 @@ function Overview({ club, onExpired, saved }: { club: ClubDetail; onExpired: () 
         </>}
         <h3 className="club-subhead">Mentor</h3>
         {club.mentorList.length ? <ul className="member-list">{club.mentorList.map(mentor =>
-          <li key={mentor.userId}><span className="avatar avatar-small" aria-hidden="true">{initials(mentor.name)}</span>{mentor.name}</li>)}</ul>
+          <li key={mentor.userId}><PersonName name={mentor.name} role="teacher" /></li>)}</ul>
           : <p className="learning-muted">Belum ada mentor aktif.</p>}
       </div>
       <ul className="report-metrics">
@@ -445,8 +445,7 @@ function Members({ club, timezone, onExpired, saved }: { club: ClubDetail; timez
       {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length
         ? <EmptyState icon="users" title="Belum ada anggota" description={q || role ? "Tidak ada anggota yang sesuai filter." : "Mentor menambahkan anggota dari santri course klub."} />
         : <ul className="member-list club-members">{data.items.map(person => <li key={person.userId}>
-          <span className="avatar avatar-small" aria-hidden="true">{initials(person.name)}</span>
-          <span className="club-member-name">{person.name}<small className="table-sub">Bergabung {formatDateTime(person.joinedAt, timezone)}</small></span>
+          <PersonName className="club-member-name" name={person.name} role={person.role === "mentor" ? "teacher" : "student"} classroom={person.className} sub={`Bergabung ${formatDateTime(person.joinedAt, timezone)}`} />
           <span className="badge-group">
             <span className={`badge ${person.role === "mentor" ? "badge-discovery" : "badge-draft"}`}>{clubRoleLabels[person.role]}</span>
             {person.role === "member" && (person.groupName
@@ -560,8 +559,7 @@ function GroupCard({ club, group, tracks, manage, onExpired, saved }: {
     </span>
     <ul className="club-group-meta">
       <li><span className="summary-label">Mentor</span>
-        {group.mentorName ? <span className="learning-row"><span className="avatar avatar-small" aria-hidden="true">{initials(group.mentorName)}</span>
-          <span>{group.mentorName}</span><span className={`badge ${mentor.tone}`}>{mentor.label}</span></span>
+        {group.mentorName ? <span className="learning-row"><PersonName name={group.mentorName} role="teacher" /><span className={`badge ${mentor.tone}`}>{mentor.label}</span></span>
           : <span className="learning-muted">Belum ditunjuk</span>}</li>
       <li><span className="summary-label">Tema</span><span>{group.topic || "—"}</span></li>
       <li><span className="summary-label">Jadwal</span><span>{group.schedule || "—"}</span></li>
@@ -696,7 +694,7 @@ function Progress({ club, onExpired }: { club: ClubDetail; onExpired: () => void
         <thead><tr><th scope="col">Peringkat</th><th scope="col">Anggota</th><th scope="col">Level</th><th scope="col">XP</th><th scope="col">Badge</th><th scope="col">Lesson selesai</th><th scope="col">Proyek disetujui</th></tr></thead>
         <tbody>{data.items.map((row, index) => <tr key={row.studentId}>
           <td><span className="club-rank">{offset + index + 1}</span></td>
-          <td><span className="learning-row"><span className="avatar avatar-small" aria-hidden="true">{initials(row.studentName)}</span><strong>{row.studentName}</strong></span></td>
+          <td><PersonName name={row.studentName} classroom={row.className} /></td>
           <td><span className="badge badge-discovery"><Icon name="star" size={12} />Level {row.level}</span></td>
           <td><strong>{row.xp}</strong></td><td>{row.badges}</td>
           <td><span className="board-progress"><progress max={club.stats.lessons || 1} value={Math.min(row.lessonsCompleted, club.stats.lessons)} aria-hidden="true" /><span>{row.lessonsCompleted}/{club.stats.lessons} lesson</span></span></td>

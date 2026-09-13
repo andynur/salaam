@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { Assessment, AssessmentKind, AssessmentRubric, AttemptRow, Question, QuestionType, ResultsVisibility, RubricCriterion, ScoreAdjustment, ScoringMode } from "../../shared/assessment";
 import type { Page } from "../../shared/learning";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, EmptyState, ErrorState, LoadingState } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PersonName } from "../components/ui";
 import { Field, MutationForm, Pager, Search, Status, deviceTimezone, errorMessage, formatDateTime, fromLocalInput, learningApi, toLocalInput, useData } from "../components/learning";
 
 type Common = { courseId: string; timezone: string; onExpired: () => void };
@@ -13,8 +13,8 @@ const scoringLabels: Record<ScoringMode, string> = { all_or_nothing: "Semua bena
 const optionIds = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export function LessonAssessments({ courseId, lessonId, assessments, canManage, canParticipate, publishButton, archiveButton, changed, timezone, onExpired }: Common & {
-  lessonId: string; assessments: Assessment[]; canManage: boolean; canParticipate: boolean; changed: () => void;
+export function LessonAssessments({ courseId, classroom, lessonId, assessments, canManage, canParticipate, publishButton, archiveButton, changed, timezone, onExpired }: Common & {
+  classroom: string; lessonId: string; assessments: Assessment[]; canManage: boolean; canParticipate: boolean; changed: () => void;
   publishButton: (path: string, published: boolean, label: string) => ReactNode; archiveButton: (path: string, label: string) => ReactNode;
 }) {
   const [editor, setEditor] = useState<Assessment | "new" | null>(null);
@@ -44,7 +44,7 @@ export function LessonAssessments({ courseId, lessonId, assessments, canManage, 
         <p className="learning-muted">{assessment.questionCount} soal · nilai maks. {assessment.maxScore} · {settings.timeLimitMinutes ? `${settings.timeLimitMinutes} menit` : "tanpa batas waktu"} · {settings.maxAttempts}× percobaan{settings.opensAt ? ` · dibuka ${formatDateTime(settings.opensAt, timezone)}` : ""}{settings.closesAt ? ` · ditutup ${formatDateTime(settings.closesAt, timezone)}` : ""}</p>
         <p className="learning-prose">{assessment.instructions}</p>
         {canManage && <div className="learning-actions"><Button className="button-secondary button-small" onClick={() => setEditor(assessment)}>{assessment.locked ? "Lihat pengaturan" : "Edit & pilih soal"}</Button>{publishButton(`activities/${assessment.id}`, assessment.published, assessment.title)}{archiveButton(`activities/${assessment.id}`, assessment.title)}<Button className="button-small" aria-expanded={resultsFor === assessment.id} onClick={() => setResultsFor(resultsFor === assessment.id ? "" : assessment.id)}>Hasil santri</Button></div>}
-        {canManage && resultsFor === assessment.id && <AttemptTable courseId={courseId} assessment={assessment} timezone={timezone} onExpired={onExpired} />}
+        {canManage && resultsFor === assessment.id && <AttemptTable courseId={courseId} classroom={classroom} assessment={assessment} timezone={timezone} onExpired={onExpired} />}
         {canParticipate && <div className="submitted-answer">
           {assessment.attempts.map(attempt => <a key={attempt.id} className="material-link attempt-link" href={`/learning/courses/${courseId}/attempts/${attempt.id}`}>Percobaan {attempt.number}: {attempt.submittedAt ? attempt.score !== null ? `nilai ${attempt.score} / ${attempt.maxScore}` : "dikumpulkan" : "sedang berjalan"} →</a>)}
           {open ? <Button disabled={Boolean(starting)} onClick={() => void start(assessment)}>Lanjutkan mengerjakan</Button>
@@ -211,7 +211,7 @@ function QuestionEditor({ courseId, value, close, saved, onExpired }: { courseId
   </Card>;
 }
 
-function AttemptTable({ courseId, assessment, timezone, onExpired }: Common & { assessment: Assessment }) {
+function AttemptTable({ courseId, classroom, assessment, timezone, onExpired }: Common & { classroom: string; assessment: Assessment }) {
   const [offset, setOffset] = useState(0);
   const [q, setQ] = useState("");
   const [revision, setRevision] = useState(0);
@@ -221,7 +221,7 @@ function AttemptTable({ courseId, assessment, timezone, onExpired }: Common & { 
   return <div className="submission-review"><div className="learning-row"><h4>Hasil santri · {assessment.title}</h4><Search change={value => { setQ(value); setOffset(0); }} /></div>
     {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState /> : !data.items.length ? <EmptyState title="Belum ada percobaan" description="Percobaan santri akan tampil setelah mereka mulai mengerjakan." />
       : <div className="table-scroll" tabIndex={0} role="region" aria-label={`Hasil ${assessment.title}`}><table className="data-table"><thead><tr><th scope="col">Santri</th><th scope="col">Percobaan</th><th scope="col">Status</th><th scope="col">Nilai</th><th scope="col">Aksi</th></tr></thead><tbody>
-        {data.items.map(attempt => <tr key={attempt.id}><td>{attempt.studentName}</td><td>{attempt.number}</td><td>{attempt.submittedAt ? `${attempt.submissionReason === "expired" ? "Waktu habis" : "Dikumpulkan"} · ${formatDateTime(attempt.submittedAt, timezone)}` : "Sedang mengerjakan"}</td><td>{attempt.score === null ? "—" : `${attempt.score} / ${attempt.maxScore}${attempt.adjusted ? " (dikoreksi)" : ""}`}</td>
+        {data.items.map(attempt => <tr key={attempt.id}><td><PersonName name={attempt.studentName} classroom={classroom} /></td><td>{attempt.number}</td><td>{attempt.submittedAt ? `${attempt.submissionReason === "expired" ? "Waktu habis" : "Dikumpulkan"} · ${formatDateTime(attempt.submittedAt, timezone)}` : "Sedang mengerjakan"}</td><td>{attempt.score === null ? "—" : `${attempt.score} / ${attempt.maxScore}${attempt.adjusted ? " (dikoreksi)" : ""}`}</td>
           <td><div className="learning-actions"><a className="material-link" href={`/learning/courses/${courseId}/attempts/${attempt.id}`}>Lihat</a>{!attempt.submittedAt && <Button className="button-secondary button-small" aria-expanded={accommodating === attempt.id} onClick={() => setAccommodating(accommodating === attempt.id ? "" : attempt.id)}>Tambah waktu</Button>}{attempt.submittedAt && <Button className="button-secondary button-small" aria-expanded={adjusting === attempt.id} onClick={() => setAdjusting(adjusting === attempt.id ? "" : attempt.id)}>Koreksi nilai</Button>}</div></td></tr>)}
       </tbody></table></div>}
     {adjusting && data?.items.some(item => item.id === adjusting) && <AdjustForm courseId={courseId} attempt={data.items.find(item => item.id === adjusting)!} timezone={timezone} onExpired={onExpired} saved={() => { setAdjusting(""); setRevision(value => value + 1); }} />}

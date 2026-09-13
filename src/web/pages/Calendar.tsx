@@ -95,9 +95,11 @@ function LearningAgenda({ actor, onExpired }: { actor: Actor; onExpired: () => v
 }
 const categoryLabels: Record<string, string> = { academic: "Akademik", holiday: "Libur", assessment: "Asesmen", student: "Kegiatan santri", learning: "Pembelajaran" };
 const categoryClass = (category: string) => `academic-day-${category}`;
-const notificationLabels = { reminder: "Pembelajaran", level_up: "Pertumbuhan", checkin: "Kehadiran" } as const;
-const notificationIcons = { reminder: "book", level_up: "star", checkin: "attendance" } as const;
-const notificationCategoryClass = (kind: NotificationItem["kind"]) => `notification-category-${kind.replace("_", "-")}`;
+export const notificationLabels = { reminder: "Pembelajaran", level_up: "Pertumbuhan", checkin: "Kehadiran" } as const;
+export const notificationIcons = { reminder: "book", level_up: "star", checkin: "attendance" } as const;
+// Dispatched on window after a read receipt so the topbar badge and the inbox page stay in step.
+export const notificationsChanged = "salaam:notifications-changed";
+export const notificationCategoryClass =(kind: NotificationItem["kind"]) => `notification-category-${kind.replace("_", "-")}`;
 function AcademicCalendar({ onExpired }: { onExpired: () => void }) {
   const [yearId, setYearId] = useState(""), [classId, setClassId] = useState("");
   const query = new URLSearchParams(); if (yearId) query.set("yearId", yearId); if (classId) query.set("classId", classId);
@@ -144,11 +146,16 @@ function AcademicDay({ day, date, events }: { day: number; date: string; events:
   </span>;
 }
 export function Notifications({ onExpired }: { onExpired: () => void }) {
-  const [offset, setOffset] = useState(0), [unread, setUnread] = useState(false), [revision, setRevision] = useState(0), [settings, setSettings] = useState(false);
+  const [offset, setOffset] = useState(0), [unread, setUnread] = useState(false), [revision, setRevision] = useState(0), [settings, setSettings] = useState(() => new URLSearchParams(location.search).has("preferences"));
   const view = useData<Page<NotificationItem>>(`/api/notifications?offset=${offset}&unread=${unread}`, onExpired, revision);
   const prefs = useData<NotificationPreferences>("/api/notifications/preferences", onExpired);
   const [saved, setSaved] = useState(false);
   useEffect(() => { document.title = brandTitle("Notifikasi"); }, []);
+  useEffect(() => {
+    const changed = () => setRevision(r => r + 1);
+    addEventListener(notificationsChanged, changed);
+    return () => removeEventListener(notificationsChanged, changed);
+  }, []);
   return <><PageHeader title="Notifikasi" description="Pengingat dan kabar pertumbuhan Anda di aplikasi." actions={<Button className="button-secondary" aria-expanded={settings} aria-controls="notification-preferences" onClick={() => setSettings(!settings)}>Preferensi</Button>} />
     {settings && <Card className="admin-form-card"><div id="notification-preferences"><h2>Preferensi notifikasi</h2>
       {prefs.error ? <ErrorState message={prefs.error} retry={prefs.retry} /> : !prefs.data ? <LoadingState /> : <MutationForm path="/api/notifications/preferences" method="PATCH" label="Simpan preferensi" onExpired={onExpired} saved={() => { setSaved(true); prefs.retry(); }}
@@ -164,7 +171,7 @@ export function Notifications({ onExpired }: { onExpired: () => void }) {
           return <li className={`notification-row ${unreadItem ? "is-unread" : ""}`} key={n.id}>
             <span className={`notification-icon ${notificationCategoryClass(n.kind)}`} aria-hidden="true"><Icon name={notificationIcons[n.kind]} size={18} /></span>
             <div className="task-body"><div className="notification-title-line"><a className="table-link" href={n.href}>{n.title}</a><span className={`badge notification-category ${notificationCategoryClass(n.kind)}`}>{notificationLabels[n.kind]}</span></div><span className="task-meta">{display(n.deliveredAt ?? n.scheduledAt)}</span></div>
-            <div className="notification-actions"><span className={`badge ${unreadItem ? "" : n.status === "suppressed" ? "badge-danger" : "badge-draft"}`}>{n.status === "pending" ? "Menunggu pengiriman" : n.status === "suppressed" ? "Tidak dikirim" : unreadItem ? "Belum dibaca" : "Sudah dibaca"}</span>{unreadItem && <MutationForm path={`/api/notifications/${n.id}/read`} label="Tandai dibaca" body={() => ({})} onExpired={onExpired} saved={() => setRevision(r => r + 1)} />}</div>
+            <div className="notification-actions"><span className={`badge ${unreadItem ? "" : n.status === "suppressed" ? "badge-danger" : "badge-draft"}`}>{n.status === "pending" ? "Menunggu pengiriman" : n.status === "suppressed" ? "Tidak dikirim" : unreadItem ? "Belum dibaca" : "Sudah dibaca"}</span>{unreadItem && <MutationForm path={`/api/notifications/${n.id}/read`} label="Tandai dibaca" body={() => ({})} onExpired={onExpired} saved={() => dispatchEvent(new Event(notificationsChanged))} />}</div>
           </li>;
         })}</ul>}
         <Pager offset={offset} next={view.data.nextOffset} change={setOffset} />

@@ -2,41 +2,63 @@ import type { Actor } from "../../core/permissions";
 import type { IconName } from "../components/icons";
 
 export interface NavItem { href: string; label: string; icon: IconName; active: (path: string) => boolean }
-export interface NavGroup { label?: string; items: NavItem[] }
+export interface NavGroup { id: string; label?: string; items: NavItem[] }
 export interface FutureItem { label: string; icon: IconName }
 
 const exact = (href: string) => (path: string) => path === href;
+const prefix = (href: string) => (path: string) => path === href || path.startsWith(`${href}/`);
+const oneOf = (...hrefs: string[]) => (path: string) => hrefs.includes(path);
+const item = (href: string, label: string, icon: IconName, active = prefix(href)): NavItem => ({ href, label, icon, active });
 
-// Shared by the sidebar and the topbar search so both only offer pages the actor can open.
+// Shared by the sidebar, the topbar, and the topbar search so all only offer pages the actor can open.
+// The sidebar holds workspaces; personal pages (profile, notifications) live in the topbar, and
+// administration sections with several screens are one entry whose screens are tabs.
 export function navigationFor(actor: Actor) {
   const can = (permission: string) => actor.permissions.includes(permission);
   const isStudent = actor.roles.includes("student") && !actor.roles.some(role => role === "admin" || role === "teacher");
-  const main: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard", icon: "dashboard", active: exact("/dashboard") },
-    ...(can("dashboard:view") ? [
-      { href: "/calendar", label: "Kalender", icon: "calendar", active: exact("/calendar") } satisfies NavItem,
-      { href: "/notifications", label: "Notifikasi", icon: "history", active: exact("/notifications") } satisfies NavItem,
-    ] : []),
-    ...(can("learning.view") ? [
-      { href: "/learning", label: "Pembelajaran", icon: "book", active: (path: string) => path.startsWith("/learning") } satisfies NavItem,
-      { href: "/projects", label: "Projects", icon: "board", active: (path: string) => path.startsWith("/projects") } satisfies NavItem,
-      { href: "/attendance", label: "Kehadiran", icon: "attendance", active: (path: string) => path.startsWith("/attendance") } satisfies NavItem,
-      { href: "/gamification", label: "Pertumbuhan", icon: "star", active: (path: string) => path.startsWith("/gamification") } satisfies NavItem,
-    ] : []),
-    ...(can("club.view") ? [{ href: "/club", label: "Club", icon: "club", active: (path: string) => path.startsWith("/club") } satisfies NavItem] : []),
-    ...(can("reports.view") ? [{ href: "/reports", label: "Laporan", icon: "chart", active: (path: string) => path.startsWith("/reports") } satisfies NavItem] : []),
+  const main = [
+    item("/dashboard", "Dashboard", "dashboard", exact("/dashboard")),
+    ...(can("dashboard:view") ? [item("/calendar", "Kalender", "calendar", exact("/calendar"))] : []),
+    ...(can("reports.view") ? [item("/reports", "Laporan", "chart")] : []),
   ];
-  const admin: NavItem[] = ([
-    ["/admin/users", "Akun & profil", "users", "admin.users.manage"],
-    ["/admin/import", "Import santri", "users", "admin.users.manage"],
-    ["/admin/transfers", "Transfer kelas", "arrowRight", "academic.manage"],
-    ["/admin/academic", "Akademik", "academic", "academic.manage"],
-    ["/admin/audit", "Audit log", "history", "audit.view"],
-  ] as const).filter(([, , , permission]) => can(permission)).map(([href, label, icon]) => ({ href, label, icon, active: exact(href) }));
+  const learning = can("learning.view") ? [
+    item("/learning", "Pembelajaran", "book"),
+    item("/curriculum", "Kurikulum", "route", exact("/curriculum")),
+    item("/attendance", "Kehadiran", "attendance"),
+    item("/projects", "Projects", "board"),
+  ] : [];
+  const growth = [
+    ...(can("learning.view") ? [item("/gamification", "Pertumbuhan", "star")] : []),
+    ...(can("links.view") ? [item("/links", "Tautan", "link")] : []),
+    ...(can("club.view") ? [item("/club", "Club", "club")] : []),
+  ];
+  const admin = [
+    ...(can("admin.users.manage") ? [item("/admin/users", "Pengguna", "users", oneOf("/admin/users", "/admin/import"))] : []),
+    ...(can("academic.manage") ? [item("/admin/academic", "Akademik", "academic", oneOf("/admin/academic", "/admin/transfers"))] : []),
+    ...(can("audit.view") ? [item("/admin/audit", "Audit log", "shield", exact("/admin/audit"))] : []),
+  ];
+  const groups: NavGroup[] = [
+    { id: "main", items: main },
+    { id: "learning", label: "Belajar", items: learning },
+    { id: "growth", label: "Pembinaan", items: growth },
+    { id: "admin", label: "Administrasi", items: admin },
+  ].filter(group => group.items.length > 0);
+  const account = [
+    item("/account", "Profil saya", "user", exact("/account")),
+    ...(can("dashboard:view") ? [item("/notifications", "Notifikasi", "bell", exact("/notifications"))] : []),
+  ];
+  // Screens reached through a tab rather than the sidebar; listed so search can jump to them.
+  const screens = [
+    ...(can("admin.users.manage") ? [item("/admin/import", "Import santri", "upload", exact("/admin/import"))] : []),
+    ...(can("academic.manage") ? [item("/admin/transfers", "Transfer kelas", "transfer", exact("/admin/transfers"))] : []),
+  ];
   const future: FutureItem[] = [];
-  const groups: NavGroup[] = [{ items: main },...(admin.length ? [{ label: "Administrasi", items: admin }] : [])];
-  return { isStudent, groups, future, pages: groups.flatMap(group => group.items) };
+  const pages = [...groups.flatMap(group => group.items), ...account, ...screens];
+  return { isStudent, groups, future, account, pages, canNotify: can("dashboard:view") };
 }
 
-const roleLabels: Record<string, string> = { admin: "Admin", teacher: "Guru", student: "Santri" };
-export const roleLabel = (actor: Actor) => actor.roles.map(role => roleLabels[role] ?? role).join(" · ");
+const roleLabels: Record<string, string> = { admin: "Admin", teacher: "Guru", asmen: "Asisten Mentor", student: "Santri" };
+export const roleName = (role: string) => roleLabels[role] ?? role;
+const roleTones: Record<string, string> = { admin: "badge-discovery", teacher: "", asmen: "badge-gold", student: "badge-success" };
+export const roleTone = (role: string) => roleTones[role] ?? "badge-draft";
+export const roleLabel = (actor: Actor) => actor.roles.map(roleName).join(" · ");

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { taskStatuses, type ProjectDetail, type ProjectTask, type ProjectTaskComment, type ReviewDecision, type TaskStatus } from "../../shared/project";
 import { api, ApiError } from "../lib/api";
-import { Button, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Button, Card, ErrorState, LoadingState, PageHeader, PersonName, initials } from "../components/ui";
 import { Icon } from "../components/icons";
 import { Field, MutationForm, errorMessage, formatDateTime, fromLocalInput, toLocalInput, useData } from "../components/learning";
 import { uploadTypes } from "../../shared/learning";
-import { AvatarStack, MemberPicker, ProjectStatusBadge, initials, jsonRequest, projectsApi, taskStatusLabels } from "../components/projects";
+import { AvatarStack, MemberPicker, ProjectStatusBadge, jsonRequest, projectsApi, taskStatusLabels } from "../components/projects";
 
 type Run = (path: string, body: unknown, done: string, method?: string) => Promise<boolean>;
 type Common = { data: ProjectDetail; pending: boolean; run: Run; reload: () => Promise<void>; timezone: string; onExpired: () => void };
@@ -233,7 +233,7 @@ function Overview({ data, pending, run, reload, timezone, onExpired }: Common) {
     </div>
     <div className="project-side">
       <Card className="lesson-card"><div className="learning-row"><h2>Tim</h2>{data.canManage && data.canEdit && <Button className="button-secondary button-small" aria-expanded={editingMembers} onClick={() => setEditingMembers(!editingMembers)}>Ubah anggota</Button>}</div>
-        <ul className="member-list">{data.members.map(member => <li key={member.id}><span className="avatar avatar-small" aria-hidden="true">{initials(member.name)}</span>{member.name}</li>)}</ul>
+        <ul className="member-list">{data.members.map(member => <li key={member.id}><PersonName name={member.name} classroom={data.course.className} /></li>)}</ul>
         {editingMembers && <MembersForm courseId={data.course.id} max={challenge.maxTeamSize} initial={data.members.map(member => member.id)} pending={pending} run={run} close={() => setEditingMembers(false)} onExpired={onExpired} />}
       </Card>
       {data.canManage && project.status === "submitted" && <ReviewForm pending={pending} run={run} />}
