@@ -16,6 +16,7 @@
     "db:migrate:reset": "bun src/core/database/reset.ts",
     "db:seed": "bun database/seed/admin.ts",
     "db:seed:demo": "bun database/seed/demo.ts",
+    "db:seed:curriculum": "bun database/seed/curriculum.ts",
     "db:bootstrap-admin": "bun database/seed/bootstrap-admin.ts"
   },
   "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },

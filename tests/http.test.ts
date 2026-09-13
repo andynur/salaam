@@ -2,9 +2,11 @@ import { expect, test } from "bun:test";
 import { loadConfig } from "../src/core/config";
 import { createHttpHandler, loginInput, requireSameOrigin } from "../src/core/http";
 import type { AuthService } from "../src/core/auth/service";
+import { HttpError } from "../src/core/errors";
 
 const config = loadConfig({ DATABASE_URL: "postgres://localhost/hsi_test", APP_BASE_URL: "http://localhost:3000", STORAGE_ROOT: "storage" });
-const auth: AuthService = { actor: async () => null, login: async () => Response.json({ ok: true }), logout: async () => new Response(null, { status: 204 }) };
+const unauthenticated = async () => { throw new HttpError(401, "UNAUTHENTICATED", "Silakan masuk untuk melanjutkan."); };
+const auth: AuthService = { actor: async () => null, account: unauthenticated, changePassword: unauthenticated, login: async () => Response.json({ ok: true }), logout: async () => new Response(null, { status: 204 }) };
 test("liveness does not touch DB; readiness returns safe 503", async () => {
   let checks = 0;
   const handle = createHttpHandler(config, auth, async () => { checks++; throw new Error("postgres://secret"); });

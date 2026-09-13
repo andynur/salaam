@@ -2,13 +2,31 @@ import type { SQL } from "bun";
 import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
-import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { adjustRoster, attendanceReport, changeMeeting, createMeeting, createMeetingSeries, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, rosterOptions, sessionHistory } from "../modules/attendance/service";
+import { databaseInputError, idField, jsonObject, listInput, multipartInput } from "./validation";
+import { addDocumentation, adjustRoster, attendanceReport, changeMeeting, createMeeting, createMeetingSeries, documentationFile, listMeetings, meetingDetail, recordAttendance, recordAttendanceBulk, rosterOptions, sessionHistory } from "../modules/attendance/service";
 import { changeCheckinWindow, importCheckins, issueCheckinCode, submitCheckin } from "../modules/attendance/checkin";
-export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}) {
+import { attendanceAgenda } from "../modules/attendance/agenda";
+export function createAttendanceHandler(db: SQL, changed: (courseId: string, sessionId: string) => void = () => {}, timezone = "Asia/Jakarta", storageRoot = ".") {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
     requirePermission(actor, "learning.view");
     const url = new URL(request.url);
+    if (url.pathname === "/api/attendance/agenda") {
+      if (request.method !== "GET") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+      return Response.json(await attendanceAgenda(db, actor, timezone));
+    }
+    const documentationMatch = /^\/api\/attendance\/courses\/([^/]+)\/sessions\/([^/]+)\/documentation(?:\/([^/]+)\/file)?$/.exec(url.pathname);
+    if (documentationMatch) {
+      const courseId = idField({ id: documentationMatch[1] }, "id").toLowerCase();
+      const sessionId = idField({ id: documentationMatch[2] }, "id").toLowerCase();
+      if (documentationMatch[3] && request.method === "GET") return documentationFile(db, storageRoot, actor, courseId, sessionId, idField({ id: documentationMatch[3] }, "id").toLowerCase());
+      if (!documentationMatch[3] && request.method === "POST") {
+        const { body, file } = await multipartInput(request, 10 * 1024 * 1024 + 16384);
+        const result = await addDocumentation(db, storageRoot, actor, courseId, sessionId, file, typeof body.caption === "string" ? body.caption : "", requestId);
+        changed(courseId, sessionId);
+        return Response.json(result, { status: 201 });
+      }
+      throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
+    }
     const rosterMatch = /^\/api\/attendance\/courses\/([^/]+)\/sessions\/([^/]+)\/(roster|roster-options)$/.exec(url.pathname);
     if (rosterMatch) {
       const rosterCourseId = idField({ id: rosterMatch[1] }, "id").toLowerCase();

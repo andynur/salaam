@@ -132,6 +132,43 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect((await post("users", {})).status).toBe(403);
     await db`INSERT INTO role_permissions SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.key = 'admin' AND p.key = 'admin.users.manage'`;
   });
+  test("a signed-in user reads their own account and changes their own password", async () => {
+    const userId = await create("users", { name: "Guru Mandiri", email: "self@example.test", role: "teacher", identifier: "G-SELF", password });
+    const current = await login("self@example.test");
+    const other = await login("self@example.test");
+    expect((await request("/api/auth/account", "")).status).toBe(401);
+    const accountResponse = await request("/api/auth/account", current);
+    expect(accountResponse.status).toBe(200);
+    const content = await accountResponse.text();
+    expect(content).not.toContain("argon2");
+    expect(JSON.parse(content)).toMatchObject({ id: userId, name: "Guru Mandiri", email: "self@example.test", roles: [{ role: "teacher", identifier: "G-SELF" }], activeSessions: 2 });
+    const next = `${password}-mandiri`;
+    const change = (cookie: string, body: unknown, origin?: string) => request("/api/auth/password", cookie, body, origin);
+    expect((await change("", { currentPassword: password, newPassword: next })).status).toBe(401);
+    expect((await change(current, { currentPassword: password, newPassword: next }, "https://evil.example")).status).toBe(403);
+    expect((await change(current, { currentPassword: password, newPassword: "short" })).status).toBe(400);
+    expect((await change(current, { currentPassword: password, newPassword: password })).status).toBe(400);
+    expect((await change(current, { newPassword: next })).status).toBe(400);
+    expect((await change(current, { currentPassword: "bukan-kata-sandi-ini", newPassword: next })).status).toBe(400);
+    expect((await request("/api/auth/password", current)).status).toBe(404);
+    expect((await db`SELECT * FROM audit_logs WHERE event = 'auth.password_changed'`).length).toBe(0);
+    const changed = await change(current, { currentPassword: password, newPassword: next });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toEqual({ sessionsRevoked: 1 });
+    // The session that changed the password survives; every other session of the account ends.
+    expect((await request("/api/auth/me", current)).status).toBe(200);
+    expect((await request("/api/auth/me", other)).status).toBe(401);
+    expect(await (await request("/api/auth/account", current)).json()).toMatchObject({ activeSessions: 1 });
+    // A retried request carries the old password, which no longer matches, and changes nothing.
+    expect((await change(current, { currentPassword: password, newPassword: next })).status).toBe(400);
+    expect((await request("/api/auth/login", "", { email: "self@example.test", password })).status).toBe(401);
+    expect((await request("/api/auth/login", "", { email: "self@example.test", password: next })).status).toBe(200);
+    const audit = await db`SELECT * FROM audit_logs WHERE event = 'auth.password_changed'`;
+    expect(audit.length).toBe(1);
+    expect(audit[0].actor_id).toBe(userId);
+    expect(audit[0].resource_id).toBe(userId);
+    expect(JSON.stringify(audit[0])).not.toContain(next);
+  });
   test("administrator recovery resets the password, revokes every session and is audited", async () => {
     const recoveredId = await create("users", { name: "Lupa Sandi", email: "recovery@example.test", role: "student", identifier: "NIS-R", password });
     const cookie = await login("recovery@example.test");

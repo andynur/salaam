@@ -24,7 +24,7 @@ function profileInput(body: Record<string, unknown>) {
   const email = textField(body, "email", 254).toLowerCase();
   if (!/^([^\s@]+)@([^\s@]+)\.([^\s@]+)$/.test(email)) invalid("Email tidak valid.");
   const role = textField(body, "role", 20);
-  if (!["student", "teacher", "admin"].includes(role)) invalid("Role tidak valid.");
+  if (!["student", "teacher", "asmen", "admin"].includes(role)) invalid("Role tidak valid.");
   const identifier = textField(body, "identifier", 50);
   if (typeof body.isActive !== "boolean") invalid("Status akun tidak valid.");
   return { name, email, role, identifier, isActive: body.isActive };
@@ -34,7 +34,7 @@ async function userInput(body: Record<string, unknown>) {
   const email = textField(body, "email", 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) invalid("Email tidak valid.");
   const role = textField(body, "role", 20);
-  if (!["student", "teacher", "admin"].includes(role)) invalid("Role tidak valid.");
+  if (!["student", "teacher", "asmen", "admin"].includes(role)) invalid("Role tidak valid.");
   const identifier = textField(body, "identifier", 50);
   const passwordHash = await hashPassword(passwordField(body));
   return { name, email, role, identifier, passwordHash };
@@ -84,7 +84,7 @@ export async function updateUser(db: SQL, userId: string, body: Record<string, u
     const roles = await tx<{ key: string; roleId: string }[]>`SELECT r.key, r.id AS "roleId" FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ${userId} FOR SHARE`;
     const currentKeys = new Set(roles.map(role => role.key));
     if ((currentKeys.has("student") && input.role !== "student" && (await tx`SELECT 1 FROM class_members WHERE student_id = ${userId} LIMIT 1`).length) ||
-      (currentKeys.has("teacher") && input.role !== "teacher" && (await tx`SELECT 1 FROM teaching_assignments WHERE teacher_id = ${userId} LIMIT 1`).length)) {
+      ((currentKeys.has("teacher") || currentKeys.has("asmen")) && !["teacher", "asmen"].includes(input.role) && (await tx`SELECT 1 FROM teaching_assignments WHERE teacher_id = ${userId} LIMIT 1`).length)) {
       throw new HttpError(409, "ROLE_HAS_RELATIONS", "Selesaikan relasi akademik akun sebelum mengganti role.");
     }
     if (currentKeys.has("admin") && (input.role !== "admin" || !input.isActive)) {

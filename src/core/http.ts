@@ -14,6 +14,8 @@ import type { GamificationHandler } from "./gamification-http";
 import type { ReportingHandler } from "./reporting-http";
 import type { ShareHandler } from "./share-http";
 import type { ClubHandler } from "./club-http";
+import type { CurriculumHandler } from "./curriculum-http";
+import type { LinksHandler } from "./links-http";
 import { jsonObject } from "./validation";
 
 export function securityHeaders(production: boolean): Record<string, string> {
@@ -47,7 +49,7 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
   return { email: body.email.trim().toLowerCase(), password: body.password };
 }
 
-export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler; share?: ShareHandler; clubs?: ClubHandler }) {
+export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler; share?: ShareHandler; clubs?: ClubHandler; curriculum?: CurriculumHandler; links?: LinksHandler }) {
   const limiter = new LoginLimiter();
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
@@ -75,6 +77,16 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if (path === "/api/auth/logout" && method === "POST") {
         requireSameOrigin(request, config);
         response = await auth.logout(request, requestId);
+      } else if (path === "/api/auth/account" && method === "GET") {
+        response = Response.json(await auth.account(request));
+      } else if (path === "/api/auth/password" && method === "POST") {
+        requireSameOrigin(request, config);
+        // Shares the login throttle and concurrency cap: both verify an Argon2id hash.
+        limiter.consume(`password:${ip}`);
+        if (activeLogins >= 2) throw new HttpError(429, "BUSY", "Layanan sedang sibuk. Silakan coba kembali.");
+        activeLogins++;
+        try { response = Response.json(await auth.changePassword(request, await jsonObject(request), requestId)); }
+        finally { activeLogins--; }
       } else if ((path === "/api/auth/me" || path === "/api/dashboard") && method === "GET") {
         const actor = await auth.actor(request);
         if (path === "/api/auth/me") {
@@ -93,6 +105,12 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
       } else if ((path === "/api/clubs" || path.startsWith("/api/clubs/")) && services?.clubs) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.clubs(request, await auth.actor(request), requestId);
+      } else if ((path === "/api/curriculum" || path.startsWith("/api/curriculum/")) && services?.curriculum) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.curriculum(request, await auth.actor(request), requestId);
+      } else if ((path === "/api/links" || path.startsWith("/api/links/")) && services?.links) {
+        if (method !== "GET") requireSameOrigin(request, config);
+        response = await services.links(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/api/gamification/") && services?.gamification) {
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.gamification(request, await auth.actor(request), requestId);
