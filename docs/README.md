@@ -55,6 +55,9 @@ workflow.
 | 30 — QR check-in import | [phases/30-qr-checkin-import.md](phases/30-qr-checkin-import.md) |
 | 31 — Student-visible leaderboard | [phases/31-student-leaderboard.md](phases/31-student-leaderboard.md) |
 | 32 — Club management | [phases/32-club-management.md](phases/32-club-management.md) |
+| 34 — Curriculum map | [phases/34-curriculum-map.md](phases/34-curriculum-map.md) |
+| 36 — Navigation, account page, and administration layout | [phases/36-navigation-account.md](phases/36-navigation-account.md) |
+| 37 — Attendance agenda | [phases/37-attendance-agenda.md](phases/37-attendance-agenda.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).

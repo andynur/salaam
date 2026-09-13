@@ -41,6 +41,9 @@ Coding agents follow skill `deliver-phase`.
 | 31 | Lesson documents | Delivered — [record](phases/31-lesson-documents.md) |
 | 31 | Student-visible leaderboard | Delivered — [record](phases/31-student-leaderboard.md) |
 | 32 | Club management | Delivered — [record](phases/32-club-management.md) |
+| 34 | Curriculum map | Delivered — [record](phases/34-curriculum-map.md) |
+| 36 | Navigation, account page, and administration layout | Delivered — [record](phases/36-navigation-account.md) |
+| 37 | Attendance agenda | Delivered — [record](phases/37-attendance-agenda.md) |
 
 ## Delivered
 
@@ -206,3 +209,11 @@ santri — plus the learning tracks a club splits its members across (`Olympiad 
 `Product Track` for Coders Club). A senior santri can be named as a group's mentor, which
 stays a label on the card: every group and track write still goes through `club.manage`, and
 no new capability was added.
+
+### Phase 34 — Curriculum map
+
+A `Kurikulum` menu with the weekly roadmap for kelas X and XI — phases, objectives, materi,
+praktik, asesmen, and milestones — with search, semester and phase filters, and expandable
+weeks; kelas XII shows "Segera hadir". `curriculum.csv` is only the first import: the
+curriculum tables are the source of truth, administrators revise weeks and grades in place
+or re-import a corrected CSV, and every change is versioned and audited. No new capability.

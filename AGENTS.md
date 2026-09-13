@@ -33,6 +33,7 @@ bun run db:migrate                # db:migrate:rollback and db:migrate:reset des
 | `src/core/{foundation,learning,project}-http.ts` | Routers for `/api/admin`, `/api/learning/courses`, `/api/projects` |
 | `src/core/attendance-{http,realtime}.ts` | Attendance HTTP routes and authenticated WebSocket invalidations |
 | `src/core/reporting-http.ts` | Read-only report and CSV export routes under `/api/reports` |
+| `src/core/curriculum-http.ts` | `/api/curriculum`: the curriculum map, CSV import, and week/grade revisions |
 | `src/core/share-http.ts` | The only public surface: `/share/lessons/:slug` renders a shared lesson |
 | `src/core/` | Config, `HttpError`, validation helpers, permissions, auth, audit, storage, logger, migrations |
 | `src/modules/<domain>/` | `input.ts` validates bodies; `service.ts` and siblings hold SQL and rules |

@@ -210,7 +210,7 @@ in the log line.
 ## Account recovery
 
 A santri or teacher who forgets their password cannot recover it themselves: there is no
-email delivery and no reset link. An administrator opens **Administrasi → Akun & profil**,
+email delivery and no reset link. An administrator opens **Administrasi → Pengguna**,
 uses **Atur ulang sandi** on the account's row, and hands the new password over in person.
 The reset ends every session of that account immediately and is recorded in the audit log as
 `user.password_reset`. An administrator who resets their own account is signed out too, so
@@ -225,7 +225,8 @@ load-testing caveats. The HTTPS proxy behavior and a restore drill were validate
 
 ## Academic operations
 
-Use `/admin/import` for administrator-controlled student CSV import. The required header is
+Use **Administrasi → Pengguna → Import santri** (`/admin/import`) for administrator-controlled
+student CSV import; the CSV can be pasted or loaded from a file. The required header is
 `nama,email,identifier,password`; preview must show zero row errors before the atomic save. A
 recurring attendance series materializes real sessions immediately, so review the generated
 session list before opening the first session. Every generated session keeps its own roster

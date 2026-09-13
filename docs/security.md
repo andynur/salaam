@@ -21,7 +21,16 @@ approval of privacy and retention policies are still open.
   password (`POST /api/admin/users/:id/password`, 12–128 characters). The new hash and the
   deletion of **every** session of that account happen in one transaction, so a stolen or
   shared session cannot outlive the reset, and the change is audited as
-  `user.password_reset`. Self-recovery, email links, and one-time tokens do not exist:
+  `user.password_reset`. A signed-in user can change their own password on **Profil saya**
+  (`POST /api/auth/password` with `currentPassword` and `newPassword`, 12–128 characters).
+  The current password is verified first and the request shares the login throttle and
+  the two-check concurrency cap; a wrong current password returns 400, not 401, so the
+  session stays signed in. The new hash is written only if the stored hash is still the one
+  that was verified (otherwise 409), every *other* session of the account is deleted in
+  the same transaction, and the change is audited as `auth.password_changed`.
+  `GET /api/auth/account` returns the user's own name, email, roles with identifiers,
+  creation time, and active-session count — never a hash. Self-recovery of a forgotten
+  password, email links, and one-time tokens do not exist:
   recovery is an in-person administrative act, and the new password is handed over
   privately. An administrator who resets their own account is signed out by the same rule.
 - No default account ships. The first administrator comes from `db:bootstrap-admin`, which

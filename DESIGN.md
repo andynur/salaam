@@ -101,12 +101,25 @@ layout:
 - **`.app-shell`** — authenticated app (`src/web/layouts/Shell.tsx`):
   - `.topbar` (sticky, `--topbar-height`): `.topbar-start` (sidebar toggle
     `.icon-button` + `.brand` link: 28px SALAAM mark and the product name at 16px/650),
-    `GlobalSearch` in the middle, `.topbar-end` with the
-    account menu (`.account-trigger` → `.menu-popover[role=menu]` with `.menu-profile`,
-    `.menu-separator`, `.menu-item`).
+    `GlobalSearch` in the middle, `.topbar-end` with the notification bell and the
+    account menu. The bell (`.notification-trigger` with a `.notification-count` badge,
+    `aria-haspopup="dialog"`) opens `.menu-popover.notification-popover`: up to six unread
+    notifications as `.notification-popover-item` rows (open marks read, a check
+    `.icon-button-small` marks read in place), `.notification-popover-empty`, and a
+    `.card-footer-link` to `/notifications`. It polls every 60 s while the tab is visible and
+    listens for `notificationsChanged` (`Calendar.tsx`), which the inbox page also fires and
+    hears, so the badge and the list agree. At ≤760px the popover is fixed under the topbar.
+    The account menu (`.account-trigger` → `.menu-popover[role=menu]`, arrow keys and
+    Home/End move between items) holds `.menu-profile`, the personal pages as `a.menu-item`
+    (`.is-active` on the current one: **Profil saya**, **Notifikasi**), `.menu-separator`,
+    and **Keluar**.
   - `.sidebar` (sticky, own scroll): `.space-header` (`.space-avatar` — the HSI logo on
     a white bordered tile — + school name/role),
-    `nav.navigation` of `.nav-group`s — optional `.nav-heading`, `ul` of `.nav-item`
+    `nav.navigation` of `.nav-group`s — an unlabeled first group (Dashboard, Kalender,
+    Laporan), then labeled groups (Belajar, Pembinaan, Administrasi) whose `.nav-heading`
+    is a `.nav-disclosure` button (`aria-expanded`; closed groups remembered in
+    `localStorage` under `salaam:nav-closed-groups`, and a group holding the current page
+    always starts open), `ul` of `.nav-item`
     links (`.is-active` + `aria-current="page"` draws the blue left indicator), a
     collapsible "Segera hadir" group (`.nav-disclosure`, `.nav-item-disabled`,
     `.nav-soon`), and `.sidebar-footer`.
@@ -115,8 +128,11 @@ layout:
     `localStorage`) and opens it as an off-canvas drawer (`.sidebar.is-open` +
     `.sidebar-backdrop`, Escape closes) at ≤760px.
 - Navigation entries come from `navigationFor(actor)` in `src/web/layouts/navigation.ts`,
-  filtered by permission. Add a new page there once; the sidebar and the topbar search
-  both read it.
+  filtered by permission. Add a new page there once; the sidebar, the account menu, and the
+  topbar search all read it. Workspaces go in `groups` (sidebar), personal pages in
+  `account` (account menu), and screens reached only through a tab in `screens` (search
+  only). An administration section with several screens is one sidebar entry whose
+  `active` matcher covers every screen path, and the screens are tabs.
 - `GlobalSearch` (`src/web/layouts/GlobalSearch.tsx`) is an ARIA combobox: it filters
   reachable pages locally and matches course names through `GET /api/learning/courses?q=`
   (debounced, top 5). `/` focuses it; ↑/↓/Enter/Escape work. At ≤760px it collapses to a
@@ -164,6 +180,15 @@ reimplemented per page:
 
 - `useData<T>(path, onExpired, revision?)` — fetch + loading/error state, redirects to
   `onExpired()` on a `401`, exposes `retry()`. Standard way to load any view's data.
+- `<PersonName name sub? role? classroom? className? />` (`components/ui.tsx`) — the only way a
+  student or teacher name appears in a table cell or member list: `.avatar-small` initials, the
+  name, and an optional `.table-sub` meta line (NIS, join date). Always pass what the row knows
+  so the avatar colour identifies the person: `role` (`admin`, `teacher`, `student`, or a
+  comma list) and, for a santri, `classroom` (a class name; `gradeOf()` reads X/XI/XII from
+  it). Tones: admin `.avatar-admin` (purple), guru `.avatar-teacher` (navy/gold), kelas X
+  `.avatar-grade-x` (blue), XI `.avatar-grade-xi` (green), XII `.avatar-grade-xii` (gold),
+  santri without a class `.avatar-student` (grey). Use `initials()` from the same file for any
+  other initials tile.
 - `<Pager offset next change />` — the only pagination UI (`.table-pagination`),
   50 rows/page convention baked into the label.
 - `<Search change />` — the only in-card search box pattern (`.table-search`).
@@ -180,9 +205,21 @@ Create flows on list pages follow the Jira pattern in `Foundation.tsx`: a primar
 `+ Action` button in `PageHeader` actions toggles an `.admin-form-card` panel above the
 list (focus moves to the first field), and the empty state offers the same action.
 
+Every administration screen has the same shape: `PageHeader` with the `Administrasi`
+breadcrumb and the section name as `h1`, section tabs when the section has several screens,
+form panels as `.admin-form-card` opened by `PanelHeading` (title, hint, close button), the
+success line below the panels, then one card with `.card-heading` + `.card-tools` (filter
+select and `.table-search`) over the table, row actions in `.table-actions`, and
+`.table-pagination`. Sections: **Pengguna** (`UsersAdmin`: tabs Akun `/admin/users` and
+Import santri `/admin/import`), **Akademik** (`AcademicFoundation`: one tab per academic
+resource at `/admin/academic?tab=<resource>` plus Transfer kelas `/admin/transfers`), and
+**Audit log**. `AdminTabs` rewrites the URL with `history.replaceState`, so a reload or a
+search result lands on the same tab. Status columns render lozenges (Aktif/Nonaktif,
+Aktif/Diarsipkan, role lozenges from `roleTone`), never raw booleans or role keys.
+
 The admin Audit log (`Foundation.tsx`, `resource: "audit"`) is the one list in this kit
-without a create flow, and adds a `.report-filter-card`/`.report-filters` category filter
-above the table (reusing the Reports filter bar shape) plus a category lozenge — tone and
+without a create flow; its category filter is a `.filter-select` in the list card's
+`.card-tools` beside the search box, plus a category lozenge — tone and
 `Icon` keyed off the event's dot-separated prefix (e.g. `gamification` for
 `gamification.badge.awarded`) — in the Event column, with the humanized action underneath
 via `.table-sub`. Add a new prefix to `auditCategories` in `Foundation.tsx` when a module
@@ -228,7 +265,15 @@ adding a near-duplicate.
   Model a new list row on the nearest of these.
 - **Forms in a grid**: `.admin-fields` (2-column grid, collapses to 1 column ≤760px) +
   `.admin-field`/`.learning-field`, `.field-wide` to span both columns,
-  `.form-actions` to place the submit button.
+  `.form-actions` to place the submit button. `PanelHeading` (`ui.tsx`) renders
+  `.admin-form-heading` at the top of an `.admin-form-card`; `.admin-check` is a checkbox
+  row inside the grid, `.admin-code` a monospace textarea (CSV input), `.admin-tabs` adds
+  icons to section tabs, `.table-actions` spaces row buttons, and `.admin-result-footer`
+  holds the confirm/cancel row under a preview table.
+- **Account page**: `Account.tsx` at `/account` — `.account-layout` (profile card beside
+  `.account-side`, one column ≤1100px), `.account-identity` with `.avatar-xl`, the
+  `.account-facts` definition list, `.account-note`, and `.account-links-text`/
+  `.account-links` for the notification shortcuts.
 - **Assessment-specific** (question/attempt UI): `.option-row` (+
   `.option-correct`/`.option-wrong` review states), `.attempt-bar` (sticky under the
   topbar), `.attempt-timer`/`.attempt-timer-low`, `.question-picker`/`.picker-row`. Only
@@ -245,24 +290,73 @@ adding a near-duplicate.
   `.member-picker`, `.board-progress` (inline done/total bar in tables), showcase tiles
   (`.course-tile` with `.showcase-summary`/`.showcase-team`/`.showcase-links`),
   `.portfolio-entry` with `.portfolio-reflection` (gold rule).
-- **Gamification**: `.growth-level` (XP/level header card) with `.growth-level-main` and
-  `.growth-level-mark`, `.growth-progress` (+ `progress` bar and `.growth-progress-meta`),
-  `.award-grid` of `.award-tile` (`.is-locked` for an unearned badge) with `.award-icon`,
-  `.award-text`, `.award-meta`, plus the `.xp-row` and `.rule-row` list rows.
+- **Gamification**: `.growth-level` (navy-to-blue hero card) with `.growth-level-main` and
+  the gold `.growth-level-mark` showing the level number, `.growth-progress` with a
+  `.growth-meter` (`role="progressbar"`, animated fill) and `.growth-progress-meta`;
+  `.award-grid` of `.award-tile` (`.is-earned` gold tint, `.is-locked` with a lock icon and
+  an `.award-meter` progress strip) with `.award-icon`, `.award-text`, `.award-meta`, plus
+  the `.xp-row` and `.rule-row` list rows with an `.xp-icon` per rule inside `.xp-row-main`.
+  The leaderboard adds a `.podium` of three `.podium-place-N` cards (`.podium-card` is a
+  button when the viewer can open a student; the first place sits in the middle, and on
+  phones the cards shrink and hide their meta lines), a `.leaderboard-table` with `.rank-mark`
+  (`.rank-mark-1..3` gold/silver/bronze), a `.grade-chip-x|xi|xii|lainnya` class chip, an
+  `.xp-cell` with an `.xp-bar` scaled to the leader, `.badge-count`, and clickable rows
+  (`tr.is-clickable`, with a "Lihat" button kept for keyboard users). `.leaderboard-filter`
+  is the class select grouped by grade.
   `.dashboard-side` stacks cards in the dashboard's right column, and `.card-hint` is a
   muted one-line note under a `.card-heading`.
 - **Attendance**: `Attendance.tsx` reuses `.lesson-workspace`, `.lesson-card`, the form
-  kit, `.filter-bar`, lozenges, and scrolling tables. `.attendance-actions` arranges
-  lifecycle forms in responsive columns. A visible live-connection status and manual
-  refresh sit above each session. Editors retain their original version/predecessor
-  during realtime updates so stale edits fail rather than overwrite newer records. The
-  session detail also uses the same card/table kit for manager-only session history and
-  a bounded bulk attendance action.
+  kit, `.filter-bar`, and scrolling tables, and colours everything through one tone set:
+  `.tone-success|gold|blue|discovery|danger|neutral` set `--tone-ink`/`--tone-soft` for a
+  component, with `.tone-fill-*`, `.tone-text-*`, and `.tone-soft-*` helpers. Attendance
+  statuses map hadir→success, terlambat→gold, izin→blue, sakit→discovery, alpa→danger;
+  session states map terjadwal→blue, berlangsung→success (pulsing dot), ditutup→neutral,
+  dibatalkan→danger.
+  - Landing agenda: `.agenda-card` sits above the catalog and lists today's sessions plus
+    any still open (`GET /api/attendance/agenda`), open sessions first. Each `.agenda-item`
+    has an `.agenda-time` column, an `.agenda-body` (class chip and course, `.agenda-title`
+    link, `.agenda-meta` with the session pill and relative timing, gold when a session
+    runs late), and one `.agenda-action` button. The open session gets `.is-live` (green
+    left border); closed and cancelled rows mute their time, and cancelled titles are struck
+    through. Managers see an `.agenda-progress` meter ("12/30 dicatat") and a primary
+    "Catat kehadiran" or "Buka sesi" button; santri see their own status pill and a primary
+    "Absen QR" button while check-in is open and they have no record. Actions deep-link with
+    `?tab=checkin|manage`. The agenda refreshes every minute and when the tab becomes visible,
+    without blanking the list. When nothing is scheduled today, the empty state names the
+    next session. Kehadiran has no counters.
+  - Course list: `.segmented` pill filters with `.segmented-count` (grade here, session
+    status on the session list) sit in their own row under the card heading, without a
+    grey band; the active pill uses the tab/badge blue (`--color-blue-soft` ground,
+    `--color-blue` border, text, and count), grade-accented `.catalog-tile` with
+    `.course-avatar-x|xi|xii`, and `.grade-chip`. This catalog is the shared
+    `CourseCatalog` in `components/courses.tsx`, used by Pembelajaran and Kehadiran; only
+    Pembelajaran turns on the three full-width `.catalog-stats` counters. Kehadiran passes a
+    `badge` so each tile shows its live session, the next session ("Besok, 08.00"), or
+    "Belum ada jadwal" instead of the publication status. There is no
+    separate grade chart because the grade pills already carry the counts.
+  - Session list: `.session-spotlight` links the live or next session, the
+    `.session-table` rows open on click (`tr.is-clickable`, with a "Buka" link kept) and
+    show a `.date-block` (highlighted `.is-today`) and a `.session-pill`.
+  - Report: `.report-glance` stat cards (page average, below 75%), a `.status-legend`,
+    a stacked `.status-bar` per santri, centred `.count-col` numbers, and a `.rate-cell`
+    meter toned by rate (≥90 success, ≥75 gold, otherwise danger), with a sort select.
+  - Session detail: `.live-status` shows the realtime connection; the summary card has a
+    recorded-percentage `.status-bar` and `.status-tile` buttons that filter the loaded
+    roster page (`aria-pressed`). Managers mark attendance in one click with the
+    `.quick-mark` letter buttons (H T I S A), keeping the note and predecessor record so
+    concurrent edits still fail with 409; the "Catatan" button opens the full editor.
+    `.qr-mark` flags rows that scanned the QR. The roster editor collapses behind a toggle.
+  - Manage and history: `.session-stepper` shows the lifecycle, `.session-note` the
+    private note, and `.session-timeline` the session history with action icons.
+  Editors retain their original version/predecessor during realtime updates so stale
+  edits fail rather than overwrite newer records.
 - **QR check-in**: `checkin.tsx` adds one `.lesson-card` to the session screen.
   `.checkin-display` puts the `.checkin-qr` SVG beside the large `.checkin-code`, stacking
   and centring below 760px. `.checkin-qr-paper` and `.checkin-qr-ink` carry the QR's fills,
   so contrast comes from tokens rather than hard-coded colours. `.checkin-scanner` holds the
-  `.checkin-video` camera preview and its close button. The camera is never the only path:
+  `.checkin-video` camera preview and its close button. `.checkin-countdown` drains once
+  per code rotation, `.checkin-idle` explains why the QR is not available yet, and
+  `.checkin-done` confirms a santri's recorded check-in. The camera is never the only path:
   a typed code field sits beside it for keyboard use and unsupported browsers, and the QR
   carries an `aria-label` spelling out the code.
 - **Reports**: `Reports.tsx` reuses `.summary-grid`/`.stat-card`, `.tabs`, `.card-tools`,
@@ -298,6 +392,15 @@ adding a near-duplicate.
   (auto-filling 300px cards, one column below 760px) whose facts sit in `.club-group-meta`.
   The club pickers use the list form of `.member-picker` (`ul.member-picker`): one candidate
   per row with its action at the end.
+- **Curriculum map**: `Curriculum.tsx` reuses `.tabs`, `.summary-grid`/`.stat-card`,
+  `.report-filter-card`/`.report-filters`, `.admin-form-card`, `.task-body`, lozenges, and the
+  form kit. New here: `.curriculum-tab` (a tab with a trailing "Segera hadir" lozenge),
+  `.curriculum-intro` (program card), `.curriculum-semester` with `.curriculum-phases` of
+  `.curriculum-phase-chip` toggle buttons (`aria-pressed`), `.curriculum-phase` groups, and
+  `.curriculum-week` disclosure rows (`.curriculum-week-toggle` with `aria-expanded`, the
+  `.curriculum-week-number` tile turning gold for `.is-milestone`, and
+  `.curriculum-week-detail` holding the `.curriculum-facts` definition list and
+  `.curriculum-chips`).
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title

@@ -57,12 +57,18 @@ measured operational requirement exists.
 - Capabilities: `dashboard:view` (all roles); `admin.users.manage` (admin; it also covers
   account recovery through `POST /api/admin/users/:id/password`, which rewrites the hash,
   deletes every session of that account and audits `user.password_reset` in one
-  transaction), `academic.manage`, and `audit.view` (admin); `learning.view` (all roles); `learning.manage` (admin, teacher);
-  `learning.manage.all` (admin); `learning.participate` (student); `reports.view` (admin,
+  transaction), `academic.manage`, and `audit.view` (admin). Any signed-in user reads their
+  own account through `GET /api/auth/account` and changes their own password through
+  `POST /api/auth/password` (current password required; other sessions end; audited as
+  `auth.password_changed`) — both are session checks in `auth/service.ts`, not capabilities; `learning.view` (all roles); `learning.manage` (admin, teacher);
+  `learning.manage.all` (admin); `learning.participate` (student); `learning.assist` (asmen,
+  scoped to their teaching assignments); `attendance.manage` (admin,
+  teacher, asmen) for scoped attendance marking and session documentation; `reports.view` (admin,
   teacher) for cross-course reports and their CSV exports; `club.view` (all roles) and
   `club.manage` (admin, teacher) for club workspaces.
 - Course scope comes from `courseAccess`. *Manage* needs `learning.manage` plus a teaching
-  assignment or `learning.manage.all`. *Participate* needs enrollment in the course's class
+  assignment or `learning.manage.all`. An assigned asmen has scoped *view* plus attendance-only
+  assistance; *Participate* needs enrollment in the course's class
   and a published course. *View* accepts either. Failing scope returns 404, so the API does
   not reveal whether a resource exists. Project routes resolve the course from the project
   and apply the same rules.
@@ -89,6 +95,7 @@ measured operational requirement exists.
 | `0025_attendance_checkin_imports` | Idempotency records for verified offline QR scan imports |
 | `0028_club_management` | `clubs`, `club_goals`, `club_members`, `club_courses`, the `club.view`/`club.manage` capabilities, and the seeded Coders Club |
 | `0030_club_directory` | No table: seeds Builders Club and Multimedia Club with their goals |
+| `0032_curriculum` | `curriculum_grades`, `curriculum_semesters`, `curriculum_weeks`; grades X/XI seeded published and XII unpublished. Weeks arrive by CSV import and are revised in place (`learning.view` reads, `academic.manage` writes) |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
