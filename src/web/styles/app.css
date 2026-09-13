@@ -226,6 +226,14 @@
 
 @layer components {
   .attendance-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+  .attendance-status-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+  .attendance-status-actions .badge { gap: 5px; }
+  .attendance-summary { padding-top: 14px; padding-bottom: 14px; }
+  .attendance-hint { padding-top: 10px; padding-bottom: 16px; border-top: 1px solid var(--color-border); line-height: 1.6; }
+  .attendance-course-tile { min-height: 190px; }
+  .attendance-roster-card .learning-form { margin-top: 0; }
+  .attendance-roster-card .admin-fields { gap: 12px 16px; }
+  .attendance-form-note { margin: 0; padding: 0; line-height: 1.6; }
   .checkin-display { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; }
   .checkin-qr { width: 200px; height: 200px; flex-shrink: 0; border: 1px solid var(--color-border); border-radius: 8px; }
   .checkin-qr-paper { fill: var(--color-surface); }
@@ -606,6 +614,8 @@
   .card-heading:has(.card-tools) { align-items: stretch; flex-direction: column; }
   .card-tools .filter-select, .card-tools .club-filter { width: 100%; }
   .filter-bar { padding: 10px 16px; }
+  .attendance-summary { padding-top: 12px; padding-bottom: 12px; }
+  .attendance-hint { padding-top: 10px; padding-bottom: 14px; }
   .project-meta { margin-top: 0; }
   .board { grid-auto-columns: minmax(260px, 84%); scroll-snap-type: x mandatory; }
   .board-column { scroll-snap-align: start; }
@@ -738,8 +748,21 @@
   .academic-summary-assessment { background: var(--color-discovery); }
   .academic-summary-student { background: var(--color-gold); }
   .academic-summary-learning { background: var(--color-blue); }
-  .notification-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--color-border); }
-  .notification-row .task-body { min-width: 180px; overflow-wrap: anywhere; }
+  .notification-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--color-border); }
+  .notification-row.is-unread { background: color-mix(in srgb, var(--color-blue-soft) 28%, var(--color-surface)); }
+  .notification-row .task-body { min-width: 0; overflow-wrap: anywhere; }
+  .notification-row.is-unread .task-body > .notification-title-line > .table-link { font-weight: 600; }
+  .notification-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; }
+  .notification-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+  .notification-title-line .table-link { min-width: 0; }
+  .notification-category { font-size: 11px; }
+  .notification-category-reminder { background: var(--color-blue-soft); color: var(--color-blue); }
+  .notification-category-level-up { background: var(--color-discovery-soft); color: var(--color-discovery); }
+  .notification-category-checkin { background: var(--color-success-soft); color: var(--color-success); }
+  .notification-icon.notification-category-reminder { background: var(--color-blue-soft); color: var(--color-blue); }
+  .notification-icon.notification-category-level-up { background: var(--color-discovery-soft); color: var(--color-discovery); }
+  .notification-icon.notification-category-checkin { background: var(--color-success-soft); color: var(--color-success); }
+  .notification-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
   .notification-row .learning-form { margin: 0; }
   .notification-row .admin-fields { display: block; }
   .notification-row .form-actions { margin: 0; }
@@ -755,6 +778,8 @@
   .calendar-search { padding-left: 16px; padding-right: 16px; }
   .academic-calendar-heading, .academic-calendar-filters, .academic-calendar-months { padding-left: 16px; padding-right: 16px; }
   .academic-month-grid { grid-template-columns: 1fr; }
+  .notification-row { grid-template-columns: 32px minmax(0, 1fr); align-items: start; padding: 14px 16px; }
+  .notification-actions { grid-column: 2; justify-content: flex-start; }
 }
 
 /* Club workspace: the learning-flow strip, goal list, and membership rows. */

@@ -3,6 +3,7 @@ import type { Actor } from "../../core/permissions";
 import type { LearningCourse } from "../../shared/learning";
 import { calendarHref, calendarLabels, type AcademicCalendarData, type AcademicCalendarEvent, type CalendarEntry, type NotificationItem, type NotificationPreferences } from "../../shared/calendar";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Icon } from "../components/icons";
 import { Field, MutationForm, Pager, Search, formatDateTime, useData } from "../components/learning";
 import { brandTitle } from "../lib/brand";
 type Page<T> = { items: T[]; nextOffset: number | null };
@@ -94,6 +95,9 @@ function LearningAgenda({ actor, onExpired }: { actor: Actor; onExpired: () => v
 }
 const categoryLabels: Record<string, string> = { academic: "Akademik", holiday: "Libur", assessment: "Asesmen", student: "Kegiatan santri", learning: "Pembelajaran" };
 const categoryClass = (category: string) => `academic-day-${category}`;
+const notificationLabels = { reminder: "Pembelajaran", level_up: "Pertumbuhan", checkin: "Kehadiran" } as const;
+const notificationIcons = { reminder: "book", level_up: "star", checkin: "attendance" } as const;
+const notificationCategoryClass = (kind: NotificationItem["kind"]) => `notification-category-${kind.replace("_", "-")}`;
 function AcademicCalendar({ onExpired }: { onExpired: () => void }) {
   const [yearId, setYearId] = useState(""), [classId, setClassId] = useState("");
   const query = new URLSearchParams(); if (yearId) query.set("yearId", yearId); if (classId) query.set("classId", classId);
@@ -155,11 +159,14 @@ export function Notifications({ onExpired }: { onExpired: () => void }) {
     </div></Card>}
     <Card><div className="card-heading"><h2>Inbox</h2><div className="card-tools"><label className="calendar-preference"><input type="checkbox" checked={unread} onChange={e => { setUnread(e.target.checked); setOffset(0); }} />Belum dibaca</label><Button className="button-secondary" onClick={view.retry}>Muat ulang</Button></div></div>
       {view.error ? <ErrorState message={view.error} retry={view.retry} /> : !view.data ? <LoadingState /> : <>
-        {!view.data.items.length ? <EmptyState icon="calendar" title="Belum ada notifikasi" description="Pengingat, kenaikan level, dan pembukaan absensi QR akan tampil di sini." /> : <ul className="task-list">{view.data.items.map(n => <li className="notification-row" key={n.id}>
-          <div className="task-body"><a className="table-link" href={n.href}>{n.kind === "reminder" ? "Pengingat: " : n.kind === "checkin" ? "Absensi QR dibuka: " : ""}{n.title}</a><span className="task-meta">{display(n.deliveredAt ?? n.scheduledAt)}</span></div>
-          <span className={`badge ${n.status === "delivered" && !n.readAt ? "" : "badge-draft"}`}>{n.status === "pending" ? "Menunggu pengiriman" : n.status === "suppressed" ? "Tidak dikirim" : n.readAt ? "Sudah dibaca" : "Terkirim · belum dibaca"}</span>
-          {n.status === "delivered" && !n.readAt && <MutationForm path={`/api/notifications/${n.id}/read`} label="Tandai dibaca" body={() => ({})} onExpired={onExpired} saved={() => setRevision(r => r + 1)} />}
-        </li>)}</ul>}
+        {!view.data.items.length ? <EmptyState icon="calendar" title="Belum ada notifikasi" description="Pengingat, kenaikan level, dan pembukaan absensi QR akan tampil di sini." /> : <ul className="task-list">{view.data.items.map(n => {
+          const unreadItem = n.status === "delivered" && !n.readAt;
+          return <li className={`notification-row ${unreadItem ? "is-unread" : ""}`} key={n.id}>
+            <span className={`notification-icon ${notificationCategoryClass(n.kind)}`} aria-hidden="true"><Icon name={notificationIcons[n.kind]} size={18} /></span>
+            <div className="task-body"><div className="notification-title-line"><a className="table-link" href={n.href}>{n.title}</a><span className={`badge notification-category ${notificationCategoryClass(n.kind)}`}>{notificationLabels[n.kind]}</span></div><span className="task-meta">{display(n.deliveredAt ?? n.scheduledAt)}</span></div>
+            <div className="notification-actions"><span className={`badge ${unreadItem ? "" : n.status === "suppressed" ? "badge-danger" : "badge-draft"}`}>{n.status === "pending" ? "Menunggu pengiriman" : n.status === "suppressed" ? "Tidak dikirim" : unreadItem ? "Belum dibaca" : "Sudah dibaca"}</span>{unreadItem && <MutationForm path={`/api/notifications/${n.id}/read`} label="Tandai dibaca" body={() => ({})} onExpired={onExpired} saved={() => setRevision(r => r + 1)} />}</div>
+          </li>;
+        })}</ul>}
         <Pager offset={offset} next={view.data.nextOffset} change={setOffset} />
       </>}
     </Card></>;
