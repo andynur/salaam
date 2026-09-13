@@ -21,3 +21,6 @@ coverage/
 CLAUDE.local.md
 .claude/settings.local.json
 AGENTS.override.md
+
+# Real school data used only to seed a local demo database
+database/seed/data/
