@@ -1,5 +1,6 @@
 import { idField, invalid, textField } from "../../core/validation";
-import { clubRoles, clubSlugPattern, maxClubGoals, maxClubText, type ClubGoal, type ClubRole } from "../../shared/club";
+import { sessionLabels } from "../../shared/attendance";
+import { clubGroupCapacity, clubGroupLevels, clubRoles, clubSlugPattern, maxClubGoals, maxClubText, maxClubTracks, type ClubGoal, type ClubRole } from "../../shared/club";
 
 function optionalText(body: Record<string, unknown>, key: string, max: number, label: string) {
   const value = body[key] ?? "";
@@ -55,4 +56,69 @@ export function clubCourseInput(body: Record<string, unknown>) {
   const linked = body.linked;
   if (typeof linked !== "boolean") invalid("Status tautan course tidak valid.");
   return { courseId: idField(body, "courseId"), linked };
+}
+// Tab filters follow the report filter bar: an empty value is "Semua", and a value outside
+// the known set is rejected instead of silently listing everything.
+export function clubMeetingFilter(url: URL) {
+  const status = url.searchParams.get("status") ?? "";
+  if (status && !(status in sessionLabels)) invalid("Filter status pertemuan tidak valid.");
+  return status;
+}
+export function clubMemberFilter(url: URL) {
+  const role = url.searchParams.get("role") ?? "";
+  if (role && !clubRoles.includes(role as ClubRole)) invalid("Filter peran anggota tidak valid.");
+  return role;
+}
+
+// An optional reference: an empty value means "none", anything else must be a real id. It
+// keeps "no track" and "no mentor" expressible without a second endpoint.
+function optionalId(body: Record<string, unknown>, key: string) {
+  const value = body[key] ?? "";
+  if (typeof value !== "string") invalid("Pilihan tidak valid.");
+  return value.trim() ? idField(body, key) : null;
+}
+// Tracks and groups are saved through one upsert body each, the shape clubMemberInput and
+// clubCourseInput already use: an id present means "change that row", absent means "create".
+export function clubTrackInput(body: Record<string, unknown>) {
+  const name = textField(body, "name", 100);
+  const raw = (typeof body.slug === "string" && body.slug.trim() ? body.slug.trim() : slugify(name)).toLowerCase();
+  if (!clubSlugPattern.test(raw)) invalid("Slug track harus 3–40 karakter huruf kecil, angka, atau tanda hubung.");
+  const position = Number(body.position ?? 1);
+  if (!Number.isSafeInteger(position) || position < 1 || position > maxClubTracks) invalid(`Urutan track harus 1–${maxClubTracks}.`);
+  const archived = body.archived ?? false;
+  if (typeof archived !== "boolean") invalid("Status arsip track tidak valid.");
+  return {
+    trackId: optionalId(body, "trackId"), slug: raw, name, position, archived,
+    tagline: optionalText(body, "tagline", 200, "Tagline track"),
+    description: optionalText(body, "description", maxClubText, "Keterangan track"),
+  };
+}
+export function clubGroupInput(body: Record<string, unknown>) {
+  const level = Number(body.level ?? 1);
+  if (!(level in clubGroupLevels)) invalid("Level kelompok harus 1–4.");
+  const capacity = Number(body.capacity ?? clubGroupCapacity.default);
+  if (!Number.isSafeInteger(capacity) || capacity < clubGroupCapacity.min || capacity > clubGroupCapacity.max) {
+    invalid(`Kapasitas kelompok harus ${clubGroupCapacity.min}–${clubGroupCapacity.max} santri.`);
+  }
+  const archived = body.archived ?? false;
+  if (typeof archived !== "boolean") invalid("Status arsip kelompok tidak valid.");
+  return {
+    groupId: optionalId(body, "groupId"), trackId: optionalId(body, "trackId"), mentorId: optionalId(body, "mentorId"),
+    name: textField(body, "name", 100), level, capacity, archived,
+    topic: optionalText(body, "topic", 200, "Tema kelompok"),
+    schedule: optionalText(body, "schedule", 100, "Jadwal kelompok"),
+    note: optionalText(body, "note", 2000, "Catatan kelompok"),
+  };
+}
+export function clubGroupMemberInput(body: Record<string, unknown>) {
+  const removed = body.removed ?? false;
+  if (typeof removed !== "boolean") invalid("Status keanggotaan kelompok tidak valid.");
+  return { groupId: idField(body, "groupId"), userId: idField(body, "userId"), removed };
+}
+export function clubGroupFilter(url: URL) {
+  const trackId = (url.searchParams.get("trackId") ?? "").trim();
+  if (trackId) idField({ trackId }, "trackId");
+  const raw = (url.searchParams.get("level") ?? "").trim();
+  if (raw && !(Number(raw) in clubGroupLevels)) invalid("Filter level kelompok tidak valid.");
+  return { trackId, level: raw ? Number(raw) : 0 };
 }

@@ -185,14 +185,15 @@ The dataset covers every delivered phase, so each role has something to work wit
 
 | Role | What the demo shows |
 | --- | --- |
-| Administrator | 38 accounts and role profiles, one academic year with two terms, three classes, three courses, reward rules and the badge catalogue, an audit log, and cross-course reports with CSV exports |
+| Administrator | 119 accounts and role profiles, one academic year with two terms, five classes (X-A/X-B and XI-A/XI-B/XI-C), seven courses, reward rules and the badge catalogue, an audit log, and cross-course reports with CSV exports |
 | Teacher | A full JavaScript course following the "Modern JavaScript Programming" curriculum, submissions waiting to be graded, a closed exam and an open quiz, capstone projects at every review stage, eight weeks of recorded attendance, a class running right now with QR check-in open, and the class leaderboard |
 | Santri | Lessons taught and still to come, an assignment due tonight, an open quiz, XP and badges earned over the term, attendance history, an agenda, and an inbox of delivered reminders |
 
-Two teachers hold overlapping but different scopes — Ahmad teaches X RPL 1 and X RPL 2,
-Siti teaches X RPL 2 and XI RPL 1 — so scoped reports and leaderboards differ per teacher
-and from what an administrator sees. Accounts use the `@hsibs.my.id` domain and the script
-prints the shared demo password on success; every seeded account uses it.
+Andy Nur teaches the three kelas XI courses for Coders Club, while Ari Heru teaches the
+two kelas X courses and the Builders Club and Multimedia Club courses. Accounts use the
+`@hsibs.my.id` domain and the script prints the shared demo password on success; every
+seeded account uses it. The student accounts and NIS values are loaded from
+`database/seed/data/students.csv`; kelas XII has no seeded students yet.
 
 Timings are relative to the moment you seed: the running class, the deadline, the quiz
 window, and the next meeting all fall inside the notification worker's 24-hour reminder

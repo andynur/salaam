@@ -198,3 +198,11 @@ over existing accounts, and linked courses, with tabs that read the existing lea
 challenge, project, meeting, and gamification rows. Administrators create, archive, and
 restore clubs; mentors run the club they lead. No club-owned engine is added, and membership
 never widens course access.
+
+### Phase 33 — Club mentoring groups and learning tracks
+
+Small mentoring circles inside a club — one mentor, a topic, a level, and a handful of
+santri — plus the learning tracks a club splits its members across (`Olympiad Track` and
+`Product Track` for Coders Club). A senior santri can be named as a group's mentor, which
+stays a label on the card: every group and track write still goes through `club.manage`, and
+no new capability was added.

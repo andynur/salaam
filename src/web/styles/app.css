@@ -604,7 +604,7 @@
 }
 @media (max-width: 760px) {
   .card-heading:has(.card-tools) { align-items: stretch; flex-direction: column; }
-  .card-tools .filter-select { width: 100%; }
+  .card-tools .filter-select, .card-tools .club-filter { width: 100%; }
   .filter-bar { padding: 10px 16px; }
   .project-meta { margin-top: 0; }
   .board { grid-auto-columns: minmax(260px, 84%); scroll-snap-type: x mandatory; }
@@ -777,7 +777,44 @@
   .club-members { padding: 0 20px 8px; }
   .club-members li { flex-wrap: wrap; }
   .club-member-name { flex: 1 1 auto; min-width: 0; }
+  /* Each tab filters beside its search box; the label itself is for screen readers only. */
+  .club-filter { display: flex; align-items: center; }
+  /* The club pickers use the list form of .member-picker: one candidate per row with its
+     action at the end, the shape .picker-row gives the project member picker. */
+  ul.member-picker { display: grid; margin: 0; padding: 0 20px 12px; list-style: none; }
+  ul.member-picker li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--color-border); }
+  ul.member-picker li:first-child { border-top: 0; }
+  ul.member-picker li > span { display: grid; min-width: 0; overflow-wrap: anywhere; }
+  .club-rank { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--color-background); color: var(--color-subtle); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* Learning tracks: one row per track, the hairline-separated shape .club-goal uses. */
+  .club-track-list { margin: 0; padding: 4px 20px 20px; list-style: none; display: grid; gap: 4px; }
+  .club-track-card { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--color-border); }
+  .club-track-card:first-child { border-top: 0; }
+  .club-track-card > div { display: grid; gap: 2px; min-width: 220px; flex: 1 1 320px; }
+  .club-track-card .learning-prose { margin: 4px 0 0; }
+  /* Two counts beside the track copy, not stacked: the row is the header of a track, so it
+     must stay shorter than the paragraph it sits next to. */
+  .club-track-card .report-metrics { flex: 0 0 auto; margin: 0; padding: 0; grid-template-columns: repeat(2, minmax(96px, auto)); gap: 8px; }
+  .club-track-card .report-metrics li { padding: 8px 12px; }
+  /* Mentoring groups are cards, not a table: each one is a small circle with its own mentor,
+     capacity bar, and member avatars, so a mentor scans them the way they scan clubs. */
+  .club-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 4px 20px 20px; }
+  .club-group-card { display: grid; align-content: start; gap: 10px; padding: 16px; }
+  .club-group-card .card-heading { padding: 0; border: 0; }
+  .club-group-card .card-hint { margin: 0; padding: 0; }
+  .club-group-card .board-progress { max-width: none; }
+  .club-group-meta { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
+  .club-group-meta li { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+  /* The mentor reads as one unit — avatar, name, lozenge — so it starts at the left edge
+     instead of spreading across the card the way a .learning-row header does. */
+  .club-group-meta .learning-row { flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+  /* Member names sit under their avatars rather than in a narrow column beside them. */
+  .club-group-card .avatar-stack { display: flex; flex-wrap: wrap; align-items: center; }
+  .club-group-card .avatar-names { margin-left: 0; flex-basis: 100%; }
 }
 @media (max-width: 760px) {
-  .club-body, .club-goals, .club-list, .club-members { padding-left: 16px; padding-right: 16px; }
+  .club-body, .club-goals, .club-list, .club-members, ul.member-picker,
+  .club-track-list, .club-group-grid { padding-left: 16px; padding-right: 16px; }
+  ul.member-picker li { align-items: stretch; flex-direction: column; }
+  .club-group-grid { grid-template-columns: 1fr; }
 }

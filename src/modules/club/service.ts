@@ -95,7 +95,7 @@ export async function clubChallenges(db: SQL, actor: Actor, clubId: string): Pro
   });
 }
 
-export async function clubMeetings(db: SQL, actor: Actor, clubId: string, pattern: string, offset: number) {
+export async function clubMeetings(db: SQL, actor: Actor, clubId: string, pattern: string, offset: number, status = "") {
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     await clubAccess(tx, actor, clubId);
     const manage = can(actor, "learning.manage");
@@ -108,19 +108,25 @@ export async function clubMeetings(db: SQL, actor: Actor, clubId: string, patter
         CASE WHEN ${manage} AND (${all} OR EXISTS (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id}))
           THEN s.reason END AS reason
       FROM classroom_sessions s JOIN visible v ON v.course_id = s.course_id JOIN courses c ON c.id = s.course_id
-      WHERE (s.title ILIKE ${pattern} OR c.name ILIKE ${pattern}) AND (
+      WHERE (s.title ILIKE ${pattern} OR c.name ILIKE ${pattern}) AND (${status} = '' OR s.status = ${status}) AND (
         (${manage} AND (${all} OR EXISTS (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id})))
         OR EXISTS (SELECT 1 FROM classroom_roster r WHERE r.session_id = s.id AND r.student_id = ${actor.id} AND r.removed_at IS NULL))
       ORDER BY s.starts_at DESC, s.id LIMIT 51 OFFSET ${offset}`;
   });
 }
 
-export async function clubMembers(db: SQL, actor: Actor, clubId: string, pattern: string, offset: number) {
+export async function clubMembers(db: SQL, actor: Actor, clubId: string, pattern: string, offset: number, role = "") {
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     await clubAccess(tx, actor, clubId);
-    return tx<ClubPerson[]>`SELECT m.user_id AS "userId", u.display_name AS name, m.role, m.joined_at::text AS "joinedAt"
+    // The active mentoring group travels with the member row so the tab can show who guides
+    // whom without a second request; it is null for a santri not placed in a group yet.
+    return tx<ClubPerson[]>`SELECT m.user_id AS "userId", u.display_name AS name, m.role, m.joined_at::text AS "joinedAt",
+        g.id AS "groupId", g.name AS "groupName"
       FROM club_members m JOIN users u ON u.id = m.user_id
+      LEFT JOIN club_group_members gm ON gm.club_id = m.club_id AND gm.user_id = m.user_id AND gm.removed_at IS NULL
+      LEFT JOIN club_groups g ON g.id = gm.group_id AND g.archived_at IS NULL
       WHERE m.club_id = ${clubId} AND m.removed_at IS NULL AND u.is_active AND u.display_name ILIKE ${pattern}
+        AND (${role} = '' OR m.role = ${role})
       ORDER BY (m.role = 'mentor') DESC, u.display_name, u.id LIMIT 51 OFFSET ${offset}`;
   });
 }

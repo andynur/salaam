@@ -15,7 +15,7 @@ import { createAcademic } from "../src/modules/academic/service";
 import type { AcademicResource } from "../src/shared/foundation";
 import type { Page } from "../src/shared/learning";
 import type { ProjectRow } from "../src/shared/project";
-import type { ClubChallengeRow, ClubCourseRow, ClubDetail, ClubMeetingRow, ClubPerson, ClubProgressRow, ClubSummary } from "../src/shared/club";
+import type { ClubChallengeRow, ClubCourseRow, ClubDetail, ClubGroupRow, ClubMeetingRow, ClubPerson, ClubProgressRow, ClubSummary, ClubTrack } from "../src/shared/club";
 
 const url = process.env.TEST_DATABASE_URL;
 describe.skipIf(!url)("Club management (isolated PostgreSQL schema)", () => {
@@ -197,9 +197,20 @@ describe.skipIf(!url)("Club management (isolated PostgreSQL schema)", () => {
     expect(meetings.items[0]).toMatchObject({ title: "Pertemuan 1", courseId, courseName: "Pemrograman Dasar", note: null });
     expect((await json<Page<ClubMeetingRow>>(request(club("meetings"), teacher))).items[0]).toMatchObject({ note: "" });
 
+    // Tab filters narrow a list server-side; an unknown value is rejected rather than ignored.
+    expect((await json<Page<ClubMeetingRow>>(request(club("meetings?status=scheduled"), teacher))).items.length).toBe(1);
+    expect((await json<Page<ClubMeetingRow>>(request(club("meetings?status=cancelled"), teacher))).items.length).toBe(0);
+    expect((await request(club("meetings?status=besok"), teacher)).status).toBe(400);
+    expect((await json<Page<ClubPerson>>(request(club("members?role=mentor"), teacher))).items.map(row => row.userId)).toEqual([people.mentor!.id]);
+    expect((await json<Page<ClubPerson>>(request(club("members?role=member"), teacher))).items.every(row => row.role === "member")).toBe(true);
+    expect((await request(club("members?role=ketua"), teacher)).status).toBe(400);
+
     // Projects reuse the project list: a student sees only their own, the mentor sees all.
     expect((await json<Page<ProjectRow>>(request(club("projects"), people.santri!.cookie))).items.map(row => row.id)).toEqual([project.id]);
     expect((await json<Page<ProjectRow>>(request(club("projects"), teacher))).items.length).toBe(1);
+    expect((await json<Page<ProjectRow>>(request(club("projects?status=in_progress"), teacher))).items.map(row => row.id)).toEqual([project.id]);
+    expect((await json<Page<ProjectRow>>(request(club("projects?status=approved"), teacher))).items.length).toBe(0);
+    expect((await request(club("projects?status=selesai"), teacher)).status).toBe(400);
     // A classmate who is not a club member never reaches the club list at all.
     expect((await request(club("projects"), people.peer!.cookie)).status).toBe(404);
 
@@ -257,6 +268,125 @@ describe.skipIf(!url)("Club management (isolated PostgreSQL schema)", () => {
       expect((await request(club(), teacher, { name: "Nama gagal" }, "PATCH")).status).toBe(400);
       expect((await json<ClubDetail>(request(club(), teacher))).name).toBe("Coders Club HSI");
     } finally { await db.unsafe("ALTER TABLE audit_logs DROP CONSTRAINT reject_club_audit"); }
+  });
+
+  test("mentoring groups hold one mentor and a few santri inside a learning track", async () => {
+    const teacher = people.mentor!.cookie;
+    const santri = people.santri!.cookie;
+    // Coders Club runs the two tracks the migration seeds; the other clubs run none.
+    const tracks = (await json<Page<ClubTrack>>(request(club("tracks"), teacher))).items;
+    expect(tracks.map(track => track.slug)).toEqual(["olympiad", "product"]);
+    expect(tracks[0]).toMatchObject({ name: "Olympiad Track", position: 1, archived: false, groups: 0, members: 0 });
+    const buildersId = (await db<{ id: string }[]>`SELECT id FROM clubs WHERE slug = 'builders-club'`)[0]!.id;
+    expect((await json<Page<ClubTrack>>(request(`/api/clubs/${buildersId}/tracks`, admin))).items.length).toBe(0);
+
+    // Two more santri so a group can fill up; peer and outsider are already enrolled accounts.
+    for (const name of ["peer", "outsider"]) expect((await request(club("members"), admin, { userId: people[name]!.id, role: "member" })).status).toBe(200);
+
+    // A santri may be named mentor: that is the point of the small circles. It stays a
+    // label, never a capability — the same santri is refused every write below.
+    const product = tracks[1]!.id;
+    const created = await json<{ id: string }>(request(club("groups"), teacher, {
+      name: "Kelompok HTML & CSS Dasar", topic: "HTML dan CSS", trackId: product, mentorId: people.peer!.id,
+      level: 1, capacity: 2, schedule: "Sabtu, 09.00", note: "Kelompok pemula",
+    }));
+    expect((await request(club("groups"), teacher, { name: "Kelompok", mentorId: people.otherteacher!.id })).status).toBe(400);
+    expect((await request(club("groups"), teacher, { name: "Kelompok", mentorId: crypto.randomUUID() })).status).toBe(400);
+    expect((await request(club("groups"), teacher, { name: "Kelompok", level: 9 })).status).toBe(400);
+    expect((await request(club("groups"), teacher, { name: "Kelompok", capacity: 99 })).status).toBe(400);
+    // A track of another club never reaches this club's groups.
+    const foreign = await json<{ id: string }>(request(`/api/clubs/${buildersId}/tracks`, admin, { name: "Track Builders", position: 1 }));
+    expect((await request(club("groups"), teacher, { name: "Kelompok", trackId: foreign.id })).status).toBe(400);
+    expect((await request(club("groups"), teacher, { groupId: crypto.randomUUID(), name: "Kelompok" })).status).toBe(404);
+
+    // Capacity is 2: the third santri is refused, and the mentor may not join their own group.
+    const member = (userId: string, removed = false) => request(club("group-members"), teacher, { groupId: created.id, userId, removed });
+    expect((await member(people.santri!.id)).status).toBe(200);
+    expect((await member(people.santri!.id)).status).toBe(200);   // idempotent retry
+    expect((await member(people.outsider!.id)).status).toBe(200);
+    const mentorJoin = await member(people.peer!.id);
+    expect(mentorJoin.status).toBe(409);
+    expect(await mentorJoin.json()).toMatchObject({ error: { code: "MENTOR_IS_MEMBER" } });
+
+    const second = await json<{ id: string }>(request(club("groups"), teacher, { name: "Kelompok Algoritma", trackId: tracks[0]!.id, level: 3, mentorId: people.mentor!.id }));
+    const full = await request(club("group-members"), teacher, { groupId: second.id, userId: people.peer!.id });
+    expect(full.status).toBe(200);
+    // Filling the first group to capacity refuses the next santri with a clear code.
+    const third = await json<{ id: string }>(request(club("groups"), teacher, { name: "Kelompok Penuh", capacity: 2 }));
+    for (const name of ["santri", "outsider"]) {
+      const moved = await request(club("group-members"), teacher, { groupId: third.id, userId: people[name]!.id });
+      expect(moved.status).toBe(409);
+      expect(await moved.json()).toMatchObject({ error: { code: "ALREADY_GROUPED" } });
+    }
+    expect((await member(people.santri!.id, true)).status).toBe(200);
+    expect((await request(club("group-members"), teacher, { groupId: third.id, userId: people.santri!.id })).status).toBe(200);
+    expect((await request(club("group-members"), teacher, { groupId: third.id, userId: people.mentor!.id })).status).toBe(400);
+    expect((await request(club("group-members"), teacher, { groupId: crypto.randomUUID(), userId: people.santri!.id })).status).toBe(404);
+
+    // The list carries the mentor, their club role, the live count, and the member names.
+    const groups = (await json<Page<ClubGroupRow>>(request(club("groups"), teacher))).items;
+    expect(groups.length).toBe(3);
+    const first = groups.find(row => row.id === created.id)!;
+    expect(first).toMatchObject({ name: "Kelompok HTML & CSS Dasar", level: 1, capacity: 2, trackName: "Product Track",
+      mentorName: "peer", mentorRole: "member", memberCount: 1, schedule: "Sabtu, 09.00" });
+    expect(first.members.map(row => row.name)).toEqual(["outsider"]);
+    expect(groups.find(row => row.id === second.id)).toMatchObject({ mentorName: "mentor", mentorRole: "mentor", trackName: "Olympiad Track", level: 3 });
+    // A santri sees their own group flagged, so the tab can point them at it.
+    expect((await json<Page<ClubGroupRow>>(request(club("groups"), santri))).items.find(row => row.id === third.id)!.mine).toBe(true);
+    expect((await json<Page<ClubGroupRow>>(request(club("groups"), teacher))).items.every(row => row.mine === false)).toBe(true);
+
+    // Filters narrow server-side; an unknown value is refused rather than ignored.
+    expect((await json<Page<ClubGroupRow>>(request(club(`groups?trackId=${product}`), teacher))).items.map(row => row.id)).toEqual([created.id]);
+    expect((await json<Page<ClubGroupRow>>(request(club("groups?level=3"), teacher))).items.map(row => row.id)).toEqual([second.id]);
+    expect((await json<Page<ClubGroupRow>>(request(club("groups?q=Algoritma"), teacher))).items.map(row => row.id)).toEqual([second.id]);
+    expect((await request(club("groups?level=9"), teacher)).status).toBe(400);
+    expect((await request(club("groups?trackId=bukan-uuid"), teacher)).status).toBe(400);
+
+    // Track counts follow the groups, and the members tab names each santri's group.
+    const counted = (await json<Page<ClubTrack>>(request(club("tracks"), teacher))).items;
+    expect(counted.find(track => track.slug === "product")).toMatchObject({ groups: 1, members: 1 });
+    const members = (await json<Page<ClubPerson>>(request(club("members?role=member"), teacher))).items;
+    expect(members.find(row => row.userId === people.outsider!.id)!.groupName).toBe("Kelompok HTML & CSS Dasar");
+    expect(members.find(row => row.userId === people.peer!.id)!.groupName).toBe("Kelompok Algoritma");
+
+    // Candidates are santri without a group; everyone is placed, so the list is empty.
+    expect((await json<Page<{ userId: string }>>(request(club("group-candidates"), teacher))).items.length).toBe(0);
+    expect((await member(people.outsider!.id, true)).status).toBe(200);
+    expect((await json<Page<{ userId: string }>>(request(club("group-candidates"), teacher))).items.map(row => row.userId)).toEqual([people.outsider!.id]);
+
+    // A santri reads the tab and is refused every write, including the santri who mentors a
+    // group — mentoring is a label in the club, not a capability in the application.
+    expect((await request(club("groups"), santri)).status).toBe(200);
+    expect((await request(club("tracks"), santri)).status).toBe(200);
+    expect((await request(club("group-candidates"), santri)).status).toBe(403);
+    for (const cookie of [santri, people.peer!.cookie]) {
+      expect((await request(club("groups"), cookie, { name: "Kelompok Saya" })).status).toBe(403);
+      expect((await request(club("tracks"), cookie, { name: "Track Saya" })).status).toBe(403);
+      expect((await request(club("group-members"), cookie, { groupId: created.id, userId: people.outsider!.id })).status).toBe(403);
+    }
+    expect((await request(club("groups"), teacher, { name: "Kelompok" }, "POST", "https://evil.test")).status).toBe(403);
+
+    // A track is edited in place and archiving drops it from the list without losing rows.
+    expect((await request(club("tracks"), teacher, { trackId: product, name: "Product Track", slug: "product", tagline: "Web dan produk", position: 2 })).status).toBe(200);
+    expect((await json<Page<ClubTrack>>(request(club("tracks"), teacher))).items[1]).toMatchObject({ tagline: "Web dan produk" });
+    expect((await request(club("tracks"), teacher, { trackId: crypto.randomUUID(), name: "Track" })).status).toBe(404);
+
+    // Editing a group goes through the same upsert body, keyed by its id.
+    expect((await request(club("groups"), teacher, { groupId: created.id, name: "Kelompok HTML & CSS Dasar A", topic: "HTML, CSS, dan tata letak",
+      trackId: product, mentorId: people.peer!.id, level: 2, capacity: 8, schedule: "Sabtu, 10.00", note: "Kelompok pemula" })).status).toBe(200);
+    expect((await json<Page<ClubGroupRow>>(request(club("groups"), teacher))).items.find(row => row.id === created.id))
+      .toMatchObject({ name: "Kelompok HTML & CSS Dasar A", level: 2, capacity: 8, schedule: "Sabtu, 10.00" });
+
+    // Archiving a group hides it from the tab but keeps its membership history.
+    expect((await request(club("groups"), teacher, { groupId: third.id, name: "Kelompok Penuh", archived: true })).status).toBe(200);
+    expect((await json<Page<ClubGroupRow>>(request(club("groups"), teacher))).items.map(row => row.id)).not.toContain(third.id);
+    expect((await db`SELECT 1 FROM club_group_members WHERE group_id = ${third.id}`).length).toBe(1);
+
+    for (const event of ["club.group.created", "club.group.updated", "club.group.archived", "club.group.member.added", "club.group.member.removed", "club.track.created", "club.track.updated"]) {
+      expect((await db<{ count: number }[]>`SELECT count(*)::int AS count FROM audit_logs WHERE event = ${event}`)[0]!.count).toBeGreaterThan(0);
+    }
+    // Clean up so the directory test below sees the membership it expects.
+    for (const name of ["peer", "outsider"]) expect((await request(club("members"), admin, { userId: people[name]!.id, role: "member", removed: true })).status).toBe(200);
   });
 
   test("the club directory is administrator work: create, archive, and restore", async () => {

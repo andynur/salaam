@@ -283,7 +283,13 @@ adding a near-duplicate.
   `.club-goals` of `.club-goal` rows with the `.club-goal-mark` numeral tile, `.club-list`
   (hairline-free list of `.task-item` rows for challenges), and `.club-members` with
   `.club-member-name` so a role lozenge and a remove button wrap instead of squeezing the
-  name. `.club-note` is the muted draft notice under the tabs.
+  name. `.club-note` is the muted draft notice under the tabs. Each tab's filter select sits
+  in `.club-filter` beside its `Search`, and the Progres table numbers rows with
+  `.club-rank`. The Kelompok tab adds `.club-track-list` of `.club-track-card` (one learning
+  track per hairline-separated row) and `.club-group-grid` of `.club-group-card`
+  (auto-filling 300px cards, one column below 760px) whose facts sit in `.club-group-meta`.
+  The club pickers use the list form of `.member-picker` (`ul.member-picker`): one candidate
+  per row with its action at the end.
 - **Small shared helpers**: `.avatar-small`, `.avatar-stack`/`.avatar-more`/`.avatar-names`,
   `.badge-group` (inline lozenge row), `.card-tools` (filters + search in a
   `.card-heading`), `.filter-select`, `.filter-bar`, `.table-link` + `.table-sub` (title
@@ -420,11 +426,20 @@ one card per club — initials tile, state lozenges (Mentor/Anggota, Draft, Arsi
 `.club-tile-meta` counts, and a `.course-open` call to action. An administrator gets a
 `Klub baru` form and a `Tampilkan arsip` checkbox there; nobody else sees either. Choosing a
 card opens that club at `/club?club=<id>`, which carries the club switcher, a `Semua klub`
-button back to the directory, and seven tabs (Ringkasan, Pembelajaran,
-Pertemuan, Challenge, Projects, Anggota, Progres). Ringkasan carries the stat row, the
+button back to the directory, and eight tabs (Ringkasan, Pembelajaran,
+Pertemuan, Challenge, Projects, Anggota, Kelompok, Progres). Ringkasan carries the stat row, the
 narrative cards, the learning-flow strip, and the goal list; the other tabs are the standard
 card + table/list + search + pager shape, each with its own loading, empty, error-with-retry
-and success states.
+and success states. Pertemuan, Projects, Anggota, and Kelompok each filter server-side from a
+`.club-filter` select beside the search box, so the pager never lies about what was narrowed.
+
+Kelompok is the club's mentoring structure: learning tracks on top (hidden for a club that
+runs none), then one `.club-group-card` per small circle — track and level lozenges, the
+mentor with a `Guru` or `Mentor santri` lozenge, tema and jadwal, a `.board-progress`
+capacity bar, and the member `AvatarStack`. A santri's own group is flagged `Kelompok Anda`.
+Naming a santri as mentor is a label on the card, never a capability: every group and track
+write still goes through `club.manage`, so the manage panels appear for club mentors and
+administrators only.
 
 Mentor controls are additive, never a separate screen: a `Kelola klub` toggle (with
 `aria-expanded`) reveals the profile form, the goal editor (one goal per line,
