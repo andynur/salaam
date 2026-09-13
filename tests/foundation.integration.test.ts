@@ -98,6 +98,13 @@ describe.skipIf(!url)("Phase 1 foundation (isolated PostgreSQL schema)", () => {
     expect(audit.length).toBe(1);
     expect(audit[0].actor_id).toBe(adminId);
     expect(audit[0].request_id).toBeTruthy();
+    // The admin audit log's category filter matches the event's dot-separated prefix only.
+    const academicOnly = await (await request(`/api/admin/audit?category=academic`)).json() as RecordPage;
+    expect(academicOnly.items.length).toBeGreaterThan(0);
+    expect(academicOnly.items.every(row => String(row.name).startsWith("academic."))).toBe(true);
+    const userOnly = await (await request(`/api/admin/audit?category=user`)).json() as RecordPage;
+    expect(userOnly.items.some(row => row.name === "user.created")).toBe(true);
+    expect(userOnly.items.some(row => String(row.name).startsWith("academic."))).toBe(false);
     expect(audit[0].metadata).toEqual({});
     // Student dashboards count published courses only; teachers also count assigned drafts.
     await db`UPDATE courses SET published = true WHERE id = ${courseId}`;

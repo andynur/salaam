@@ -180,6 +180,14 @@ Create flows on list pages follow the Jira pattern in `Foundation.tsx`: a primar
 `+ Action` button in `PageHeader` actions toggles an `.admin-form-card` panel above the
 list (focus moves to the first field), and the empty state offers the same action.
 
+The admin Audit log (`Foundation.tsx`, `resource: "audit"`) is the one list in this kit
+without a create flow, and adds a `.report-filter-card`/`.report-filters` category filter
+above the table (reusing the Reports filter bar shape) plus a category lozenge — tone and
+`Icon` keyed off the event's dot-separated prefix (e.g. `gamification` for
+`gamification.badge.awarded`) — in the Event column, with the humanized action underneath
+via `.table-sub`. Add a new prefix to `auditCategories` in `Foundation.tsx` when a module
+introduces one instead of letting it fall through to "Lainnya".
+
 ## Component class catalogue
 
 Grouped by what they're for. This is the full inventory in `app.css` — check here before

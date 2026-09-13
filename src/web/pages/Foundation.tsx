@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { FoundationResource, RecordPage, RecordRow } from "../../shared/foundation";
 import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
-import { Icon } from "../components/icons";
+import { Icon, type IconName } from "../components/icons";
 
 type Field = { key: string; label: string; type?: string; max?: number; source?: FoundationResource; role?: string };
 type Definition = { title: string; action: string; description: string; columns: [string, string][]; fields: Field[] };
@@ -21,8 +21,40 @@ const definitions: Record<FoundationResource, Definition> = {
   subjects: { title: "Mata pelajaran", action: "Tambah mata pelajaran", description: "Buat katalog mata pelajaran sekolah dengan kode yang unik.", columns: [["code", "Kode"], ["name", "Mata pelajaran"]], fields: [{ key: "code", label: "Kode mata pelajaran", max: 30 }, name] },
   courses: { title: "Course dasar", action: "Tambah course", description: "Hubungkan mata pelajaran, kelas, dan semester dalam tahun ajaran yang sama.", columns: [["name", "Course"], ["subject", "Mata pelajaran"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [name, { key: "subjectId", label: "Mata pelajaran", source: "subjects" }, classField, { key: "termId", label: "Semester", source: "terms" }] },
   "teaching-assignments": { title: "Penugasan guru", action: "Assign guru", description: "Tugaskan guru aktif ke course yang sudah dibuat.", columns: [["name", "Guru"], ["course", "Course"], ["class", "Kelas"], ["term", "Semester"], ["year", "Tahun ajaran"]], fields: [{ key: "teacherId", label: "Guru", source: "users", role: "teacher" }, { key: "courseId", label: "Course", source: "courses" }] },
-  audit: { title: "Audit log", action: "", description: "Riwayat login, pembuatan akun, dan perubahan akademik. Waktu ditampilkan sesuai zona sekolah.", columns: [["createdAt", "Waktu"], ["actor", "Pelaku"], ["name", "Event"], ["resourceType", "Resource"], ["resourceId", "Resource ID"], ["requestId", "Request ID"]], fields: [] },
+  audit: { title: "Audit log", action: "", description: "Riwayat login, pembuatan akun, dan perubahan akademik. Waktu ditampilkan sesuai zona sekolah.", columns: [["createdAt", "Waktu"], ["actor", "Pelaku"], ["name", "Event"], ["resourceType", "Resource"], ["requestId", "Request ID"]], fields: [] },
 };
+// Every recorded event is "<category>.<action...>" (e.g. "gamification.badge.awarded").
+// The admin audit log groups by that prefix — a lozenge plus icon per category — and
+// offers it as a filter, so an administrator can scan for one kind of activity at a glance
+// instead of reading raw event strings.
+type AuditCategory = { id: string; label: string; icon: IconName; tone: string };
+const auditCategories: AuditCategory[] = [
+  { id: "auth", label: "Autentikasi", icon: "key", tone: "badge-discovery" },
+  { id: "user", label: "Akun", icon: "users", tone: "badge" },
+  { id: "academic", label: "Akademik", icon: "academic", tone: "badge-draft" },
+  { id: "classroom", label: "Kelas & presensi", icon: "attendance", tone: "badge-success" },
+  { id: "assessment", label: "Asesmen", icon: "quiz", tone: "badge-gold" },
+  { id: "activity", label: "Aktivitas", icon: "assignment", tone: "badge-gold" },
+  { id: "learning", label: "Pembelajaran", icon: "book", tone: "badge-success" },
+  { id: "survey", label: "Survei", icon: "quiz", tone: "badge-draft" },
+  { id: "calendar", label: "Kalender", icon: "calendar", tone: "badge" },
+  { id: "club", label: "Klub", icon: "club", tone: "badge-discovery" },
+  { id: "project", label: "Proyek", icon: "board", tone: "badge" },
+  { id: "portfolio", label: "Portofolio", icon: "briefcase", tone: "badge-draft" },
+  { id: "gamification", label: "Gamifikasi", icon: "star", tone: "badge-gold" },
+  { id: "notification", label: "Notifikasi", icon: "info", tone: "badge-draft" },
+  { id: "report", label: "Laporan", icon: "chart", tone: "badge-draft" },
+  { id: "demo_seed", label: "Demo seed", icon: "refresh", tone: "badge-draft" },
+];
+const auditCategoryMap = new Map(auditCategories.map(category => [category.id, category]));
+const otherAuditCategory: AuditCategory = { id: "other", label: "Lainnya", icon: "info", tone: "badge-draft" };
+function auditCategoryOf(event: string): AuditCategory {
+  return auditCategoryMap.get(event.split(".")[0] ?? "") ?? otherAuditCategory;
+}
+function auditActionLabel(event: string) {
+  const parts = event.split(".");
+  return (parts.length > 1 ? parts.slice(1) : parts).join(" ").replaceAll("_", " ");
+}
 function optionLabel(row: RecordRow) {
   return [row.name, row.email, row.code, row.class, row.term, row.year].filter(Boolean).join(" · ");
 }
@@ -72,6 +104,7 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   const [page, setPage] = useState<RecordPage | null>(null);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
   const [formRevision, setFormRevision] = useState(0);
@@ -80,16 +113,19 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   const [success, setSuccess] = useState("");
   const [pending, setPending] = useState(false);
   const saving = useRef(false);
+  const isAudit = resource === "audit";
   useEffect(() => {
     let active = true;
     setPage(null); setError("");
-    api<RecordPage>(`/api/admin/${resource}?${new URLSearchParams({ q: search, offset: String(offset) })}`).then(result => { if (active) setPage(result); }).catch(cause => {
+    const params = new URLSearchParams({ q: search, offset: String(offset) });
+    if (isAudit && category) params.set("category", category);
+    api<RecordPage>(`/api/admin/${resource}?${params}`).then(result => { if (active) setPage(result); }).catch(cause => {
       if (!active) return;
       if (cause instanceof ApiError && cause.status === 401) onExpired();
       else setError(cause instanceof Error ? cause.message : "Data tidak dapat dimuat.");
     });
     return () => { active = false; };
-  }, [resource, search, offset, revision, onExpired]);
+  }, [resource, search, category, isAudit, offset, revision, onExpired]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving.current) return;
@@ -142,6 +178,14 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
   function display(row: RecordRow, key: string) {
     const value = row[key];
     if (key === "createdAt" && typeof value === "string") return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(value));
+    if (isAudit && key === "name" && typeof value === "string") {
+      const category = auditCategoryOf(value);
+      return <><span className={`badge ${category.tone}`} title={value}><Icon name={category.icon} size={12} />{category.label}</span>
+        <div className="table-sub">{auditActionLabel(value)}</div></>;
+    }
+    if (isAudit && key === "actor") return value ?? <span className="learning-muted">Sistem</span>;
+    // Resource type and id are one identity, the way the report's audit tab shows them.
+    if (isAudit && key === "resourceType") return <>{value ?? "—"}{row.resourceId ? <span className="table-sub">{row.resourceId}</span> : null}</>;
     return typeof value === "boolean" ? <span className={`badge ${value ? "badge-success" : "badge-draft"}`}>{value ? "Ya" : "Tidak"}</span> : value ?? "—";
   }
   const canCreate = definition.fields.length > 0;
@@ -153,6 +197,14 @@ export function Foundation({ resource, timezone, onExpired, title, tabs }: { res
     <PageHeader breadcrumbs={[{ label: "Administrasi" }]} title={title ?? definition.title} description={definition.description}
       actions={canCreate && <Button aria-expanded={creating} aria-controls="create-panel" className={creating ? "button-secondary" : ""} onClick={() => toggleCreate(!creating)}><Icon name={creating ? "close" : "plus"} />{creating ? "Tutup formulir" : definition.action}</Button>} />
     {tabs}
+    {isAudit && <Card className="report-filter-card"><div className="filter-bar report-filters">
+      <label className="report-filter"><span>Kategori</span>
+        <select className="input filter-select" value={category} onChange={event => { setCategory(event.target.value); setOffset(0); }}>
+          <option value="">Semua kategori</option>
+          {auditCategories.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select></label>
+      <Button className="button-secondary button-small" onClick={() => { setCategory(""); setOffset(0); }}>Atur ulang</Button>
+    </div></Card>}
     {canCreate && creating && <div id="create-panel" ref={panel}><Card className="admin-form-card"><h2>{definition.action}</h2>
       <form key={formRevision} onSubmit={event => void submit(event)}><fieldset disabled={pending} className="admin-fields">
         {definition.fields.map(field => <div className="admin-field" key={field.key}><label htmlFor={field.key}>{field.label}</label>{field.source ? <Choice field={field} onExpired={onExpired} /> : field.type === "role" ? <select className="input" id={field.key} name={field.key} required defaultValue="student"><option value="student">Santri</option><option value="teacher">Guru</option><option value="admin">Admin</option></select> : <input className="input" id={field.key} name={field.key} type={field.type ?? "text"} required maxLength={field.max} minLength={field.type === "password" ? 12 : undefined} autoComplete={field.type === "password" ? "new-password" : "off"} {...(field.type === "date" ? { min: "1900-01-01", max: "2200-12-31" } : {})} />}</div>)}

@@ -57,7 +57,7 @@ export function createFoundationHandler(db: SQL) {
       const { pattern, offset } = listInput(url);
       let rows: RecordRow[];
       if (resource === "users") rows = await listUsers(db, pattern, offset, url.searchParams.get("role") ?? "");
-      else if (resource === "audit") rows = await listAudit(db, pattern, offset);
+      else if (resource === "audit") rows = await listAudit(db, pattern, offset, (url.searchParams.get("category") ?? "").slice(0, 40));
       else rows = await listAcademic(db, resource as AcademicResource, pattern, offset);
       const page: RecordPage = { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null };
       return Response.json(page);
