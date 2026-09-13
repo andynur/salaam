@@ -14,7 +14,7 @@ const can = (actor: Actor, permission: string) => actor.permissions.includes(per
 
 export interface ProjectAccess {
   id: string; courseId: string; activityId: string; status: ProjectStatus; summary: string; firstSubmittedAt: string | null; closed: boolean;
-  canManage: boolean; isMember: boolean; canEdit: boolean;
+  canManage: boolean; canAssist: boolean; isMember: boolean; canEdit: boolean;
 }
 
 // Course managers always reach a project. Members reach it while they are enrolled and
@@ -33,13 +33,15 @@ export async function projectAccess(db: SQL, actor: Actor, projectId: string, lo
       p.first_submitted_at::text AS "firstSubmittedAt", (a.due_at IS NOT NULL AND clock_timestamp() >= a.due_at) AS closed,
       (${can(actor, "learning.manage")} AND (${can(actor, "learning.manage.all")} OR EXISTS
         (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = p.course_id AND ta.teacher_id = ${actor.id}))) AS "canManage",
+      (${can(actor, "learning.assist")} AND EXISTS
+        (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = p.course_id AND ta.teacher_id = ${actor.id})) AS "canAssist",
       (${can(actor, "learning.participate")} AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.student_id = ${actor.id})
         AND EXISTS (SELECT 1 FROM class_members cm WHERE cm.class_id = c.class_id AND cm.student_id = ${actor.id})
         AND c.published AND a.published AND l.published AND m.published AND a.archived_at IS NULL AND l.archived_at IS NULL AND m.archived_at IS NULL) AS "isMember"
     FROM projects p JOIN activities a ON a.id = p.activity_id JOIN lessons l ON l.id = a.lesson_id
     JOIN course_modules m ON m.id = l.module_id JOIN courses c ON c.id = p.course_id
     WHERE p.id = ${projectId}`)[0];
-  if (!row || !(row.canManage || row.isMember)) notFound();
+  if (!row || !(row.canManage || row.canAssist || row.isMember)) notFound();
   return { ...row, canEdit: row.status === "in_progress" || row.status === "changes_requested" };
 }
 
@@ -120,6 +122,8 @@ export async function listProjects(db: SQL, actor: Actor, pattern: string, offse
       AND (${clubId}::uuid IS NULL OR EXISTS (SELECT 1 FROM club_courses cc WHERE cc.club_id = ${clubId}::uuid AND cc.course_id = c.id))
       AND ((${can(actor, "learning.manage")} AND (${can(actor, "learning.manage.all")} OR EXISTS
           (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = c.id AND ta.teacher_id = ${actor.id})))
+        OR (${can(actor, "learning.assist")} AND EXISTS
+          (SELECT 1 FROM teaching_assignments ta WHERE ta.course_id = c.id AND ta.teacher_id = ${actor.id}))
         OR (${can(actor, "learning.participate")} AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.student_id = ${actor.id})
           AND EXISTS (SELECT 1 FROM class_members cm WHERE cm.class_id = c.class_id AND cm.student_id = ${actor.id})
           AND c.published AND a.published AND l.published AND m.published AND a.archived_at IS NULL AND l.archived_at IS NULL AND m.archived_at IS NULL))

@@ -34,7 +34,7 @@ export async function listAcademic(db: SQL, resource: AcademicResource, pattern:
 async function requireRole(db: SQL, userId: string, role: string) {
   const rows = await db`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id
     WHERE u.id = ${userId} AND u.is_active = true AND r.key = ${role} FOR SHARE OF u, ur`;
-  if (!rows.length) invalid(role === "student" ? "Pilih akun santri aktif." : "Pilih akun guru aktif.");
+  if (!rows.length) invalid(role === "student" ? "Pilih akun santri aktif." : "Pilih akun guru atau asisten mentor aktif.");
 }
 export async function createAcademic(db: SQL, resource: AcademicResource, body: Record<string, unknown>, actorId: string, requestId: string) {
   return db.begin(async tx => {
@@ -93,7 +93,9 @@ export async function createAcademic(db: SQL, resource: AcademicResource, body: 
       case "teaching-assignments": {
         const courseId = idField(body, "courseId");
         const teacherId = idField(body, "teacherId");
-        await requireRole(tx, teacherId, "teacher");
+        const assignmentRole = await tx`SELECT 1 FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id
+          WHERE u.id = ${teacherId} AND u.is_active AND r.key IN ('teacher', 'asmen') FOR SHARE OF u, ur`;
+        if (!assignmentRole.length) invalid("Pilih akun guru atau asisten mentor aktif.");
         rows = await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${courseId}, ${teacherId}) RETURNING id`;
         break;
       }

@@ -71,6 +71,7 @@ export async function learningTasks(db: SQL, actor: Actor): Promise<LearningTask
       FROM classroom_sessions s JOIN courses c ON c.id = s.course_id
       WHERE s.status IN ('scheduled', 'open') AND (
         (${actor.permissions.includes("learning.manage")} AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id})) AND s.status = 'open')
+        OR (${actor.permissions.includes("learning.assist")} AND EXISTS (SELECT 1 FROM teaching_assignments t WHERE t.course_id = c.id AND t.teacher_id = ${actor.id}))
         OR (c.published AND s.ends_at >= clock_timestamp() AND EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id}) AND EXISTS (SELECT 1 FROM classroom_roster r WHERE r.session_id = s.id AND r.student_id = ${actor.id})))
       ORDER BY s.starts_at, s.id LIMIT 5`);
   }

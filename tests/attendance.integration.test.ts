@@ -331,6 +331,55 @@ describe.skipIf(!url)("Phase 6 attendance (isolated PostgreSQL schema)", () => {
     expect(report.items.every((r: any) => r.unrecorded === 1 && r.rate === null)).toBe(true);
   });
 
+  test("agenda lists today's and still-open sessions in scope with role-specific progress", async () => {
+    const f = await workspace();
+    // Noon in the school timezone keeps "today" stable whatever time the suite runs.
+    const [{ noon }] = await db<[{ noon: Date }]>`SELECT (((clock_timestamp() AT TIME ZONE ${config.timezone})::date + time '12:00') AT TIME ZONE ${config.timezone}) AS noon`;
+    const at = (days: number, hours = 0) => new Date(noon.getTime() + days * 86400000 + hours * 3600000).toISOString();
+    const create = async (title: string, days: number) => (await json<{ id: string }>(request(base(f.courseId), people.teacher.cookie, { ...input(), title, startsAt: at(days), endsAt: at(days, 1) }), 201)).id;
+    const today = await create("Hari ini", 0);
+    const tomorrow = await create("Besok", 1);
+    const earlier = await create("Lupa ditutup", -2);
+    const cancelled = await create("Dibatalkan", 0);
+    const agenda = (cookie: string) => json<any>(request("/api/attendance/agenda", cookie));
+    const ids = (result: any) => result.sessions.filter((s: any) => s.courseId === f.courseId).map((s: any) => s.id);
+    await json(action(`${base(f.courseId)}/${earlier}`, { action: "open", version: 1 }));
+    await json(action(`${base(f.courseId)}/${cancelled}`, { action: "cancel", version: 1, reason: "Libur" }));
+    await json(action(`${base(f.courseId)}/${earlier}/attendance/${people.student.id}`, { status: "late", previousId: null }));
+
+    const manager = await agenda(people.teacher.cookie);
+    expect(typeof manager.now).toBe("string");
+    expect(ids(manager)[0]).toBe(earlier);
+    expect(new Set(ids(manager))).toEqual(new Set([earlier, today, cancelled]));
+    expect(manager.sessions.find((s: any) => s.id === earlier)).toMatchObject({ status: "open", canManage: true, recorded: 1, myStatus: null, checkinOpen: false });
+    // Other tests enrol extra santri into the shared class, so compare with the snapshot itself.
+    const [{ rostered }] = await db<[{ rostered: number }]>`SELECT count(*)::int AS rostered FROM classroom_roster WHERE session_id = ${earlier} AND removed_at IS NULL`;
+    expect(manager.sessions.find((s: any) => s.id === earlier).total).toBe(rostered);
+    expect(manager.courses.find((c: any) => c.courseId === f.courseId)).toMatchObject({ sessionId: earlier, status: "open" });
+
+    const student = await agenda(people.student.cookie);
+    expect(new Set(ids(student))).toEqual(new Set([earlier, today, cancelled]));
+    expect(student.sessions.find((s: any) => s.id === earlier)).toMatchObject({ canManage: false, total: null, recorded: null, myStatus: "late" });
+    expect((await agenda(people.peer.cookie)).sessions.find((s: any) => s.id === earlier).myStatus).toBeNull();
+    expect(ids(await agenda(people.outsider.cookie))).toEqual([]);
+    expect(ids(await agenda(people.otherTeacher.cookie))).toEqual([]);
+    expect((await agenda(people.otherTeacher.cookie)).courses.some((c: any) => c.courseId === f.courseId)).toBe(false);
+
+    await json(action(`${base(f.courseId)}/${earlier}`, { action: "cancel", version: 3, reason: "Tidak jadi" }));
+    const closed = await agenda(people.teacher.cookie);
+    expect(ids(closed)).not.toContain(earlier);
+    expect(closed.courses.find((c: any) => c.courseId === f.courseId)).toMatchObject({ status: "scheduled" });
+    expect([today, tomorrow]).toContain(closed.courses.find((c: any) => c.courseId === f.courseId).sessionId);
+
+    await json(action(`${base(f.courseId)}/${today}/roster`, { studentId: people.peer.id, active: false, version: 1 }));
+    expect(ids(await agenda(people.peer.cookie))).not.toContain(today);
+    await db`UPDATE courses SET published = false WHERE id = ${f.courseId}`;
+    expect(ids(await agenda(people.student.cookie))).toEqual([]);
+    expect(ids(await agenda(people.teacher.cookie))).toContain(today);
+    expect((await request("/api/attendance/agenda", people.teacher.cookie, {})).status).toBe(405);
+    expect((await request("/api/attendance/agenda", "")).status).toBe(401);
+  });
+
   test("managers can adjust a roster, preserve history, and apply changes to future series sessions", async () => {
     const yearId = (await db`SELECT academic_year_id FROM classes WHERE id = ${classId}`)[0].academic_year_id;
     const targetClass = await academic("classes", { yearId, name: `Roster adjustments ${crypto.randomUUID().slice(0, 6)}` });

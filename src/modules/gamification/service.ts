@@ -8,13 +8,13 @@ import { levelFor, type Badge, type GrowthCounters, type GrowthSummary, type Lea
 
 const can = (actor: Actor, permission: string) => actor.permissions.includes(permission);
 
-// A student reads their own growth. A teacher reads a student in a class they teach, and
-// learning.manage.all reads anyone; anything else is 404, like every other scope check.
+// A student reads their own growth. Teachers and assigned Asisten Mentor read a student
+// in their class, while learning.manage.all reads anyone; anything else is a scoped 404.
 async function studentScope(db: SQL, actor: Actor, studentId: string | null) {
   requirePermission(actor, "learning.view");
   const target = studentId ?? actor.id;
   if (target !== actor.id) {
-    if (!can(actor, "learning.manage")) notFound();
+    if (!(can(actor, "learning.manage") || can(actor, "learning.assist"))) notFound();
     if (!can(actor, "learning.manage.all")) {
       const rows = await db`SELECT 1 FROM class_members cm JOIN courses c ON c.class_id = cm.class_id
         JOIN teaching_assignments ta ON ta.course_id = c.id
@@ -60,8 +60,8 @@ export async function growthSummary(db: SQL, actor: Actor, studentId: string | n
 // Teachers compare their own classes. Students see only the current active class they belong
 // to; arbitrary class filters from a student client are ignored.
 export async function leaderboard(db: SQL, actor: Actor, classId: string | null, pattern: string, offset: number) {
-  const manager = can(actor, "learning.manage");
-  if (manager) requirePermission(actor, "learning.manage");
+  const manager = can(actor, "learning.manage") || can(actor, "learning.assist");
+  if (manager) requirePermission(actor, can(actor, "learning.manage") ? "learning.manage" : "learning.assist");
   else requirePermission(actor, "learning.participate");
   let scopedClassId = classId;
   if (!manager) {

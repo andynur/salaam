@@ -6,7 +6,8 @@ import { recordAudit } from "../../core/audit/repository";
 import { courseAccess, notFound } from "../learning/access";
 import { attendanceInput, bulkAttendanceInput, meetingInput, meetingSeriesInput, operationInput, rosterAdjustmentInput } from "./input";
 import { checkinState } from "./checkin";
-import type { AttendanceCounts, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, QrBreakdown, RosterOption, SessionEvent } from "../../shared/attendance";
+import { fileResponse, recordStoredFile, uploadInput, withFileCleanup } from "../../core/storage/files";
+import type { AttendanceCounts, AttendanceDocumentation, AttendanceReport, AttendanceRow, Meeting, MeetingDetail, QrBreakdown, RosterOption, SessionEvent } from "../../shared/attendance";
 export const conflict = () => new HttpError(409, "STALE_ATTENDANCE", "Data sesi berubah. Muat ulang sebelum menyimpan.");
 export function page<T>(rows: T[], offset: number) { return { items: rows.slice(0, 50), nextOffset: rows.length > 50 ? offset + 50 : null }; }
 export async function sessionRow(tx: SQL, courseId: string, sessionId: string, lock: boolean | "share" = false) {
@@ -107,7 +108,46 @@ export async function meetingDetail(db: SQL, actor: Actor, courseId: string, ses
       (count(r.*) - count(c.*))::int AS unscanned FROM classroom_roster r
       LEFT JOIN attendance_checkins c ON c.session_id = r.session_id AND c.student_id = r.student_id
       WHERE r.session_id = ${sessionId} AND r.removed_at IS NULL AND (${course.canManage} OR r.student_id = ${actor.id})`;
-    return { course, session, roster: page(rows, offset), counts: counts!, qrBreakdown: qrBreakdown!, checkin: await checkinState(tx, actor, sessionId, course.canManage) };
+    const documentations = (course.canManage || course.canAssist) ? await tx<AttendanceDocumentation[]>`SELECT d.id, d.caption, d.uploaded_by AS "uploadedBy", u.display_name AS "uploaderName", d.created_at::text AS "createdAt",
+      json_build_object('id', f.id, 'name', f.original_name, 'mediaType', f.media_type, 'sizeBytes', f.size_bytes) AS file
+      FROM attendance_documentations d JOIN stored_files f ON f.id = d.file_id JOIN users u ON u.id = d.uploaded_by
+      WHERE d.session_id = ${sessionId} ORDER BY d.created_at DESC, d.id DESC` : [];
+    return { course, session, roster: page(rows, offset), counts: counts!, qrBreakdown: qrBreakdown!, checkin: await checkinState(tx, actor, sessionId, course.canManage), documentations };
+  });
+}
+
+async function attendanceAccess(tx: SQL, actor: Actor, courseId: string, lock: boolean | "share" = false) {
+  const access = await courseAccess(tx, actor, courseId, "view", lock);
+  if (!access.course.canManage && !access.course.canAssist) notFound();
+  return access;
+}
+
+export async function addDocumentation(db: SQL, storageRoot: string, actor: Actor, courseId: string, sessionId: string, file: File | null, caption: string, requestId: string) {
+  if (!file) throw new HttpError(400, "PHOTO_REQUIRED", "Lampirkan satu foto dokumentasi.");
+  const upload = await uploadInput(file);
+  if (!upload.mediaType.startsWith("image/")) throw new HttpError(400, "PHOTO_REQUIRED", "Dokumentasi harus berupa foto PNG, JPG, atau WebP.");
+  const text = caption.trim();
+  if (text.length > 500) throw new HttpError(400, "INVALID_INPUT", "Keterangan maksimal 500 karakter.");
+  return withFileCleanup(storageRoot, upload, store => db.begin(async tx => {
+    await attendanceAccess(tx, actor, courseId, true);
+    await sessionRow(tx, courseId, sessionId, "share");
+    await recordStoredFile(tx, courseId, actor.id, upload);
+    const [row] = await tx<{ id: string }[]>`INSERT INTO attendance_documentations (session_id, file_id, caption, uploaded_by)
+      VALUES (${sessionId}, ${upload.id}, ${text}, ${actor.id}) RETURNING id`;
+    await recordAudit(tx, actor.id, "classroom.attendance.documentation_uploaded", "attendance_documentations", row!.id, requestId);
+    await store();
+    return { id: row!.id };
+  }));
+}
+
+export async function documentationFile(db: SQL, storageRoot: string, actor: Actor, courseId: string, sessionId: string, documentationId: string) {
+  return db.begin(async tx => {
+    await attendanceAccess(tx, actor, courseId, "share");
+    await sessionRow(tx, courseId, sessionId, "share");
+    const [file] = await tx<{ id: string; name: string; mediaType: string; sizeBytes: number }[]>`SELECT f.id, f.original_name AS name, f.media_type AS "mediaType", f.size_bytes AS "sizeBytes"
+      FROM attendance_documentations d JOIN stored_files f ON f.id = d.file_id WHERE d.id = ${documentationId} AND d.session_id = ${sessionId}`;
+    if (!file) notFound();
+    return fileResponse(storageRoot, file, "inline");
   });
 }
 export async function rosterOptions(db: SQL, actor: Actor, courseId: string, sessionId: string): Promise<RosterOption[]> {
@@ -164,10 +204,10 @@ export async function adjustRoster(db: SQL, actor: Actor, courseId: string, sess
   });
 }
 export async function recordAttendance(db: SQL, actor: Actor, courseId: string, sessionId: string, studentId: string, body: Record<string, unknown>, requestId: string) {
-  requirePermission(actor, "learning.manage");
+  requirePermission(actor, "attendance.manage");
   const input = attendanceInput(body);
   return db.begin(async tx => {
-    await courseAccess(tx, actor, courseId, "manage", true);
+    await attendanceAccess(tx, actor, courseId, true);
     const session = await sessionRow(tx, courseId, sessionId, true);
     if (!(await tx`SELECT 1 FROM classroom_roster WHERE session_id = ${sessionId} AND student_id = ${studentId} AND removed_at IS NULL`).length) notFound();
     const [latest] = await tx`SELECT a.* FROM attendance_records a WHERE a.session_id = ${sessionId} AND a.student_id = ${studentId}
@@ -183,10 +223,10 @@ export async function recordAttendance(db: SQL, actor: Actor, courseId: string, 
   });
 }
 export async function recordAttendanceBulk(db: SQL, actor: Actor, courseId: string, sessionId: string, body: Record<string, unknown>, requestId: string) {
-  requirePermission(actor, "learning.manage");
+  requirePermission(actor, "attendance.manage");
   const input = bulkAttendanceInput(body);
   return db.begin(async tx => {
-    await courseAccess(tx, actor, courseId, "manage", true);
+    await attendanceAccess(tx, actor, courseId, true);
     const session = await sessionRow(tx, courseId, sessionId, true);
     if (session.status !== "open") throw new HttpError(409, "SESSION_NOT_OPEN", "Buka sesi sebelum mencatat kehadiran.");
     const seen = new Set<string>();

@@ -30,6 +30,8 @@ export interface ClubGoal { position: number; title: string; description: string
 export interface ClubPerson {
   userId: string; name: string; role: ClubRole; joinedAt: string;
   groupId?: string | null; groupName?: string | null;
+  // The santri's class in the latest active academic year; it colours the avatar by grade.
+  className?: string | null;
 }
 export interface ClubTrack {
   id: string; slug: string; name: string; tagline: string; description: string;
@@ -54,6 +56,6 @@ export interface ClubChallengeRow {
 }
 export interface ClubMeetingRow extends Meeting { courseName: string }
 export interface ClubProgressRow {
-  studentId: string; studentName: string; role: ClubRole; xp: number; level: number; badges: number;
+  studentId: string; studentName: string; className: string | null; role: ClubRole; xp: number; level: number; badges: number;
   lessonsCompleted: number; projectsApproved: number;
 }

@@ -115,13 +115,19 @@ export async function clubMeetings(db: SQL, actor: Actor, clubId: string, patter
   });
 }
 
+// Correlated fragment for `club_members m`: the member's class in the latest active academic year.
+const currentClassName = (tx: SQL) => tx`SELECT c.name FROM class_members cm JOIN classes c ON c.id = cm.class_id
+  JOIN academic_years y ON y.id = c.academic_year_id
+  WHERE cm.student_id = m.user_id AND c.archived_at IS NULL AND y.archived_at IS NULL
+  ORDER BY y.starts_on DESC, c.id LIMIT 1`;
+
 export async function clubMembers(db: SQL, actor: Actor, clubId: string, pattern: string, offset: number, role = "") {
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     await clubAccess(tx, actor, clubId);
     // The active mentoring group travels with the member row so the tab can show who guides
     // whom without a second request; it is null for a santri not placed in a group yet.
     return tx<ClubPerson[]>`SELECT m.user_id AS "userId", u.display_name AS name, m.role, m.joined_at::text AS "joinedAt",
-        g.id AS "groupId", g.name AS "groupName"
+        g.id AS "groupId", g.name AS "groupName", (${currentClassName(tx)}) AS "className"
       FROM club_members m JOIN users u ON u.id = m.user_id
       LEFT JOIN club_group_members gm ON gm.club_id = m.club_id AND gm.user_id = m.user_id AND gm.removed_at IS NULL
       LEFT JOIN club_groups g ON g.id = gm.group_id AND g.archived_at IS NULL
@@ -135,7 +141,7 @@ export async function clubProgress(db: SQL, actor: Actor, clubId: string, patter
   return db.begin("ISOLATION LEVEL REPEATABLE READ READ ONLY", async tx => {
     await clubAccess(tx, actor, clubId);
     const rows = await tx<Omit<ClubProgressRow, "level">[]>`WITH visible AS (${visibleCourses(tx, actor, clubId)})
-      SELECT m.user_id AS "studentId", u.display_name AS "studentName", m.role,
+      SELECT m.user_id AS "studentId", u.display_name AS "studentName", (${currentClassName(tx)}) AS "className", m.role,
         COALESCE((SELECT sum(x.points)::int FROM xp_entries x WHERE x.student_id = m.user_id), 0) AS xp,
         (SELECT count(*)::int FROM badge_awards ba WHERE ba.student_id = m.user_id) AS badges,
         (SELECT count(*)::int FROM lesson_completions lc JOIN lessons l ON l.id = lc.lesson_id JOIN visible v ON v.course_id = l.course_id

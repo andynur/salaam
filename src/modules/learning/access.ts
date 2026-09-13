@@ -17,13 +17,15 @@ export async function courseAccess(db: SQL, actor: Actor, courseId: string, mode
   const rows = await db<(LearningCourse & { enrolled: boolean })[]>`SELECT c.id, c.name, cl.name AS "className", t.name AS term, y.name AS year, c.published,
     (${actor.permissions.includes("learning.manage")} AND (${actor.permissions.includes("learning.manage.all")} OR EXISTS
       (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id}))) AS "canManage",
+    (${actor.permissions.includes("learning.assist")} AND EXISTS
+      (SELECT 1 FROM teaching_assignments a WHERE a.course_id = c.id AND a.teacher_id = ${actor.id})) AS "canAssist",
     EXISTS (SELECT 1 FROM class_members m WHERE m.class_id = c.class_id AND m.student_id = ${actor.id}) AS enrolled
     FROM courses c JOIN classes cl ON cl.id = c.class_id JOIN terms t ON t.id = c.term_id JOIN academic_years y ON y.id = c.academic_year_id
     WHERE c.id = ${courseId}`;
   const course = rows[0];
   const academicActive = await db`SELECT 1 FROM courses c JOIN classes cl ON cl.id = c.class_id JOIN terms t ON t.id = c.term_id JOIN academic_years y ON y.id = c.academic_year_id WHERE c.id = ${courseId} AND cl.archived_at IS NULL AND t.archived_at IS NULL AND y.archived_at IS NULL`;
   const active = academicActive.length > 0;
-  if (!course || (mode === "manage" ? !course.canManage : mode === "participate" ? !(course.enrolled && course.published && active) : !(course.canManage || (course.enrolled && course.published && active)))) notFound();
+  if (!course || (mode === "manage" ? !course.canManage : mode === "participate" ? !(course.enrolled && course.published && active) : !(course.canManage || course.canAssist || (course.enrolled && course.published && active)))) notFound();
   const { enrolled, ...summary } = course;
   return { course: summary, canParticipate: active && enrolled && course.published && actor.permissions.includes("learning.participate") };
 }

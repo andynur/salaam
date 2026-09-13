@@ -16,13 +16,11 @@
 // that a real request happened; events written by the application's own code paths, such as
 // badge awards, keep their real names.
 //
-// The JavaScript course curriculum follows the table of contents of the handbook
-// "Modern JavaScript Programming" (tmp/Modern Javascript Programming.md): four parts,
-// 38 chapters. Chapter 1 and 2 content is condensed from the handbook text; the rest
-// follows the same chapter titles with syllabus-level notes, since the handbook itself
-// is still being written past Chapter 2 — matching a real in-progress curriculum.
+// The demo curriculum is kept in database/seed/data/curriculum.csv so the walkthrough
+// follows the school's roadmap without duplicating syllabus content in this seed script.
 //
 // Usage: bun database/seed/demo.ts (development only; refuses if demo data already exists).
+import type { SQL } from "bun";
 import { loadConfig } from "../../src/core/config";
 import { connectDatabase } from "../../src/core/database/connection";
 import { hashPassword } from "../../src/core/auth/password";
@@ -100,43 +98,107 @@ const sha256 = (value: string) => new Bun.CryptoHasher("sha256").update(value).d
 // ---------------------------------------------------------------------------------------
 const TEACHERS = [
   { name: "Andy Nur", email: "andynur@hsibs.my.id", identifier: "GRU2026001" },
-  { name: "Ari Heru Rinaldi", email: "ariheru@hsibs.my.id", identifier: "GRU2026002" },
+  { name: "Ari Heru", email: "ariheru@hsibs.my.id", identifier: "GRU2026002" },
 ];
-const FIRST_NAMES = [
-  "Ahmad", "Muhammad", "Abdullah", "Yusuf", "Ibrahim", "Hamzah", "Zaid", "Umar", "Ali", "Bilal",
-  "Salman", "Fathi", "Rizki", "Fauzan", "Akmal", "Dzaki", "Farel", "Naufal", "Rafi", "Azzam",
+const ASSISTANT_MENTORS = [
+  { name: "Bariq", email: "bariq@hsibs.my.id", identifier: "ASM2026001" },
+  { name: "Dafa Al Fatih", email: "dafa.alfatih@hsibs.my.id", identifier: "ASM2026002" },
 ];
-const LAST_NAMES = [
-  "Ramadhan", "Pratama", "Saputra", "Nugroho", "Hidayat", "Firmansyah", "Wijaya", "Setiawan",
-  "Maulana", "Alfarizi", "Nasution", "Siregar", "Harahap", "Lubis", "Prasetyo", "Rahman",
-];
-const CLASS_NAMES = ["X RPL 1", "X RPL 2", "XI RPL 1"];
-const STUDENTS_PER_CLASS = 12;
-const STUDENTS = Array.from({ length: CLASS_NAMES.length * STUDENTS_PER_CLASS }, (_, i) => {
-  const first = FIRST_NAMES[i % FIRST_NAMES.length]!;
-  const last = LAST_NAMES[(i * 7) % LAST_NAMES.length]!;
-  const name = `${first} ${last}`;
-  const classIndex = Math.floor(i / STUDENTS_PER_CLASS);
-  const slug = `${first}.${last}`.toLowerCase().replace(/[^a-z.]/g, "");
-  return {
-    name,
-    email: `${slug}${i + 1}@hsibs.my.id`,
-    identifier: `2026${String(classIndex + 1).padStart(2, "0")}${String((i % STUDENTS_PER_CLASS) + 1).padStart(3, "0")}`,
-    classIndex,
-    skill: 0.4 + random() * 0.55, // per-student ability, drives realistic quiz/exam variance
-  };
-});
+const CLASS_NAMES = ["X-A", "X-B", "XI-A", "XI-B", "XI-C"];
+interface DemoStudent { name: string; email: string; identifier: string; classIndex: number; skill: number }
+let STUDENTS: DemoStudent[] = [];
+
+async function loadStudentsFromCsv() {
+  const path = new URL("data/students.csv", import.meta.url);
+  const students: DemoStudent[] = [];
+  const rows = (await Bun.file(path).text()).trim().split(/\r?\n/).slice(1);
+  for (const row of rows) {
+    const [name, , identifier, rombel] = row.split(",");
+    if (!name || !identifier || !rombel) throw new Error(`Invalid demo student row: ${row}`);
+    const classIndex = CLASS_NAMES.indexOf(rombel);
+    if (classIndex < 0) throw new Error(`Unknown demo class "${rombel}"`);
+    const slug = name.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "");
+    students.push({
+      name,
+      email: `${slug}${students.length + 1}@hsibs.my.id`,
+      identifier,
+      classIndex,
+      skill: 0.4 + random() * 0.55,
+    });
+  }
+  return students;
+}
 
 // ---------------------------------------------------------------------------------------
 // Curriculum: "Modern JavaScript Programming" handbook table of contents
 // ---------------------------------------------------------------------------------------
+interface CurriculumRow {
+  grade: "X" | "XI";
+  semester: "1" | "2";
+  phase: string;
+  week: number;
+  title: string;
+  objectives: string;
+  content: string;
+  practice: string;
+  assessment: string;
+  source: string;
+}
+const CURRICULUM_PATH = new URL("data/curriculum.csv", import.meta.url);
+
+function parseCsvRow(row: string) {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < row.length; index++) {
+    const character = row[index]!;
+    if (character === '"' && row[index + 1] === '"') { cell += '"'; index++; continue; }
+    if (character === '"') { quoted = !quoted; continue; }
+    if (character === "," && !quoted) { cells.push(cell); cell = ""; continue; }
+    cell += character;
+  }
+  cells.push(cell);
+  return cells;
+}
+
+async function loadCurriculum() {
+  const rows = (await Bun.file(CURRICULUM_PATH).text()).trim().split(/\r?\n/).slice(1);
+  return rows.map(row => {
+    const [grade, semester, phase, week, title, objectives, content, practice, assessment, source] = parseCsvRow(row);
+    if (!grade || !semester || !phase || !week || !title) throw new Error(`Invalid curriculum row: ${row}`);
+    if (grade !== "X" && grade !== "XI") throw new Error(`Unknown curriculum grade "${grade}"`);
+    return { grade, semester, phase, week: Number(week), title, objectives, content, practice, assessment, source: source ?? "" } as CurriculumRow;
+  });
+}
+
+function curriculumBody(row: CurriculumRow) {
+  return `## Tujuan Pembelajaran\n- ${row.objectives}\n\n## Materi\n${row.content}\n\n## Praktik\n${row.practice}\n\n## Asesmen\n${row.assessment}`;
+}
+
+let CURRICULUM: CurriculumRow[] = [];
+
+async function seedCurriculum(tx: SQL) {
+  const rows = CURRICULUM.map(row => ({
+    ...row,
+    semester: Number(row.semester),
+    content: row.content.split(/[;\n]/).map(item => item.trim()).filter(Boolean),
+    assessment: row.assessment.split(/[;\n]/).map(item => item.trim()).filter(Boolean),
+  }));
+
+  for (const row of rows) {
+    await tx`INSERT INTO curriculum_weeks
+        (grade, semester, week, phase, title, objective, content, practice, assessment, source)
+      VALUES (${row.grade}, ${row.semester}, ${row.week}, ${row.phase}, ${row.title}, ${row.objectives},
+        ${JSON.stringify(row.content)}::text::jsonb, ${row.practice}, ${JSON.stringify(row.assessment)}::text::jsonb, ${row.source})
+      ON CONFLICT (grade, semester, week) DO UPDATE SET
+        phase = EXCLUDED.phase, title = EXCLUDED.title, objective = EXCLUDED.objective,
+        content = EXCLUDED.content, practice = EXCLUDED.practice, assessment = EXCLUDED.assessment,
+        source = EXCLUDED.source, version = curriculum_weeks.version + 1, updated_at = clock_timestamp()`;
+  }
+  if (rows.length) await recordAudit(tx, null, "demo_seed.curriculum_imported", "curriculum_weeks", null, crypto.randomUUID());
+}
+
 interface Chapter { number: number; title: string; objectives: string[]; summary: string }
-const PART_TITLES = [
-  "Bagian I – Fondasi",
-  "Bagian II – Dasar JavaScript",
-  "Bagian III – Intermediate JavaScript",
-  "Bagian IV – Best Practice",
-];
 const CHAPTERS: Chapter[] = [
   { number: 1, title: "Mengenal JavaScript", objectives: [
     "Menjelaskan pengertian pemrograman dan posisi coding sebagai tahap akhir dari sebuah solusi.",
@@ -352,6 +414,8 @@ function lessonContent(chapter: Chapter): string {
   const objectives = chapter.objectives.map(o => `- ${o}`).join("\n");
   return `## Tujuan Pembelajaran\n${objectives}\n\n## Ringkasan\n${chapter.summary}`;
 }
+void chaptersOfPart;
+void lessonContent;
 
 // ---------------------------------------------------------------------------------------
 // Question bank: 16 questions covering Bagian I-II, reused per course
@@ -387,13 +451,15 @@ async function main() {
 
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const requestId = () => crypto.randomUUID();
+  STUDENTS = await loadStudentsFromCsv();
+  CURRICULUM = await loadCurriculum();
 
   await db.begin(async tx => {
     // --- Roles -----------------------------------------------------------------------
     const roleRows = await tx<{ id: string; key: string }[]>`SELECT id, key FROM roles`;
     const roleId = (key: string) => roleRows.find(r => r.key === key)!.id;
 
-    async function createPerson(person: { name: string; email: string; identifier: string }, role: "teacher" | "student") {
+    async function createPerson(person: { name: string; email: string; identifier: string }, role: "teacher" | "asmen" | "student") {
       const [user] = await tx<{ id: string }[]>`INSERT INTO users (email, display_name, password_hash)
         VALUES (${person.email}, ${person.name}, ${passwordHash}) RETURNING id`;
       const userId = user!.id;
@@ -406,6 +472,8 @@ async function main() {
     const teacherIds: string[] = [];
     for (const teacher of TEACHERS) teacherIds.push(await createPerson(teacher, "teacher"));
     const [mainTeacherId, coTeacherId] = teacherIds as [string, string];
+    const assistantMentorIds: string[] = [];
+    for (const assistant of ASSISTANT_MENTORS) assistantMentorIds.push(await createPerson(assistant, "asmen"));
 
     const studentIds: string[] = [];
     for (const student of STUDENTS) studentIds.push(await createPerson(student, "student"));
@@ -431,19 +499,23 @@ async function main() {
       await tx`INSERT INTO class_members (class_id, academic_year_id, student_id) VALUES (${classIds[student.classIndex]}, ${yearId}, ${studentId})`;
     }
 
-    const [subject] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('JS101', 'Pemrograman JavaScript') RETURNING id`;
-    const subjectId = subject!.id;
+    // The curriculum screen reads school-wide roadmap rows, not course lessons. Seed both
+    // published grades here so a database reset immediately has the same roadmap as demo data.
+    await seedCurriculum(tx);
 
-    // --- One course per class, all following the handbook curriculum -------------------
-    // Ahmad teaches X RPL 1 and X RPL 2, Siti teaches X RPL 2 and XI RPL 1: one shared course
-    // and one course each, so scoped reports and leaderboards differ per teacher.
+    const [subjectX] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('X101', 'Literasi Digital dan Desain Produk') RETURNING id`;
+    const [subjectXI] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('XI101', 'Fullstack JavaScript Development') RETURNING id`;
+
+    // --- One course per class, populated from the grade-specific roadmap ---------------
+    // Ari Heru teaches the kelas X courses; Andy Nur teaches the kelas XI courses.
     const courses: { id: string; classIndex: number; teacherId: string; studentIds: string[] }[] = [];
     for (let classIndex = 0; classIndex < CLASS_NAMES.length; classIndex++) {
+      const isXI = CLASS_NAMES[classIndex]!.startsWith("XI");
       const [course] = await tx<{ id: string }[]>`INSERT INTO courses (name, academic_year_id, term_id, class_id, subject_id, published)
-        VALUES (${`Pemrograman JavaScript – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termId}, ${classIds[classIndex]}, ${subjectId}, true) RETURNING id`;
-      const teacherId = classIndex === 2 ? coTeacherId : mainTeacherId;
+        VALUES (${`${isXI ? "Fullstack JavaScript Development" : "Literasi Digital dan Desain Produk"} – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termId}, ${classIds[classIndex]}, ${isXI ? subjectXI!.id : subjectX!.id}, true) RETURNING id`;
+      const teacherId = CLASS_NAMES[classIndex]!.startsWith("XI") ? mainTeacherId : coTeacherId;
       await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${teacherId})`;
-      if (classIndex === 1) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${coTeacherId})`;
+      for (const assistantId of assistantMentorIds) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${assistantId})`;
       const classStudentIds = STUDENTS.filter(s => s.classIndex === classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
       courses.push({ id: course!.id, classIndex, teacherId, studentIds: classStudentIds });
       await recordAudit(tx, teacherId, "demo_seed.course_created", "courses", course!.id, requestId());
@@ -452,32 +524,33 @@ async function main() {
     // --- Modules, lessons, materials, activities, assessments, projects, per course ----
     for (const course of courses) {
       const teacherId = course.teacherId;
+      const grade = CLASS_NAMES[course.classIndex]!.startsWith("XI") ? "XI" : "X";
+      const curriculum = CURRICULUM.filter(row => row.grade === grade);
+      const phases = [...new Set(curriculum.map(row => `${row.semester} · ${row.phase}`))];
       const moduleIds: string[] = [];
-      for (let part = 0; part < PART_TITLES.length; part++) {
+      for (let part = 0; part < phases.length; part++) {
         const [module] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
-          VALUES (${course.id}, ${PART_TITLES[part]}, ${part}, ${part < 3})
+          VALUES (${course.id}, ${phases[part]}, ${part}, true)
           RETURNING id`;
         moduleIds.push(module!.id);
       }
 
       const lessonByChapter = new Map<number, { id: string; published: boolean }>();
-      for (let part = 0; part < PART_TITLES.length; part++) {
-        const chapters = chaptersOfPart(part);
-        for (let index = 0; index < chapters.length; index++) {
-          const chapter = chapters[index]!;
-          // Bagian I & II already taught; Bagian III only the first two chapters; Bagian IV still in draft.
-          const published = part <= 1 || (part === 2 && index < 2);
+      for (let index = 0; index < curriculum.length; index++) {
+          const row = curriculum[index]!;
+          const moduleIndex = phases.indexOf(`${row.semester} · ${row.phase}`);
+          const content = curriculumBody(row);
+          const published = row.semester === "1";
           const [lesson] = await tx<{ id: string }[]>`INSERT INTO lessons (course_id, module_id, title, content, position, published)
-            VALUES (${course.id}, ${moduleIds[part]}, ${`Bab ${chapter.number} – ${chapter.title}`}, ${lessonContent(chapter)}, ${index}, ${published})
+            VALUES (${course.id}, ${moduleIds[moduleIndex]}, ${`Pekan ${row.week} – ${row.title}`}, ${content}, ${row.week - 1}, ${published})
             RETURNING id`;
-          lessonByChapter.set(chapter.number, { id: lesson!.id, published });
+          lessonByChapter.set(index + 1, { id: lesson!.id, published });
           await tx`INSERT INTO lesson_materials (course_id, lesson_id, title, kind, content)
-            VALUES (${course.id}, ${lesson!.id}, 'Ringkasan Bab', 'text', ${chapter.summary.slice(0, 4000)})`;
-          if (chapter.number % 4 === 0) {
+            VALUES (${course.id}, ${lesson!.id}, 'Ringkasan pekan', 'text', ${content.slice(0, 4000)})`;
+          if (index % 4 === 0 && row.source.startsWith("http")) {
             await tx`INSERT INTO lesson_materials (course_id, lesson_id, title, kind, content)
-              VALUES (${course.id}, ${lesson!.id}, 'Referensi MDN', 'link', ${`https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(chapter.title)}`})`;
+              VALUES (${course.id}, ${lesson!.id}, 'Referensi roadmap', 'link', ${row.source})`;
           }
-        }
       }
 
       // Lesson completions: earlier chapters completed by more students; per-student skill drives pace.
@@ -485,7 +558,7 @@ async function main() {
         const student = STUDENTS[studentIds.indexOf(studentId)]!;
         for (const [chapterNumber, lesson] of lessonByChapter) {
           if (!lesson.published) continue;
-          const recency = 1 - chapterNumber / 22; // later chapters completed less often
+          const recency = 1 - chapterNumber / (curriculum.length + 1); // later lessons completed less often
           if (chance(Math.min(0.97, Math.max(0.15, recency * (0.5 + student.skill))))) {
             const completedAt = wib(-int(1, 55), int(8, 20), int(0, 59));
             await tx`INSERT INTO lesson_completions (lesson_id, student_id, completed_at) VALUES (${lesson.id}, ${studentId}, ${completedAt})`;
@@ -494,32 +567,43 @@ async function main() {
       }
 
       // --- Activities --------------------------------------------------------------
-      const anchor = (n: number) => lessonByChapter.get(n)!.id;
+      const semesterOne = curriculum.filter(row => row.semester === "1");
+      const lessonNumber = (row: CurriculumRow) => curriculum.indexOf(row) + 1;
+      const anchor = (row: CurriculumRow) => lessonByChapter.get(lessonNumber(row))!.id;
+      const semesterOneRow = (index: number): CurriculumRow => {
+        const row = semesterOne[Math.min(index, semesterOne.length - 1)];
+        if (!row) throw new Error(`Curriculum for ${grade} semester 1 is empty`);
+        return row;
+      };
+      const assignment1Row = semesterOneRow(6);
+      const assignment2Row = semesterOneRow(11);
+      const quizRow = semesterOneRow(7);
+      const examRow = semesterOneRow(semesterOne.length - 1);
       const [assignment1] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at, published)
-        VALUES (${course.id}, ${anchor(10)}, 'assignment', 'Tugas 1: Variabel & Tipe Data',
-          'Buat file variabel-siswa.js yang mendeklarasikan variabel untuk nama, umur, dan status aktif menggunakan let/const yang tepat, lalu cetak tipe setiap variabel menggunakan typeof.',
+        VALUES (${course.id}, ${anchor(assignment1Row)}, 'assignment', ${`Tugas: ${assignment1Row.title}`},
+          ${`Kerjakan praktik "${assignment1Row.practice}" dan kumpulkan bukti kerja sesuai asesmen: ${assignment1Row.assessment}.`},
           ${days(-20)}, true) RETURNING id`;
       // Due tonight and closing tomorrow: both land inside the reminder window, so santri who
       // have not finished get a notice and those who have do not.
       const dueSoon = withinReminderWindow(21, 23);
       const closesSoon = withinReminderWindow(22, 20);
       const [assignment2] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, due_at, published)
-        VALUES (${course.id}, ${anchor(16)}, 'assignment', 'Tugas 2: Function & Array',
-          'Buat function hitungRataRata(nilai) yang menerima array nilai siswa dan mengembalikan rata-ratanya menggunakan method reduce.',
+        VALUES (${course.id}, ${anchor(assignment2Row)}, 'assignment', ${`Tugas: ${assignment2Row.title}`},
+          ${`Bangun output praktik "${assignment2Row.practice}" dengan menerapkan materi ${assignment2Row.content}.`},
           ${dueSoon}, true) RETURNING id`;
       const [quiz] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
-        VALUES (${course.id}, ${anchor(20)}, 'quiz', 'Kuis Dasar JavaScript',
-          'Kerjakan kuis pilihan ganda meliputi tipe data, operator, percabangan, perulangan, function, array, dan object.', true) RETURNING id`;
+        VALUES (${course.id}, ${anchor(quizRow)}, 'quiz', ${`Kuis: ${quizRow.title}`},
+          ${`Kerjakan kuis berdasarkan fase ${quizRow.phase}: ${quizRow.content}.`}, true) RETURNING id`;
       await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility)
         VALUES (${quiz!.id}, 'quiz', ${days(-20)}, ${closesSoon}, 20, 2, true, true, 'after_submit')`;
       const [exam] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
-        VALUES (${course.id}, ${anchor(20)}, 'exam', 'Ujian Tengah Semester',
-          'Ujian tengah semester mencakup seluruh materi Bagian I dan Bagian II. Kerjakan dalam satu kali kesempatan sebelum waktu habis.', true) RETURNING id`;
+        VALUES (${course.id}, ${anchor(examRow)}, 'exam', ${`Evaluasi Semester 1: ${examRow.title}`},
+          ${`Evaluasi mencakup roadmap semester 1 sampai ${examRow.title}. Kerjakan dalam satu kali kesempatan sebelum waktu habis.`}, true) RETURNING id`;
       await tx`INSERT INTO assessment_settings (activity_id, kind, opens_at, closes_at, time_limit_minutes, max_attempts, shuffle_questions, shuffle_options, results_visibility)
         VALUES (${exam!.id}, 'exam', ${days(-25)}, ${days(-24)}, 60, 1, true, true, 'after_close')`;
       const [challenge] = await tx<{ id: string }[]>`INSERT INTO activities (course_id, lesson_id, kind, title, instructions, published)
-        VALUES (${course.id}, ${anchor(38)}, 'challenge', 'Capstone Project: Aplikasi Web untuk Kehidupan Santri',
-          'Bekerja dalam tim 2–3 orang membangun aplikasi web interaktif (DOM, array/object, dan penyimpanan lokal) yang bermanfaat bagi kegiatan santri sehari-hari. Kelola pekerjaan tim melalui papan Kanban dan ajukan untuk direview.', true) RETURNING id`;
+        VALUES (${course.id}, ${anchor(examRow)}, 'challenge', ${`Capstone: ${examRow.title}`},
+          ${`Kerjakan project akhir semester berdasarkan output "${examRow.practice}". Kelola pekerjaan tim melalui papan Kanban, kumpulkan deliverable, dan ajukan untuk direview.`}, true) RETURNING id`;
       await tx`INSERT INTO challenge_settings (activity_id, team_mode, max_team_size) VALUES (${challenge!.id}, 'team', 3)`;
       await recordAudit(tx, teacherId, "demo_seed.activity_published", "activities", challenge!.id, requestId());
 
@@ -583,12 +667,15 @@ async function main() {
 
       // --- Submissions & grades for the two assignments -------------------------------
       const feedbackPool = [
-        "Kerja bagus, logika sudah tepat dan kode mudah dibaca.",
-        "Sudah benar, tetapi perhatikan penamaan variabel agar lebih deskriptif.",
-        "Fungsi berjalan dengan baik. Coba tambahkan komentar singkat pada bagian penting.",
-        "Hampir sempurna, ada satu kasus tepi yang belum ditangani.",
-        "Baik. Lanjutkan konsistensi indentasi 2 spasi seperti standar kelas.",
+        grade === "X" ? "Kerja bagus, keputusan desain dan dokumentasi prosesnya sudah jelas." : "Kerja bagus, logika sudah tepat dan kode mudah dibaca.",
+        grade === "X" ? "Sudah baik, tetapi perjelas alasan pemilihan warna, tipografi, atau alur pengguna." : "Sudah benar, tetapi perhatikan penamaan variabel agar lebih deskriptif.",
+        grade === "X" ? "Output sudah berjalan. Tambahkan bukti uji dengan pengguna dan catatan revisinya." : "Fungsi berjalan dengan baik. Coba tambahkan komentar singkat pada bagian penting.",
+        grade === "X" ? "Hampir sempurna, masih ada detail pada hierarchy atau respons pengalaman pengguna yang perlu diperbaiki." : "Hampir sempurna, ada satu kasus tepi yang belum ditangani.",
+        grade === "X" ? "Baik. Rapikan presentasi artefak dan susun refleksi proses secara runtut." : "Baik. Lanjutkan konsistensi indentasi 2 spasi seperti standar kelas.",
       ];
+      const submissionContent = grade === "X"
+        ? "Berikut artefak desain dan catatan proses saya, termasuk keputusan visual, alur pengguna, serta revisi berdasarkan feedback."
+        : "Berikut jawaban tugas saya beserta kode, hasil pengujian, dan catatan proses pengerjaannya.";
       for (const [activity, submitRate, gradeRate, dueAt] of [
         [assignment1!, 0.85, 0.9, days(-20)],
         [assignment2!, 0.3, 0.15, dueSoon],
@@ -598,7 +685,7 @@ async function main() {
           const raw = dueAt.getTime() + (chance(0.75) ? -int(1, 10) : int(1, 3)) * 86400000;
           const submittedAt = new Date(Math.min(raw, days(-1).getTime()));
           const [submission] = await tx<{ id: string }[]>`INSERT INTO submissions (activity_id, student_id, content, submitted_at)
-            VALUES (${activity.id}, ${studentId}, ${"Berikut jawaban tugas saya:\n\nconst nama = \"Santri\";\nconst umur = 16;\nconsole.log(typeof nama, typeof umur);"}, ${submittedAt})
+            VALUES (${activity.id}, ${studentId}, ${submissionContent}, ${submittedAt})
             RETURNING id`;
           if (chance(gradeRate)) {
             const score = int(65, 100);
@@ -611,10 +698,12 @@ async function main() {
       }
 
       // --- Capstone projects: teams, kanban boards, reviews, portfolio ----------------
-      const projectTitles = [
-        "Pengingat Waktu Sholat", "Pencatat Hafalan Qur'an", "Aplikasi To-Do Harian Santri",
-        "Kalkulator Zakat Sederhana", "Jadwal Piket Kelas", "Galeri Kegiatan Kelas",
-      ];
+      const projectTitles = grade === "X"
+        ? ["Portfolio Digital Santri", "Website Kegiatan Asrama", "Produk Digital untuk Kelas", "Landing Page Club"]
+        : ["School Data Dashboard", "HSI LMS Mini", "Student Management API", "Fullstack Portfolio Showcase"];
+      const projectTheme = grade === "X"
+        ? "Produk digital yang dirancang dari riset, brand, alur pengguna, dan prototype untuk kebutuhan sekolah."
+        : "Aplikasi fullstack yang dikembangkan dengan JavaScript modern, React, Bun, REST API, database, dan deployment.";
       const teamRoster = shuffle(course.studentIds);
       const teamSize = 3;
       const teamCount = course.classIndex === 1 ? 4 : 3; // one class forms a team for every student, others leave a few unassigned
@@ -630,18 +719,26 @@ async function main() {
         const [project] = await tx<{ id: string }[]>`INSERT INTO projects
             (activity_id, course_id, title, summary, deliverable_url, status, first_submitted_at, submitted_at, showcased_at, showcased_by, created_by)
           VALUES (${challenge!.id}, ${course.id}, ${pick(projectTitles)},
-            'Aplikasi web sederhana yang dibangun sebagai capstone project menggunakan HTML, CSS, dan JavaScript murni.',
+            ${projectTheme},
             ${submitted ? "https://github.com/hsi-santri/capstone-demo" : null}, ${status}, ${firstSubmittedAt}, ${submittedAt},
             ${showcase ? days(-2) : null}, ${showcase ? teacherId : null}, ${members[0]}) RETURNING id`;
         for (const memberId of members) await tx`INSERT INTO project_members (project_id, activity_id, student_id) VALUES (${project!.id}, ${challenge!.id}, ${memberId})`;
 
-        const cardDefs: { title: string; status: "todo" | "in_progress" | "review" | "done" }[] = [
-          { title: "Rancang wireframe antarmuka", status: "done" },
-          { title: "Implementasi struktur HTML & CSS", status: "done" },
-          { title: "Implementasi logika JavaScript utama", status: status === "in_progress" ? "in_progress" : "done" },
-          { title: "Uji coba pada beberapa perangkat", status: status === "approved" ? "done" : "review" },
-          { title: "Tulis dokumentasi & catatan penggunaan", status: status === "approved" ? "done" : "todo" },
-        ];
+        const cardDefs: { title: string; status: "todo" | "in_progress" | "review" | "done" }[] = grade === "X"
+          ? [
+            { title: "Riset masalah dan pengguna", status: "done" },
+            { title: "Susun brand kit dan visual", status: "done" },
+            { title: "Bangun prototype produk", status: status === "in_progress" ? "in_progress" : "done" },
+            { title: "Uji alur dan pengalaman pengguna", status: status === "approved" ? "done" : "review" },
+            { title: "Susun portfolio dan presentasi", status: status === "approved" ? "done" : "todo" },
+          ]
+          : [
+            { title: "Susun arsitektur aplikasi", status: "done" },
+            { title: "Bangun frontend React", status: "done" },
+            { title: "Implementasikan backend dan API", status: status === "in_progress" ? "in_progress" : "done" },
+            { title: "Hubungkan database dan autentikasi", status: status === "approved" ? "done" : "review" },
+            { title: "Deploy dan dokumentasikan aplikasi", status: status === "approved" ? "done" : "todo" },
+          ];
         for (let i = 0; i < cardDefs.length; i++) {
           await tx`INSERT INTO project_tasks (project_id, title, status, position, assignee_id, created_by)
             VALUES (${project!.id}, ${cardDefs[i]!.title}, ${cardDefs[i]!.status}, ${i}, ${pick(members)}, ${members[0]})`;
@@ -747,7 +844,8 @@ async function main() {
       const closed: { id: string; startsAt: Date; records: SeededRecord[] }[] = [];
       for (let week = 0; week < 8; week++) {
         const startsAt = wib(-56 + week * 7, meetHour);
-        closed.push(await seedSession(`Pertemuan ${week + 1} – ${CHAPTERS[week * 2]!.title}`, startsAt, new Date(startsAt.getTime() + 90 * 60000),
+        const roadmapRow = curriculum[Math.min(week, curriculum.length - 1)]!;
+        closed.push(await seedSession(`Pertemuan ${week + 1} – ${roadmapRow.title}`, startsAt, new Date(startsAt.getTime() + 90 * 60000),
           "closed", "Materi tersampaikan sesuai rencana pembelajaran."));
       }
       const cancelledAt = wib(-7, meetHour);
@@ -755,11 +853,13 @@ async function main() {
       // The class started a moment ago and its late threshold is still ahead, so a santri who
       // checks in during a walkthrough is marked present rather than late.
       const liveAt = hours(-0.35 - course.classIndex * 0.2);
-      const live = await seedSession(`Pertemuan 10 – ${CHAPTERS[16]!.title}`, liveAt, new Date(liveAt.getTime() + 90 * 60000),
+      const liveRow = curriculum[Math.min(8, curriculum.length - 1)]!;
+      const live = await seedSession(`Pertemuan 10 – ${liveRow.title}`, liveAt, new Date(liveAt.getTime() + 90 * 60000),
         "open", "Sesi sedang berjalan; absensi QR ditampilkan di layar kelas.");
       // The next meeting sits inside the worker's 24-hour window, so it produces reminders.
       const nextAt = withinReminderWindow(meetHour);
-      await seedSession("Pertemuan 11 – Review dan Latihan Soal", nextAt, new Date(nextAt.getTime() + 90 * 60000), "scheduled", "");
+      const nextRow = curriculum[Math.min(9, curriculum.length - 1)]!;
+      await seedSession(`Pertemuan 11 – ${nextRow.title}`, nextAt, new Date(nextAt.getTime() + 90 * 60000), "scheduled", "");
       await seedCheckins(live, "open", new Date(liveAt.getTime() + 2 * 60000), new Date(liveAt.getTime() + 45 * 60000));
       for (const session of closed.slice(-2)) {
         await seedCheckins(session, "stopped", new Date(session.startsAt.getTime() + 2 * 60000), new Date(session.startsAt.getTime() + 15 * 60000));
@@ -769,12 +869,13 @@ async function main() {
 
     // --- Clubs: directory, own courses, and membership across clubs ---------------------
     // A club orchestrates rows that already exist, so each club needs real learning data
-    // behind it. Coders Club reuses the three JavaScript courses; Builders Club and
-    // Multimedia Club get one course each, seeded the same way but smaller. Membership then
+    // behind it. Coders Club reuses the grade XI roadmap courses; Builders Club and
+    // Multimedia Club get grade X roadmap slices as focused club courses. Membership then
     // decides who sees what: several santri join two clubs, which is what the progress,
     // challenge, and project tabs are meant to show.
     interface ClubCourseSeed {
       subjectCode: string; subjectName: string; courseName: string; classIndex: number; teacherId: string;
+      moduleTitle: string;
       lessons: [string, string][]; assignment: [string, string]; challenge: [string, string];
       projects: string[]; meetingHour: number;
     }
@@ -787,7 +888,7 @@ async function main() {
       await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${courseId}, ${teacherId})`;
       await recordAudit(tx, teacherId, "demo_seed.course_created", "courses", courseId, requestId());
       const [moduleRow] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
-        VALUES (${courseId}, 'Bagian I – Dasar', 0, true) RETURNING id`;
+        VALUES (${courseId}, ${seed.moduleTitle}, 0, true) RETURNING id`;
       const classStudentIds = STUDENTS.filter(s => s.classIndex === seed.classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
 
       const lessonIds: string[] = [];
@@ -797,7 +898,7 @@ async function main() {
           VALUES (${courseId}, ${moduleRow!.id}, ${title}, ${body}, ${index}, true) RETURNING id`;
         lessonIds.push(lesson!.id);
         await tx`INSERT INTO lesson_materials (course_id, lesson_id, title, kind, content)
-          VALUES (${courseId}, ${lesson!.id}, 'Ringkasan pertemuan', 'text', ${body})`;
+          VALUES (${courseId}, ${lesson!.id}, 'Ringkasan roadmap', 'text', ${body})`;
       }
       for (const studentId of classStudentIds) {
         const student = STUDENTS[studentIds.indexOf(studentId)]!;
@@ -900,31 +1001,28 @@ async function main() {
       return courseId;
     }
 
+    const clubLessons = (grade: "X" | "XI", phases: string[]) => CURRICULUM
+      .filter(row => row.grade === grade && phases.includes(row.phase))
+      .slice(0, 4)
+      .map(row => [`Pekan ${row.week} – ${row.title}`, curriculumBody(row)] as [string, string]);
+
     const buildersCourseId = await seedClubCourse({
       subjectCode: "DPD101", subjectName: "Desain Produk Digital",
-      courseName: `Desain Produk Digital – ${CLASS_NAMES[0]}`, classIndex: 0, teacherId: mainTeacherId, meetingHour: 13,
-      lessons: [
-        ["Dasar Desain Antarmuka", "Antarmuka yang baik lahir dari keteraturan: hierarki visual, ruang kosong yang cukup, tipografi yang mudah dibaca, dan warna yang konsisten. Pada pertemuan ini kita membedah antarmuka aplikasi yang dipakai sehari-hari dan menamai keputusan desain di dalamnya."],
-        ["Riset Pengguna dan Persona", "Sebelum merancang, kita perlu memahami siapa penggunanya. Kita berlatih menyusun pertanyaan wawancara, merangkum temuan, dan menuliskannya menjadi persona serta perjalanan pengguna yang ringkas."],
-        ["Wireframe dan Prototipe", "Wireframe menahan kita dari terlalu cepat memikirkan warna. Kita membuat kerangka layar, menyusunnya menjadi alur, lalu mengubahnya menjadi prototipe yang dapat diklik dan diuji."],
-        ["Design System dan Komponen", "Produk yang tumbuh membutuhkan komponen yang dapat dipakai ulang: tombol, kartu, formulir, dan token warna. Kita menyusun design system sederhana agar tim bekerja dengan bahasa visual yang sama."],
-      ],
-      assignment: ["Audit antarmuka aplikasi sekolah", "Pilih satu layar aplikasi yang Anda pakai sehari-hari. Tuliskan tiga masalah desain yang Anda temukan beserta usulan perbaikan dan alasannya."],
-      challenge: ["Redesign Portal Santri", "Rancang ulang satu alur pada portal santri, dari riset singkat, wireframe, sampai prototipe yang dapat diuji. Kerjakan bertiga dan presentasikan hasilnya pada pertemuan klub."],
-      projects: ["Redesign Portal Santri", "Prototipe Aplikasi Kantin Santri"],
+      courseName: `Desain Produk Digital – ${CLASS_NAMES[0]}`, classIndex: 0, teacherId: coTeacherId, meetingHour: 13,
+      moduleTitle: "Semester 1 · Digital Product dan UI/UX Design",
+      lessons: clubLessons("X", ["Digital Product", "UI/UX Design"]),
+      assignment: ["Digital Product Blueprint", "Rumuskan masalah pengguna, target pengguna, nilai utama, dan batasan scope untuk satu produk digital yang bermanfaat bagi lingkungan sekolah."],
+      challenge: ["Build My Digital Product MVP", "Bangun prototype MVP berdasarkan blueprint, brand, dan user flow. Uji dengan pengguna, catat feedback, lalu presentasikan revisinya."],
+      projects: ["Portfolio Digital Santri", "Prototype Sistem Informasi Asrama"],
     });
     const multimediaCourseId = await seedClubCourse({
       subjectCode: "MMK101", subjectName: "Multimedia dan Konten Kreatif",
-      courseName: `Multimedia dan Konten Kreatif – ${CLASS_NAMES[2]}`, classIndex: 2, teacherId: coTeacherId, meetingHour: 15,
-      lessons: [
-        ["Dasar Fotografi: Komposisi dan Cahaya", "Foto yang kuat dimulai dari komposisi dan cahaya. Kita membahas rule of thirds, garis pandu, arah cahaya, serta segitiga eksposur, lalu berlatih memotret kegiatan sekolah."],
-        ["Videografi: Pengambilan Gambar", "Kita mempelajari ukuran gambar, pergerakan kamera yang stabil, dan cara merekam suara yang bersih, kemudian menyusun daftar gambar sebelum meliput sebuah kegiatan."],
-        ["Penyuntingan Video dan Audio", "Penyuntingan menyusun potongan gambar menjadi cerita: memilih take terbaik, menjaga ritme, menyeimbangkan audio, dan menambahkan teks yang terbaca di layar kecil."],
-        ["Naskah Vlog dan Konten Media Sosial", "Konten yang bermanfaat direncanakan. Kita menyusun naskah singkat, menentukan pesan utama, dan menjaga adab liputan: meminta izin, menjaga privasi, dan menampilkan sekolah dengan jujur."],
-      ],
-      assignment: ["Foto esai kegiatan asrama", "Kumpulkan lima foto yang menceritakan satu kegiatan asrama secara berurutan, lengkapi dengan keterangan singkat untuk setiap foto."],
-      challenge: ["Produksi Vlog Pekan Santri", "Produksi satu vlog berdurasi tiga menit tentang kegiatan pekan santri: susun naskah, ambil gambar, sunting, lalu publikasikan setelah direview mentor."],
-      projects: ["Vlog Pekan Santri", "Dokumentasi Wisuda Tahfidz"],
+      courseName: `Multimedia dan Konten Kreatif – ${CLASS_NAMES[0]}`, classIndex: 0, teacherId: coTeacherId, meetingHour: 15,
+      moduleTitle: "Semester 1 · Brand Design dan Capstone",
+      lessons: clubLessons("X", ["Brand Design", "Capstone"]),
+      assignment: ["Brand Discovery", "Lakukan riset audience, positioning, dan referensi visual untuk satu kegiatan atau produk sekolah; rangkum insight menjadi moodboard."],
+      challenge: ["Brand My Product", "Terapkan brand voice dan visual language pada produk digital, susun brand kit, lalu siapkan portfolio showcase yang menjaga privasi dan adab liputan."],
+      projects: ["Brand Kit Kegiatan Asrama", "Portfolio Visual Club"],
     });
 
     const clubRows = await tx<{ id: string; slug: string }[]>`SELECT id, slug FROM clubs`;
@@ -933,8 +1031,10 @@ async function main() {
       await tx`INSERT INTO club_courses (club_id, course_id, linked_by) VALUES (${clubId(slug)}, ${courseId}, ${teacherId})`;
       await recordAudit(tx, teacherId, "demo_seed.club_course_linked", "club_courses", courseId, requestId());
     }
-    for (const course of courses) await linkClubCourse("coders-club", course.id, course.teacherId);
-    await linkClubCourse("builders-club", buildersCourseId, mainTeacherId);
+    for (const course of courses.filter(course => CLASS_NAMES[course.classIndex]!.startsWith("XI"))) {
+      await linkClubCourse("coders-club", course.id, mainTeacherId);
+    }
+    await linkClubCourse("builders-club", buildersCourseId, coTeacherId);
     await linkClubCourse("multimedia-club", multimediaCourseId, coTeacherId);
 
     async function joinClub(slug: string, userId: string, role: "mentor" | "member", joinedAt: Date) {
@@ -943,20 +1043,62 @@ async function main() {
       await recordAudit(tx, role === "mentor" ? mainTeacherId : null, "demo_seed.club_member_added", "club_members", userId, requestId());
     }
     await joinClub("coders-club", mainTeacherId, "mentor", days(-50));
-    await joinClub("coders-club", coTeacherId, "mentor", days(-50));
-    await joinClub("builders-club", mainTeacherId, "mentor", days(-45));
+    await joinClub("builders-club", coTeacherId, "mentor", days(-45));
     await joinClub("multimedia-club", coTeacherId, "mentor", days(-45));
     // Membership follows the class a club's courses belong to, so a santri only ever sees
     // club content they are already enrolled in. The overlaps are deliberate: four santri of
-    // X RPL 1 and three of XI RPL 1 belong to two clubs at once.
+    // X-A and four of XI-A belong to two clubs at once.
     const byClass = (classIndex: number) => STUDENTS.filter(s => s.classIndex === classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
     const [first, second, third] = [byClass(0), byClass(1), byClass(2)];
     const coders = [...first!.slice(0, 6), ...second!.slice(0, 6), ...third!.slice(0, 4)];
     const builders = first!.slice(2, 9);      // four of them also code
-    const multimedia = third!.slice(1, 8);    // three of them also code
+    const multimedia = first!.slice(9, 16);   // further kelas X santri join Multimedia Club
     for (const studentId of coders) await joinClub("coders-club", studentId, "member", days(-int(20, 44)));
     for (const studentId of builders) await joinClub("builders-club", studentId, "member", days(-int(15, 40)));
     for (const studentId of multimedia) await joinClub("multimedia-club", studentId, "member", days(-int(15, 40)));
+
+    // --- Coders Club: learning tracks and small mentoring groups ------------------------
+    // The two tracks come from the migration; the groups are the club's real shape. Santri
+    // of kelas X learn HTML and CSS in circles guided by kelas XI, while those same kelas XI
+    // santri are themselves guided by a teacher on harder material. That double role is the
+    // point: a santri may mentor one group while being a member of another.
+    const trackRows = await tx<{ id: string; slug: string }[]>`SELECT id, slug FROM club_tracks WHERE club_id = ${clubId("coders-club")}`;
+    const trackId = (slug: string) => trackRows.find(row => row.slug === slug)!.id;
+    const seniors = third!.slice(0, 4);                       // four XI-A santri in the club
+    const [seniorA, seniorB, seniorC, seniorD] = seniors;
+    const groupSeeds: { name: string; topic: string; track: string; level: number; capacity: number; schedule: string; note: string; mentorId: string; members: string[] }[] = [
+      {
+        name: "Kelompok HTML & CSS Dasar A", topic: "HTML, CSS, dan tata letak halaman", track: "product", level: 1, capacity: 8,
+        schedule: "Sabtu, 09.00–10.30", mentorId: seniorA!, members: first!.slice(0, 6),
+        note: "Kelompok pemula kelas X yang didampingi santri kelas XI. Fokus pada struktur halaman dan latihan membangun halaman profil sederhana.",
+      },
+      {
+        name: "Kelompok HTML & CSS Dasar B", topic: "HTML, CSS, dan tata letak halaman", track: "product", level: 1, capacity: 8,
+        schedule: "Sabtu, 10.45–12.15", mentorId: seniorB!, members: second!.slice(0, 6),
+        note: "Kelompok pemula kelas X dengan materi yang sama, dijadwalkan setelah kelompok A agar mentornya dapat saling bergantian.",
+      },
+      {
+        name: "Kelompok Proyek JavaScript", topic: "JavaScript, DOM, dan proyek web", track: "product", level: 3, capacity: 8,
+        schedule: "Ahad, 09.00–11.00", mentorId: mainTeacherId, members: [seniorC!, seniorD!],
+        note: "Kelompok kelas XI yang didampingi guru langsung. Materinya proyek web dengan JavaScript sampai siap ditampilkan di showcase.",
+      },
+      {
+        name: "Kelompok Algoritma & C++", topic: "Algoritma, struktur data, dan C++", track: "olympiad", level: 3, capacity: 8,
+        schedule: "Ahad, 13.00–15.00", mentorId: mainTeacherId, members: [seniorA!, seniorB!],
+        note: "Persiapan OSN Informatika bagi santri kelas XI, termasuk dua santri yang juga mendampingi kelompok pemula.",
+      },
+    ];
+    for (const seed of groupSeeds) {
+      const [group] = await tx<{ id: string }[]>`INSERT INTO club_groups (club_id, track_id, name, topic, level, capacity, schedule, note, mentor_id, created_at)
+        VALUES (${clubId("coders-club")}, ${trackId(seed.track)}, ${seed.name}, ${seed.topic}, ${seed.level}, ${seed.capacity},
+          ${seed.schedule}, ${seed.note}, ${seed.mentorId}, ${days(-int(25, 40))}) RETURNING id`;
+      await recordAudit(tx, mainTeacherId, "demo_seed.club_group_created", "club_groups", group!.id, requestId());
+      for (const studentId of seed.members) {
+        await tx`INSERT INTO club_group_members (group_id, club_id, user_id, joined_at)
+          VALUES (${group!.id}, ${clubId("coders-club")}, ${studentId}, ${days(-int(10, 24))})`;
+        await recordAudit(tx, mainTeacherId, "demo_seed.club_group_member_added", "club_group_members", studentId, requestId());
+      }
+    }
 
     // --- Gamification: XP and badges through the application's own award path -----------
     // Calling awardXp keeps the ledger, the badge thresholds, and the level-up notices
@@ -1109,12 +1251,15 @@ async function main() {
   // Part of the inbox has already been read, so the unread filter shows a real difference.
   await db`UPDATE notifications SET read_at = clock_timestamp()
     WHERE status = 'delivered' AND read_at IS NULL AND left(md5(id::text), 1) IN ('0', '1', '2', '3', '4')`;
-  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number; clubs: number; clubMembers: number }[]>`SELECT
+  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number; clubs: number; clubMembers: number; clubTracks: number; clubGroups: number; groupMembers: number }[]>`SELECT
     (SELECT COALESCE(sum(points), 0)::int FROM xp_entries) AS xp, (SELECT count(*)::int FROM badge_awards) AS badges,
     (SELECT count(*)::int FROM classroom_sessions) AS sessions, (SELECT count(*)::int FROM attendance_records) AS records,
     (SELECT count(*)::int FROM academic_events) AS events,
     (SELECT count(*)::int FROM clubs WHERE archived_at IS NULL AND published) AS clubs,
-    (SELECT count(*)::int FROM club_members WHERE removed_at IS NULL AND role = 'member') AS "clubMembers"`;
+    (SELECT count(*)::int FROM club_members WHERE removed_at IS NULL AND role = 'member') AS "clubMembers",
+    (SELECT count(*)::int FROM club_tracks WHERE archived_at IS NULL) AS "clubTracks",
+    (SELECT count(*)::int FROM club_groups WHERE archived_at IS NULL) AS "clubGroups",
+    (SELECT count(*)::int FROM club_group_members WHERE removed_at IS NULL) AS "groupMembers"`;
 
   console.log("Demo data seeded.");
   console.log(`- Academic year: ${DEMO_ACADEMIC_YEAR}, classes: ${CLASS_NAMES.join(", ")}`);
@@ -1125,6 +1270,7 @@ async function main() {
   console.log(`- Attendance: ${totals!.sessions} classroom sessions, ${totals!.records} attendance rows, QR check-in open on the session running now`);
   console.log(`- Calendar: ${totals!.events} academic events; notifications ${generated} generated, ${delivered} delivered, ${suppressed} suppressed by preference`);
   console.log(`- Clubs: ${totals!.clubs} klub aktif (Coders, Builders, Multimedia) dengan ${totals!.clubMembers} keanggotaan santri; sebagian santri mengikuti dua klub`);
+  console.log(`- Coders Club: ${totals!.clubTracks} track belajar (Olympiad, Product) dan ${totals!.clubGroups} kelompok bimbingan berisi ${totals!.groupMembers} santri; dua santri kelas XI mendampingi kelompok pemula sekaligus dibimbing guru`);
   console.log("- Reports derive from the data above; an administrator sees every course, a teacher only the ones they teach.");
   console.log("Bootstrap an administrator separately with `bun run db:bootstrap-admin` if one does not exist yet.");
 }

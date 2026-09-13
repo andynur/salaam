@@ -23,6 +23,7 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
   let handle: ReturnType<typeof createHttpHandler>;
   let adminId: string;
   let teacherId: string;
+  let assistantId: string;
   let studentId: string;
   let peerId: string;
   let yearId: string;
@@ -30,6 +31,7 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
   let termId: string;
   let admin: string;
   let teacher: string;
+  let assistant: string;
   let student: string;
   let peer: string;
   let outsider: string;
@@ -89,6 +91,7 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
     handle = createHttpHandler(config, createAuthService(db, config), async () => {}, { foundation: createFoundationHandler(db), learning: createLearningHandler(db, storage), dashboard: async () => ({}) });
     admin = (await request("/api/auth/login", "", { email: "admin@example.test", password })).headers.get("set-cookie")!.split(";")[0]!;
     ({ id: teacherId, cookie: teacher } = await user("teacher", "teacher"));
+    ({ id: assistantId, cookie: assistant } = await user("assistant", "asmen"));
     ({ id: studentId, cookie: student } = await user("student", "student"));
     ({ id: peerId, cookie: peer } = await user("peer", "student"));
     ({ cookie: outsider } = await user("outsider", "student"));
@@ -209,6 +212,16 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
       expect((await post(f.courseId, "publish", { published: false })).status).toBe(403);
       expect((await request(path(f.courseId), teacher)).status).toBe(404);
     } finally { await db`INSERT INTO role_permissions SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.key = 'teacher' AND p.key = 'learning.manage'`; }
+  });
+
+  test("an Asisten Mentor receives the dashboard and assigned course read scope without authoring access", async () => {
+    const f = await fixture();
+    await academic("teaching-assignments", { courseId: f.courseId, teacherId: assistantId });
+    expect((await request("/api/dashboard", assistant)).status).toBe(200);
+    const courses = await (await request("/api/learning/courses", assistant)).json() as Page<LearningCourse>;
+    expect(courses.items.find(course => course.id === f.courseId)).toMatchObject({ canManage: false, canAssist: true });
+    expect((await request(path(f.courseId), assistant)).status).toBe(200);
+    expect((await post(f.courseId, "modules", { title: "Tidak boleh", position: 2 }, assistant)).status).toBe(403);
   });
 
   test("cross-course parent references and resource IDs cannot escape the target course", async () => {

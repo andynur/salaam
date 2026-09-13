@@ -3,7 +3,7 @@ import type { Challenge } from "./project";
 
 export interface Page<T> { items: T[]; nextOffset: number | null }
 export interface StoredFile { id: string; name: string; mediaType: string; sizeBytes: number }
-export interface LearningCourse { id: string; name: string; className: string; term: string; year: string; published: boolean; canManage: boolean }
+export interface LearningCourse { id: string; name: string; className: string; term: string; year: string; published: boolean; canManage: boolean; canAssist?: boolean }
 export interface CourseModule { id: string; title: string; position: number; published: boolean; archived: boolean }
 // A lesson is a document: `content` is Markdown, `version` guards autosaves against a
 // concurrent edit, and `shareSlug` is set while the document has a public page.
