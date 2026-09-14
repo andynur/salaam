@@ -186,21 +186,21 @@ The dataset covers every delivered phase, so each role has something to work wit
 
 | Role | What the demo shows |
 | --- | --- |
-| Administrator | 119 accounts and role profiles, one academic year with two terms, five classes (X-A/X-B and XI-A/XI-B/XI-C), seven courses, reward rules and the badge catalogue, an audit log, and cross-course reports with CSV exports |
-| Teacher | Grade-specific roadmap courses for kelas X and XI, submissions waiting to be graded, a closed exam and an open quiz, capstone projects at every review stage, eight weeks of recorded attendance, a class running right now with QR check-in open, and the class leaderboard |
+| Administrator | 121 accounts and role profiles, one academic year with two terms, five classes (X-A/X-B and XI-A/XI-B/XI-C), five active semester-1 courses, five planned nonaktif semester-2 courses, three Saturday club courses, reward rules and the badge catalogue, an audit log, and cross-course reports with CSV exports |
+| Teacher | Digital Creator Foundation for kelas X on weekdays, 13.00–14.30 WIB; Modern Frontend Development for kelas XI on weekdays, 20.00–21.30 WIB; the still-inactive Digital Portfolio and Fullstack Development roadmaps; submissions waiting to be graded; a closed exam and an open quiz; capstone projects at every review stage; weekday attendance history; and the class leaderboard |
+| Everyone | Tautan: three school-wide link collections (official channels, IT systems, class progress and Coders Club sheets) plus a personal collection owned by a teacher |
 | Santri | Lessons taught and still to come, an assignment due tonight, an open quiz, XP and badges earned over the term, attendance history, an agenda, and an inbox of delivered reminders |
 
-Andy Nur teaches the three kelas XI courses for Coders Club, while Ari Heru teaches the
-two kelas X courses and the Builders Club and Multimedia Club courses. Accounts use the
+Andy Nur teaches the three kelas XI courses and the Coders Club course, while Ari Heru teaches
+the two kelas X courses and the Builders Club and Multimedia Club courses. Accounts use the
 `@hsibs.my.id` domain and the script prints the shared demo password on success; every
 seeded account uses it. The student accounts and NIS values are loaded from
 `database/seed/data/students.csv` and `database/seed/data/curriculum.csv`; kelas XII has no seeded students or roadmap yet.
 
-Timings are relative to the moment you seed: the running class, the deadline, the quiz
-window, and the next meeting all fall inside the notification worker's 24-hour reminder
-window, and the seed runs that worker once so the inbox is not empty. Synthetic history is
-audited under `demo_seed.*` event names so the audit log never claims a real request
-happened.
+Timings are relative to the moment you seed: class sessions are scheduled only on their real
+weekday windows, club sessions only on Saturdays, and the deadline and quiz window keep the
+notification worker's inbox populated. Synthetic history is audited under `demo_seed.*` event
+names so the audit log never claims a real request happened.
 
 The script is development-only, refuses to run twice against the same database (reset with
 `bun run db:migrate:reset` first), and writes its dataset in a single transaction so a

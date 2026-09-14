@@ -2,10 +2,10 @@
 // table delivered through Phase 9 (identity, academic foundation, learning core, assessment
 // engine, project learning, gamification, attendance, QR check-in, calendar and
 // notifications; reporting derives from all of them) with data shaped like a real HSI
-// Boarding School term in progress: some lessons taught, some still in draft, a closed exam,
-// an open quiz, an overdue assignment, one due tomorrow, capstone projects at every review
-// stage, eight weeks of recorded attendance, a class running right now with QR check-in
-// open, a school calendar, and an inbox produced by the real notification worker.
+// Boarding School term in progress: semester-1 courses underway, semester-2 courses planned
+// but nonaktif, a closed exam, an open quiz, an overdue assignment, one due tomorrow,
+// capstone projects at every review stage, weekday attendance history, Saturday club sessions,
+// a school calendar, and an inbox produced by the real notification worker.
 //
 // Every walkthrough role has something to look at: an administrator sees accounts, academic
 // structure, reward rules, the audit log and the cross-course reports; a teacher sees
@@ -68,6 +68,43 @@ function wib(dayOffset: number, hour: number, minute = 0) {
   const at = days(dayOffset);
   at.setUTCHours(hour - 7, minute, 0, 0);
   return at;
+}
+function wibDayOfWeek(date: Date) {
+  return new Date(date.getTime() + 7 * 3600000).getUTCDay();
+}
+function isWeekday(date: Date) {
+  const day = wibDayOfWeek(date);
+  return day >= 1 && day <= 5;
+}
+function previousWeekday(index: number, hour: number) {
+  let offset = -1;
+  let found = 0;
+  while (true) {
+    const at = wib(offset, hour);
+    if (isWeekday(at) && found++ === index) return at;
+    offset--;
+  }
+}
+function nextWeekday(hour: number) {
+  for (let offset = 0; ; offset++) {
+    const at = wib(offset, hour);
+    if (isWeekday(at) && at.getTime() > NOW.getTime()) return at;
+  }
+}
+function previousSaturday(index: number, hour: number) {
+  let offset = -1;
+  let found = 0;
+  while (true) {
+    const at = wib(offset, hour);
+    if (wibDayOfWeek(at) === 6 && found++ === index) return at;
+    offset--;
+  }
+}
+function nextSaturday(hour: number) {
+  for (let offset = 0; ; offset++) {
+    const at = wib(offset, hour);
+    if (wibDayOfWeek(at) === 6 && at.getTime() > NOW.getTime()) return at;
+  }
 }
 // A plausible school hour that still falls inside the notification worker's 24-hour reminder
 // window, whichever time of day the seed happens to run. Falls back to a bare offset so the
@@ -487,7 +524,6 @@ async function main() {
     const [termGenap] = await tx<{ id: string }[]>`INSERT INTO terms (academic_year_id, name, starts_on, ends_on)
       VALUES (${yearId}, ${`Semester Genap ${DEMO_ACADEMIC_YEAR}`}, ${dateOnly(days(120))}, ${dateOnly(days(305))}) RETURNING id`;
     const termId = termGanjil!.id;
-    void termGenap;
 
     const classIds: string[] = [];
     for (const name of CLASS_NAMES) {
@@ -503,30 +539,61 @@ async function main() {
     // published grades here so a database reset immediately has the same roadmap as demo data.
     await seedCurriculum(tx);
 
-    const [subjectX] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('X101', 'Literasi Digital dan Desain Produk') RETURNING id`;
-    const [subjectXI] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('XI101', 'Fullstack JavaScript Development') RETURNING id`;
+    const [subjectXGanjil] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('X101', 'Digital Creator Foundation') RETURNING id`;
+    const [subjectXGenap] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('X102', 'Digital Portfolio') RETURNING id`;
+    const [subjectXIGanjil] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('XI101', 'Modern Frontend Development') RETURNING id`;
+    const [subjectXIGenap] = await tx<{ id: string }[]>`INSERT INTO subjects (code, name) VALUES ('XI102', 'Fullstack Development') RETURNING id`;
 
-    // --- One course per class, populated from the grade-specific roadmap ---------------
-    // Ari Heru teaches the kelas X courses; Andy Nur teaches the kelas XI courses.
+    // --- One active and one planned course per class -----------------------------------
+    // Semester genap is deliberately seeded as unpublished: its roadmap is ready, but it
+    // must remain nonaktif until the term starts. Ari Heru teaches kelas X; Andy Nur XI.
     const courses: { id: string; classIndex: number; teacherId: string; studentIds: string[] }[] = [];
+    const futureCourses: { id: string; classIndex: number; teacherId: string }[] = [];
     for (let classIndex = 0; classIndex < CLASS_NAMES.length; classIndex++) {
       const isXI = CLASS_NAMES[classIndex]!.startsWith("XI");
       const [course] = await tx<{ id: string }[]>`INSERT INTO courses (name, academic_year_id, term_id, class_id, subject_id, published)
-        VALUES (${`${isXI ? "Fullstack JavaScript Development" : "Literasi Digital dan Desain Produk"} – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termId}, ${classIds[classIndex]}, ${isXI ? subjectXI!.id : subjectX!.id}, true) RETURNING id`;
+        VALUES (${`${isXI ? "Modern Frontend Development" : "Digital Creator Foundation"} – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termId}, ${classIds[classIndex]}, ${isXI ? subjectXIGanjil!.id : subjectXGanjil!.id}, true) RETURNING id`;
       const teacherId = CLASS_NAMES[classIndex]!.startsWith("XI") ? mainTeacherId : coTeacherId;
       await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${teacherId})`;
       for (const assistantId of assistantMentorIds) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${course!.id}, ${assistantId})`;
       const classStudentIds = STUDENTS.filter(s => s.classIndex === classIndex).map(s => studentIds[STUDENTS.indexOf(s)]!);
       courses.push({ id: course!.id, classIndex, teacherId, studentIds: classStudentIds });
       await recordAudit(tx, teacherId, "demo_seed.course_created", "courses", course!.id, requestId());
+
+      const [futureCourse] = await tx<{ id: string }[]>`INSERT INTO courses (name, academic_year_id, term_id, class_id, subject_id, published)
+        VALUES (${`${isXI ? "Fullstack Development" : "Digital Portfolio"} – ${CLASS_NAMES[classIndex]}`}, ${yearId}, ${termGenap!.id}, ${classIds[classIndex]}, ${isXI ? subjectXIGenap!.id : subjectXGenap!.id}, false) RETURNING id`;
+      await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${futureCourse!.id}, ${teacherId})`;
+      for (const assistantId of assistantMentorIds) await tx`INSERT INTO teaching_assignments (course_id, teacher_id) VALUES (${futureCourse!.id}, ${assistantId})`;
+      futureCourses.push({ id: futureCourse!.id, classIndex, teacherId });
+      await recordAudit(tx, teacherId, "demo_seed.course_planned", "courses", futureCourse!.id, requestId());
+    }
+
+    // Planned semester-2 courses carry their complete roadmap as unpublished material;
+    // this makes the plan visible to staff without exposing it to students prematurely.
+    for (const course of futureCourses) {
+      const grade = CLASS_NAMES[course.classIndex]!.startsWith("XI") ? "XI" : "X";
+      const curriculum = CURRICULUM.filter(row => row.grade === grade && row.semester === "2");
+      const phases = [...new Set(curriculum.map(row => row.phase))];
+      for (const [position, phase] of phases.entries()) {
+        const [module] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
+          VALUES (${course.id}, ${`Semester 2 · ${phase}`}, ${position}, false) RETURNING id`;
+        for (const row of curriculum.filter(item => item.phase === phase)) {
+          const [lesson] = await tx<{ id: string }[]>`INSERT INTO lessons (course_id, module_id, title, content, position, published)
+            VALUES (${course.id}, ${module!.id}, ${`Pekan ${row.week} – ${row.title}`}, ${curriculumBody(row)}, ${row.week - 1}, false) RETURNING id`;
+          await tx`INSERT INTO lesson_materials (course_id, lesson_id, title, kind, content)
+            VALUES (${course.id}, ${lesson!.id}, 'Ringkasan roadmap', 'text', ${curriculumBody(row).slice(0, 4000)})`;
+        }
+      }
     }
 
     // --- Modules, lessons, materials, activities, assessments, projects, per course ----
+    // Published lessons per course, in chapter order, kept for the XP tie-breaking pass below.
+    const courseLessons = new Map<string, string[]>();
     for (const course of courses) {
       const teacherId = course.teacherId;
       const grade = CLASS_NAMES[course.classIndex]!.startsWith("XI") ? "XI" : "X";
-      const curriculum = CURRICULUM.filter(row => row.grade === grade);
-      const phases = [...new Set(curriculum.map(row => `${row.semester} · ${row.phase}`))];
+      const curriculum = CURRICULUM.filter(row => row.grade === grade && row.semester === "1");
+      const phases = [...new Set(curriculum.map(row => row.phase))];
       const moduleIds: string[] = [];
       for (let part = 0; part < phases.length; part++) {
         const [module] = await tx<{ id: string }[]>`INSERT INTO course_modules (course_id, title, position, published)
@@ -538,7 +605,7 @@ async function main() {
       const lessonByChapter = new Map<number, { id: string; published: boolean }>();
       for (let index = 0; index < curriculum.length; index++) {
           const row = curriculum[index]!;
-          const moduleIndex = phases.indexOf(`${row.semester} · ${row.phase}`);
+          const moduleIndex = phases.indexOf(row.phase);
           const content = curriculumBody(row);
           const published = row.semester === "1";
           const [lesson] = await tx<{ id: string }[]>`INSERT INTO lessons (course_id, module_id, title, content, position, published)
@@ -552,6 +619,7 @@ async function main() {
               VALUES (${course.id}, ${lesson!.id}, 'Referensi roadmap', 'link', ${row.source})`;
           }
       }
+      courseLessons.set(course.id, [...lessonByChapter.values()].filter(l => l.published).map(l => l.id));
 
       // Lesson completions: earlier chapters completed by more students; per-student skill drives pace.
       for (const studentId of course.studentIds) {
@@ -763,7 +831,7 @@ async function main() {
       // --- Classroom sessions, attendance, and QR check-in -----------------------------
       // Written the way the application writes it: a roster snapshot per session, an
       // append-only attendance chain whose newest row wins, lifecycle events carrying the
-      // version they produced, and a live QR window on the class running right now.
+      // version they produced, and historical QR check-in windows for completed sessions.
       const roster = await tx<{ id: string; name: string; identifier: string | null }[]>`SELECT u.id, u.display_name AS name,
           (SELECT p.identifier FROM user_profiles p JOIN roles r ON r.id = p.role_id WHERE p.user_id = u.id AND r.key = 'student') AS identifier
         FROM class_members m JOIN users u ON u.id = m.student_id
@@ -840,39 +908,33 @@ async function main() {
         if (status === "open") await enqueueCheckin(tx, session.id);
       }
 
-      const meetHour = 7 + course.classIndex;
+      const meetHour = grade === "X" ? 13 : 20;
       const closed: { id: string; startsAt: Date; records: SeededRecord[] }[] = [];
       for (let week = 0; week < 8; week++) {
-        const startsAt = wib(-56 + week * 7, meetHour);
+        const startsAt = previousWeekday(7 - week, meetHour);
         const roadmapRow = curriculum[Math.min(week, curriculum.length - 1)]!;
         closed.push(await seedSession(`Pertemuan ${week + 1} – ${roadmapRow.title}`, startsAt, new Date(startsAt.getTime() + 90 * 60000),
           "closed", "Materi tersampaikan sesuai rencana pembelajaran."));
       }
-      const cancelledAt = wib(-7, meetHour);
+      const cancelledAt = previousWeekday(0, meetHour);
       await seedSession("Pertemuan 9 – Praktik Mandiri", cancelledAt, new Date(cancelledAt.getTime() + 90 * 60000), "cancelled", "");
-      // The class started a moment ago and its late threshold is still ahead, so a santri who
-      // checks in during a walkthrough is marked present rather than late.
-      const liveAt = hours(-0.35 - course.classIndex * 0.2);
-      const liveRow = curriculum[Math.min(8, curriculum.length - 1)]!;
-      const live = await seedSession(`Pertemuan 10 – ${liveRow.title}`, liveAt, new Date(liveAt.getTime() + 90 * 60000),
-        "open", "Sesi sedang berjalan; absensi QR ditampilkan di layar kelas.");
-      // The next meeting sits inside the worker's 24-hour window, so it produces reminders.
-      const nextAt = withinReminderWindow(meetHour);
+      // Do not manufacture an open class outside its real timetable. The next weekday session
+      // remains available for the schedule and reminder walkthrough.
+      const nextAt = nextWeekday(meetHour);
       const nextRow = curriculum[Math.min(9, curriculum.length - 1)]!;
-      await seedSession(`Pertemuan 11 – ${nextRow.title}`, nextAt, new Date(nextAt.getTime() + 90 * 60000), "scheduled", "");
-      await seedCheckins(live, "open", new Date(liveAt.getTime() + 2 * 60000), new Date(liveAt.getTime() + 45 * 60000));
+      await seedSession(`Pertemuan 10 – ${nextRow.title}`, nextAt, new Date(nextAt.getTime() + 90 * 60000), "scheduled", "");
       for (const session of closed.slice(-2)) {
         await seedCheckins(session, "stopped", new Date(session.startsAt.getTime() + 2 * 60000), new Date(session.startsAt.getTime() + 15 * 60000));
       }
-      await recordAudit(tx, teacherId, "demo_seed.checkin_started", "attendance_checkin_windows", live.id, requestId());
+      await recordAudit(tx, teacherId, "demo_seed.checkin_history_created", "attendance_checkin_windows", closed[closed.length - 1]!.id, requestId());
     }
 
     // --- Clubs: directory, own courses, and membership across clubs ---------------------
     // A club orchestrates rows that already exist, so each club needs real learning data
-    // behind it. Coders Club reuses the grade XI roadmap courses; Builders Club and
-    // Multimedia Club get grade X roadmap slices as focused club courses. Membership then
-    // decides who sees what: several santri join two clubs, which is what the progress,
-    // challenge, and project tabs are meant to show.
+    // behind it. Each club receives its own focused course so its Saturday extracurricular
+    // timetable never becomes entangled with the weekday curriculum. Membership then decides
+    // who sees what: several santri join two clubs, which is what the progress, challenge,
+    // and project tabs are meant to show.
     interface ClubCourseSeed {
       subjectCode: string; subjectName: string; courseName: string; classIndex: number; teacherId: string;
       moduleTitle: string;
@@ -969,7 +1031,7 @@ async function main() {
         WHERE m.class_id = ${classIds[seed.classIndex]} AND u.is_active ORDER BY u.id`;
       for (let week = 0; week < 5; week++) {
         const scheduled = week === 4;
-        const startsAt = scheduled ? wib(3, seed.meetingHour) : wib(-28 + week * 7, seed.meetingHour);
+        const startsAt = scheduled ? nextSaturday(seed.meetingHour) : previousSaturday(3 - week, seed.meetingHour);
         const endsAt = new Date(startsAt.getTime() + 90 * 60000);
         const requestKey = crypto.randomUUID();
         const title = scheduled ? "Pertemuan klub – Review karya" : `Pertemuan klub ${week + 1}`;
@@ -1006,6 +1068,15 @@ async function main() {
       .slice(0, 4)
       .map(row => [`Pekan ${row.week} – ${row.title}`, curriculumBody(row)] as [string, string]);
 
+    const codersCourseId = await seedClubCourse({
+      subjectCode: "CC101", subjectName: "Pemrograman Kompetitif dan Produk",
+      courseName: `Coders Club – ${CLASS_NAMES[2]}`, classIndex: 2, teacherId: mainTeacherId, meetingHour: 9,
+      moduleTitle: "Ekstrakurikuler Sabtu · JavaScript dan Problem Solving",
+      lessons: clubLessons("XI", ["Programming Foundation", "Modern JavaScript Application"]),
+      assignment: ["Latihan Problem Solving", "Selesaikan satu masalah algoritma dan dokumentasikan strategi, kasus uji, serta refleksi perbaikannya."],
+      challenge: ["Produk Mini Coders Club", "Bangun produk web kecil atau solusi algoritma secara berpasangan, uji bersama, lalu presentasikan proses dan hasilnya."],
+      projects: ["Dashboard Jadwal Club", "Bank Soal Algoritma Santri"],
+    });
     const buildersCourseId = await seedClubCourse({
       subjectCode: "DPD101", subjectName: "Desain Produk Digital",
       courseName: `Desain Produk Digital – ${CLASS_NAMES[0]}`, classIndex: 0, teacherId: coTeacherId, meetingHour: 13,
@@ -1031,9 +1102,7 @@ async function main() {
       await tx`INSERT INTO club_courses (club_id, course_id, linked_by) VALUES (${clubId(slug)}, ${courseId}, ${teacherId})`;
       await recordAudit(tx, teacherId, "demo_seed.club_course_linked", "club_courses", courseId, requestId());
     }
-    for (const course of courses.filter(course => CLASS_NAMES[course.classIndex]!.startsWith("XI"))) {
-      await linkClubCourse("coders-club", course.id, mainTeacherId);
-    }
+    await linkClubCourse("coders-club", codersCourseId, mainTeacherId);
     await linkClubCourse("builders-club", buildersCourseId, coTeacherId);
     await linkClubCourse("multimedia-club", multimediaCourseId, coTeacherId);
 
@@ -1079,12 +1148,12 @@ async function main() {
       },
       {
         name: "Kelompok Proyek JavaScript", topic: "JavaScript, DOM, dan proyek web", track: "product", level: 3, capacity: 8,
-        schedule: "Ahad, 09.00–11.00", mentorId: mainTeacherId, members: [seniorC!, seniorD!],
+        schedule: "Sabtu, 13.00–15.00", mentorId: mainTeacherId, members: [seniorC!, seniorD!],
         note: "Kelompok kelas XI yang didampingi guru langsung. Materinya proyek web dengan JavaScript sampai siap ditampilkan di showcase.",
       },
       {
         name: "Kelompok Algoritma & C++", topic: "Algoritma, struktur data, dan C++", track: "olympiad", level: 3, capacity: 8,
-        schedule: "Ahad, 13.00–15.00", mentorId: mainTeacherId, members: [seniorA!, seniorB!],
+        schedule: "Sabtu, 15.15–17.15", mentorId: mainTeacherId, members: [seniorA!, seniorB!],
         note: "Persiapan OSN Informatika bagi santri kelas XI, termasuk dua santri yang juga mendampingi kelompok pemula.",
       },
     ];
@@ -1137,6 +1206,76 @@ async function main() {
     awards.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
     for (const award of awards) await award.run();
 
+    // Break XP ties: reward points are coarse and discrete, so distinct students often land
+    // on the same total, which looks wrong on a leaderboard. Give every tied student past the
+    // first one more lesson completion through the normal award path; a student who has
+    // already finished every lesson instead gives back their most recent one. Runs to a
+    // fixed point since nudging one student can create a new collision with someone else.
+    const studentCourse = new Map(courses.flatMap(course => course.studentIds.map(studentId => [studentId, course] as const)));
+    async function revalidateBadges(studentId: string) {
+      await tx`WITH counters AS (
+          SELECT COALESCE(sum(points), 0)::int AS xp_total,
+            count(*) FILTER (WHERE rule_key = 'lesson.completed')::int AS lessons_completed,
+            count(*) FILTER (WHERE rule_key = 'assignment.graded')::int AS assignments_graded,
+            count(*) FILTER (WHERE rule_key = 'assessment.completed')::int AS assessments_completed,
+            count(*) FILTER (WHERE rule_key = 'project.approved')::int AS projects_approved
+          FROM xp_entries WHERE student_id = ${studentId}
+        )
+        DELETE FROM badge_awards ba USING badges b, counters c
+        WHERE ba.student_id = ${studentId} AND ba.badge_id = b.id AND b.threshold > CASE b.criterion
+          WHEN 'xp_total' THEN c.xp_total WHEN 'lessons_completed' THEN c.lessons_completed
+          WHEN 'assignments_graded' THEN c.assignments_graded WHEN 'assessments_completed' THEN c.assessments_completed
+          ELSE c.projects_approved END`;
+    }
+    // A tied cohort usually shares the same completion pattern (often "finished every
+    // lesson"), so nudging everyone by the same one lesson just moves the whole group to a
+    // new, equally shared total. Instead, the k-th member of a tied group is nudged k lessons
+    // deep, spreading the whole group across k distinct totals in one pass.
+    // A member commits to one direction for its whole nudge: switching mid-way (add until
+    // full, then start removing) would walk back through totals it already passed, colliding
+    // with a sibling nudged by the mirror step count. Capacity limits how far a member can
+    // move, so very large tied cohorts may not fully separate in one pass.
+    async function nudge(studentId: string, steps: number) {
+      const course = studentCourse.get(studentId);
+      const lessons = course ? courseLessons.get(course.id) ?? [] : [];
+      const done = new Set((await tx<{ lessonId: string }[]>`
+        SELECT lesson_id AS "lessonId" FROM lesson_completions WHERE student_id = ${studentId}`).map(r => r.lessonId));
+      const adding = lessons.some(id => !done.has(id));
+      for (let step = 0; step < steps; step++) {
+        if (adding) {
+          const next = lessons.find(id => !done.has(id));
+          if (!next) return; // ran out of room to add: stop rather than switch direction
+          const completedAt = wib(-int(1, 10), int(8, 20), int(0, 59));
+          await tx`INSERT INTO lesson_completions (lesson_id, student_id, completed_at) VALUES (${next}, ${studentId}, ${completedAt})`;
+          await awardXp(tx, studentId, "lesson.completed", "lessons", next, course!.id, awardRequest);
+          done.add(next);
+        } else {
+          const latest = [...lessons].reverse().find(id => done.has(id));
+          if (!latest) return; // ran out of room to remove: stop rather than switch direction
+          await tx`DELETE FROM lesson_completions WHERE lesson_id = ${latest} AND student_id = ${studentId}`;
+          await tx`DELETE FROM xp_entries WHERE source_type = 'lessons' AND source_id = ${latest} AND student_id = ${studentId}`;
+          await revalidateBadges(studentId);
+          done.delete(latest);
+        }
+      }
+    }
+    for (let round = 0; round < 8; round++) {
+      const totals = new Map(studentIds.map(id => [id, 0]));
+      for (const row of await tx<{ studentId: string; total: number }[]>`
+        SELECT student_id AS "studentId", sum(points)::int AS total FROM xp_entries GROUP BY student_id`)
+        totals.set(row.studentId, row.total);
+      const groups = new Map<number, string[]>();
+      for (const studentId of studentIds) {
+        const total = totals.get(studentId)!;
+        (groups.get(total) ?? groups.set(total, []).get(total)!).push(studentId);
+      }
+      let changed = false;
+      for (const group of groups.values()) {
+        for (let index = 1; index < group.length; index++) { await nudge(group[index]!, index); changed = true; }
+      }
+      if (!changed) break;
+    }
+
     // Backdate the ledger to its sources. Levels and badges are derived from totals, so
     // moving the dates changes only the story the growth timeline tells.
     await tx`UPDATE xp_entries x SET awarded_at = lc.completed_at FROM lesson_completions lc
@@ -1165,6 +1304,63 @@ async function main() {
           WHEN 'assignments_graded' THEN l.assignments_graded WHEN 'assessments_completed' THEN l.assessments_completed
           ELSE l.projects_approved END), ba.awarded_at)`;
 
+    // --- Links -----------------------------------------------------------------------
+    // Real bookmarks the school actually shares in group chats: official channels, the
+    // apps staff use daily, and the Google Sheets that track class progress. The links
+    // migration already seeds an empty "Tautan Sekolah" collection; fill it in and group
+    // the rest into a few more school-wide collections, plus one personal collection so
+    // both the school and personal scopes have something to show.
+    async function seedLinkCollection(ownerId: string | null, title: string, description: string, position: number) {
+      const [row] = await tx<{ id: string }[]>`INSERT INTO link_collections (owner_id, title, description, position)
+        VALUES (${ownerId}, ${title}, ${description}, ${position}) RETURNING id`;
+      await recordAudit(tx, ownerId ?? mainTeacherId, `demo_seed.links.collection.${ownerId ? "personal" : "school"}.created`, "link_collections", row!.id, requestId());
+      return row!.id;
+    }
+    async function seedLinkItems(collectionId: string, items: readonly (readonly [string, string, string])[]) {
+      for (const [index, [title, url, description]] of items.entries()) {
+        const [row] = await tx<{ id: string }[]>`INSERT INTO link_items (collection_id, title, url, description, position)
+          VALUES (${collectionId}, ${title}, ${url}, ${description}, ${index}) RETURNING id`;
+        await recordAudit(tx, mainTeacherId, "demo_seed.links.item.created", "link_items", row!.id, requestId());
+      }
+    }
+    const [schoolCollection] = await tx<{ id: string }[]>`SELECT id FROM link_collections WHERE owner_id IS NULL AND title = 'Tautan Sekolah'`;
+    await seedLinkItems(schoolCollection!.id, [
+      ["Web Official", "https://hsiboardingschool.sch.id/home", "Situs resmi sekolah."],
+      ["Instagram", "https://www.instagram.com/hsiboardingschool", "Akun Instagram resmi sekolah."],
+      ["Youtube", "https://www.youtube.com/@hsiboardingschool/featured", "Kanal Youtube resmi sekolah."],
+      ["Facebook Page", "https://web.facebook.com/people/HSI-Boarding-School/61586171438715", "Halaman Facebook resmi sekolah."],
+      ["Info PSB (Penerimaan Santri Baru)", "https://app.hsiboardingschool.id/public/smart-link", "Informasi dan jalur pendaftaran santri baru."],
+      ["Panduan Spek Laptop Calon Santri", "https://taap.it/y-dev", "Spesifikasi laptop yang disarankan untuk calon santri."],
+      ["Akses HiBro App", "https://app.hsiboardingschool.id/", "Aplikasi HiBro untuk operasional sekolah sehari-hari."],
+    ]);
+    const systemCollectionId = await seedLinkCollection(null, "Sistem Pembelajaran IT", "Aplikasi yang dipakai sehari-hari untuk mengajar dan belajar IT.", 1);
+    await seedLinkItems(systemCollectionId, [
+      ["Journal Mengajar Sekolah via HiBro App", "https://app.hsiboardingschool.id/jurnal/input/56EReIm0e0W5IOcz37tHVXAEqm0rwKeQ", "Input jurnal mengajar harian."],
+      ["Yahoot Quiz (Kahoot Clone)", "https://yahoot.hsibs.my.id/", "Kuis interaktif ala Kahoot untuk kelas."],
+      ["NotebookLM Pemrograman Javascript", "https://notebook.google.com/notebook/1b241e53-286c-4230-bb23-2e6d2f37664f?authuser=0&pli=1", "Catatan belajar NotebookLM untuk materi Javascript."],
+    ]);
+    // Coders Club's own sheets live here too rather than in a separate collection — one
+    // less near-empty collection to scroll past.
+    const progressCollectionId = await seedLinkCollection(null, "Progress & Laporan Kelas", "Rekap nilai, progres, dan hasil survei tiap kelas, termasuk Coders Club.", 2);
+    await seedLinkItems(progressCollectionId, [
+      ["Progress HSIBS Kelas X", "https://docs.google.com/spreadsheets/d/10SFPDdycA030t7dCMJGXDP99bS115aGH/edit?gid=2037254346#gid=2037254346", "Rekap progres belajar kelas X."],
+      ["Penilaian Tugas Liburan Kelas XI", "https://docs.google.com/spreadsheets/d/1MLiZoBhJzutEUNnYMldblDpzIC07j2LO/edit?usp=sharing&ouid=107408502617997640762&rtpof=true&sd=true", "Penilaian tugas liburan kelas XI."],
+      ["Response Feedback Pembelajaran IT - Kelas XI", "https://docs.google.com/spreadsheets/d/1dC9u9ZyQPUehOHjix2eXHn6fLBpnHJ_3duN47L8mM2g/edit?usp=sharing", "Hasil umpan balik pembelajaran IT kelas XI."],
+      ["Responses Profiling Kompetensi IT Santri Kelas XI", "https://docs.google.com/spreadsheets/d/1f_8_zGk13JHS1K-OqbZfwV2GM75ZWCBuT3pF6DUH90I/edit?usp=sharing", "Hasil profiling kompetensi IT santri kelas XI."],
+      ["Responses Profiling Kompetensi IT Santri Kelas X", "https://docs.google.com/spreadsheets/d/1q2Kl0-Ajfk1EdYr-kB01gPHtnMwMO-ayEquXkoB5AQs/edit?usp=sharing", "Hasil profiling kompetensi IT santri kelas X."],
+      ["Response Survei Coders Club", "https://docs.google.com/spreadsheets/d/16fyfvFTpWGDMFOY9D_HfYpAPl4_7etLWz2LzQhRzJW8/edit?usp=sharing", "Hasil survei anggota Coders Club."],
+      ["Response JS Weekly Challenge 1", "https://docs.google.com/spreadsheets/d/1qTR8WcaF0HwBVU0SXIx33x-HXEM-bO7PVB1dmUrJ_w4/edit?usp=sharing", "Jawaban tantangan mingguan Javascript pekan 1."],
+      ["Response JS Weekly Challenge 2", "https://docs.google.com/spreadsheets/d/1afcD6Eka0ChjUcs37XvEz36q1P77AWyR3Jk_FhmpP5E/edit?usp=sharing", "Jawaban tantangan mingguan Javascript pekan 2."],
+      ["Response JS Monthly Challenge 1", "https://docs.google.com/spreadsheets/d/1zL1MRmzcNSGlVfiBRuJxy2QXqn9L_OB5cNvW7SS8-qo/edit?usp=sharing", "Jawaban tantangan bulanan Javascript ke-1."],
+    ]);
+    // A personal collection owned by a teacher shows the personal scope working, not just school-wide data.
+    const personalCollectionId = await seedLinkCollection(mainTeacherId, "Favorit Saya", "Akses cepat pribadi yang paling sering saya buka.", 0);
+    await seedLinkItems(personalCollectionId, [
+      ["Akses HiBro App", "https://app.hsiboardingschool.id/", "Pintasan pribadi ke aplikasi HiBro."],
+      ["Yahoot Quiz (Kahoot Clone)", "https://yahoot.hsibs.my.id/", "Pintasan pribadi ke kuis interaktif kelas."],
+      ["NotebookLM Pemrograman Javascript", "https://notebook.google.com/notebook/1b241e53-286c-4230-bb23-2e6d2f37664f?authuser=0&pli=1", "Catatan belajar pribadi untuk materi Javascript."],
+    ]);
+
     // --- Academic calendar ---------------------------------------------------------------
     // The demo seeds no administrator, so school-wide events are attributed to a teacher.
     // Only capabilities decide who may edit them, so an administrator still gets the full
@@ -1184,7 +1380,8 @@ async function main() {
     const meetingAt = withinReminderWindow(19, 9);
     await seedEvent("Rapat Wali Santri Semester Ganjil", "Penyampaian laporan perkembangan santri kepada wali santri di aula.",
       meetingAt, new Date(meetingAt.getTime() + 2 * 3600000), null);
-    await seedEvent("Praktikum Bersama: Debugging JavaScript", "Praktikum tambahan di laboratorium komputer untuk kelas ini.", wib(3, 13), wib(3, 15), courses[0]!.id);
+    const nextXClassAt = nextWeekday(13);
+    await seedEvent("Praktikum Bersama: Digital Creator Foundation", "Praktikum tambahan kelas X pada jadwal belajar reguler, pukul 13.00–14.30 WIB.", nextXClassAt, new Date(nextXClassAt.getTime() + 90 * 60000), courses[0]!.id);
     await seedEvent("Libur Maulid Nabi", "Tidak ada kegiatan belajar mengajar.", wib(30, 0), wib(30, 23), null);
     await seedEvent("Ujian Akhir Semester Ganjil", "Pekan ujian akhir semester untuk seluruh tingkat.", wib(80, 7), wib(87, 12), null);
 
@@ -1251,7 +1448,7 @@ async function main() {
   // Part of the inbox has already been read, so the unread filter shows a real difference.
   await db`UPDATE notifications SET read_at = clock_timestamp()
     WHERE status = 'delivered' AND read_at IS NULL AND left(md5(id::text), 1) IN ('0', '1', '2', '3', '4')`;
-  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number; clubs: number; clubMembers: number; clubTracks: number; clubGroups: number; groupMembers: number }[]>`SELECT
+  const [totals] = await db<{ xp: number; badges: number; sessions: number; records: number; events: number; clubs: number; clubMembers: number; clubTracks: number; clubGroups: number; groupMembers: number; linkCollections: number; linkItems: number }[]>`SELECT
     (SELECT COALESCE(sum(points), 0)::int FROM xp_entries) AS xp, (SELECT count(*)::int FROM badge_awards) AS badges,
     (SELECT count(*)::int FROM classroom_sessions) AS sessions, (SELECT count(*)::int FROM attendance_records) AS records,
     (SELECT count(*)::int FROM academic_events) AS events,
@@ -1259,7 +1456,9 @@ async function main() {
     (SELECT count(*)::int FROM club_members WHERE removed_at IS NULL AND role = 'member') AS "clubMembers",
     (SELECT count(*)::int FROM club_tracks WHERE archived_at IS NULL) AS "clubTracks",
     (SELECT count(*)::int FROM club_groups WHERE archived_at IS NULL) AS "clubGroups",
-    (SELECT count(*)::int FROM club_group_members WHERE removed_at IS NULL) AS "groupMembers"`;
+    (SELECT count(*)::int FROM club_group_members WHERE removed_at IS NULL) AS "groupMembers",
+    (SELECT count(*)::int FROM link_collections WHERE archived_at IS NULL) AS "linkCollections",
+    (SELECT count(*)::int FROM link_items WHERE archived_at IS NULL) AS "linkItems"`;
 
   console.log("Demo data seeded.");
   console.log(`- Academic year: ${DEMO_ACADEMIC_YEAR}, classes: ${CLASS_NAMES.join(", ")}`);
@@ -1267,10 +1466,11 @@ async function main() {
   console.log(`- Students: ${STUDENTS.length} accounts (e.g. ${STUDENTS[0]!.email})`);
   console.log(`- Shared demo password: ${DEMO_PASSWORD}`);
   console.log(`- Gamification: ${totals!.xp} XP awarded, ${totals!.badges} badges earned`);
-  console.log(`- Attendance: ${totals!.sessions} classroom sessions, ${totals!.records} attendance rows, QR check-in open on the session running now`);
+  console.log(`- Attendance: ${totals!.sessions} classroom sessions and ${totals!.records} attendance rows; regular classes follow their weekday timetable and club sessions are on Saturdays`);
   console.log(`- Calendar: ${totals!.events} academic events; notifications ${generated} generated, ${delivered} delivered, ${suppressed} suppressed by preference`);
   console.log(`- Clubs: ${totals!.clubs} klub aktif (Coders, Builders, Multimedia) dengan ${totals!.clubMembers} keanggotaan santri; sebagian santri mengikuti dua klub`);
   console.log(`- Coders Club: ${totals!.clubTracks} track belajar (Olympiad, Product) dan ${totals!.clubGroups} kelompok bimbingan berisi ${totals!.groupMembers} santri; dua santri kelas XI mendampingi kelompok pemula sekaligus dibimbing guru`);
+  console.log(`- Tautan: ${totals!.linkCollections} koleksi (3 sekolah, 1 pribadi) berisi ${totals!.linkItems} tautan nyata sekolah`);
   console.log("- Reports derive from the data above; an administrator sees every course, a teacher only the ones they teach.");
   console.log("Bootstrap an administrator separately with `bun run db:bootstrap-admin` if one does not exist yet.");
 }
