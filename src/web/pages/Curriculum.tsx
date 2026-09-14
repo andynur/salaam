@@ -54,18 +54,18 @@ function GradeView({ summary, canManage, revision, onExpired, changed }: { summa
   const theme = (semester: CurriculumSemester) => summary.semesters.find(item => item.semester === semester)?.theme ?? "";
   const panel = `curriculum-manage-${summary.grade}`;
   return <>
-    <Card className="curriculum-intro">
+    <Card className={`curriculum-intro grade-accent-${summary.grade.toLowerCase()}`}>
       <div className="curriculum-intro-main">
         <div>
-          <span className="summary-label">Kelas {summary.grade}</span>
+          <span className="badge curriculum-grade-label">Kelas {summary.grade}</span>
           <h2>{summary.program}</h2>
           {summary.goal && <p>{summary.goal}</p>}
         </div>
         {canManage && <Button className="button-secondary button-small" aria-expanded={managing} aria-controls={panel} onClick={() => setManaging(value => !value)}><Icon name="edit" />{managing ? "Tutup" : "Kelola kelas"}</Button>}
       </div>
-      <div className="badge-group">
+      <div className="curriculum-intro-meta">
         {summary.published ? <span className="badge badge-success">Terbit</span> : <span className="badge badge-draft">Belum terbit</span>}
-        {summary.semesters.filter(item => item.theme).map(item => <span key={item.semester} className="badge">Semester {item.semester} · {item.theme}</span>)}
+        {summary.semesters.filter(item => item.theme).map(item => <span key={item.semester} className="curriculum-semester-meta">Semester {item.semester} · {item.theme}</span>)}
       </div>
     </Card>
     {managing && <div id={panel}><Card className="admin-form-card">

@@ -330,8 +330,8 @@
   .segmented-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--color-neutral); color: var(--color-subtle); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
   .segmented-option.is-active .segmented-count { background: var(--color-blue); color: var(--color-surface); }
 
-  .course-tile.catalog-tile { position: relative; overflow: hidden; border-top: 3px solid var(--grade-accent, var(--color-border)); transition: border-color .15s, background .15s, transform .15s, box-shadow .15s; }
-  .course-tile.catalog-tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px color-mix(in srgb, var(--color-navy) 12%, transparent); border-top-color: var(--grade-accent, var(--color-blue)); }
+  .course-tile.catalog-tile { position: relative; overflow: hidden; transition: border-color .15s, background .15s, transform .15s, box-shadow .15s; }
+  .course-tile.catalog-tile:hover { transform: translateY(-3px); box-shadow: 0 10px 24px color-mix(in srgb, var(--color-navy) 12%, transparent); }
   .catalog-tile p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .catalog-tile .course-open .icon { transition: transform .15s; }
   .catalog-tile:hover .course-open .icon { transform: translateX(4px); }
@@ -1357,6 +1357,11 @@
   .curriculum-tab { display: inline-flex; align-items: center; gap: 6px; }
   .curriculum-help { margin: -8px 0 16px; color: var(--color-muted); font-size: 13px; }
   .curriculum-intro { display: grid; gap: 12px; margin-bottom: 16px; padding: 16px 20px; }
+  .curriculum-intro.grade-accent-x, .curriculum-intro.grade-accent-xi { border-left: 3px solid var(--grade-accent); }
+  .curriculum-grade-label { background: var(--grade-accent, var(--color-navy)); color: var(--color-surface); }
+  .grade-accent-xii .curriculum-grade-label { color: var(--color-navy); }
+  .curriculum-intro-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .curriculum-semester-meta { color: var(--color-subtle); font-size: 12px; overflow-wrap: anywhere; }
   .curriculum-intro-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .curriculum-intro h2 { margin-top: 2px; font-size: 18px; font-weight: 600; }
   .curriculum-intro p { margin-top: 4px; max-width: 80ch; color: var(--color-subtle); font-size: 14px; }

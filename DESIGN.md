@@ -336,8 +336,10 @@ adding a near-duplicate.
   - Course list: `.segmented` pill filters with `.segmented-count` (grade here, session
     status on the session list) sit in their own row under the card heading, without a
     grey band; the active pill uses the tab/badge blue (`--color-blue-soft` ground,
-    `--color-blue` border, text, and count), grade-accented `.catalog-tile` with
-    `.course-avatar-x|xi|xii`, and `.grade-chip`. This catalog is the shared
+    `--color-blue` border, text, and count), neutral-bordered `.catalog-tile` with
+    `.course-avatar-x|xi|xii`, and neutral `.grade-chip` class tags. Class X/XI initials use
+    solid blue/green backgrounds with white text; group labels are plain headings and the
+    card surface stays white. This catalog is the shared
     `CourseCatalog` in `components/courses.tsx`, used by Pembelajaran and Kehadiran; only
     Pembelajaran turns on the three full-width `.catalog-stats` counters. Kehadiran passes a
     `badge` so each tile shows its live session, the next session ("Besok, 08.00"), or
@@ -404,7 +406,9 @@ adding a near-duplicate.
 - **Curriculum map**: `Curriculum.tsx` reuses `.tabs`, `.summary-grid`/`.stat-card`,
   `.report-filter-card`/`.report-filters`, `.admin-form-card`, `.task-body`, lozenges, and the
   form kit. New here: `.curriculum-tab` (a tab with a trailing "Segera hadir" lozenge),
-  `.curriculum-intro` (program card), `.curriculum-semester` with `.curriculum-phases` of
+  `.curriculum-intro` (program card; class X/XI reuse `.grade-accent-x|xi` for a 3px left
+  accent on white, a solid `.curriculum-grade-label`, and plain wrapping semester
+  metadata in `.curriculum-intro-meta`; publication remains a status badge), `.curriculum-semester` with `.curriculum-phases` of
   `.curriculum-phase-chip` toggle buttons (`aria-pressed`), `.curriculum-phase` groups, and
   `.curriculum-week` disclosure rows (`.curriculum-week-toggle` with `aria-expanded`, the
   `.curriculum-week-number` tile turning gold for `.is-milestone`, and
