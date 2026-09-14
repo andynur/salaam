@@ -51,6 +51,9 @@ export async function loginInput(request: Request): Promise<{ email: string; pas
 
 export function createHttpHandler(config: Config, auth: AuthService, ready: () => Promise<void>, services?: { foundation: FoundationHandler; dashboard: (actor: Actor) => Promise<unknown>; learning?: LearningHandler; projects?: ProjectHandler; gamification?: GamificationHandler; attendance?: AttendanceHandler; reports?: ReportingHandler; calendar?: CalendarHandler; share?: ShareHandler; clubs?: ClubHandler; curriculum?: CurriculumHandler; links?: LinksHandler }) {
   const limiter = new LoginLimiter();
+  // A classroom shares a proxy/NAT address. Keep a coarse source budget plus account limits.
+  // Forwarded headers remain untrusted; they cannot bypass either budget.
+  const sourceLimiter = new LoginLimiter(300);
   let activeLogins = 0;
   return async (request: Request, ip = "unknown"): Promise<Response> => {
     const requestId = crypto.randomUUID();
@@ -67,11 +70,12 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
         response = Response.json({ status: "ready" });
       } else if (path === "/api/auth/login" && method === "POST") {
         requireSameOrigin(request, config);
-        limiter.consume(ip);
+        sourceLimiter.consume(ip);
         if (activeLogins >= 2) throw new HttpError(429, "BUSY", "Layanan sedang sibuk. Silakan coba kembali.");
         activeLogins++;
         try {
           const input = await loginInput(request);
+          limiter.consume(`login:${input.email}`);
           response = await auth.login(input.email, input.password, request, requestId);
         } finally { activeLogins--; }
       } else if (path === "/api/auth/logout" && method === "POST") {
@@ -81,8 +85,10 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
         response = Response.json(await auth.account(request));
       } else if (path === "/api/auth/password" && method === "POST") {
         requireSameOrigin(request, config);
-        // Shares the login throttle and concurrency cap: both verify an Argon2id hash.
-        limiter.consume(`password:${ip}`);
+        sourceLimiter.consume(ip);
+        const actor = await auth.actor(request);
+        if (!actor) throw new HttpError(401, "UNAUTHENTICATED", "Silakan masuk untuk melanjutkan.");
+        limiter.consume(`password:${actor.id}`);
         if (activeLogins >= 2) throw new HttpError(429, "BUSY", "Layanan sedang sibuk. Silakan coba kembali.");
         activeLogins++;
         try { response = Response.json(await auth.changePassword(request, await jsonObject(request), requestId)); }

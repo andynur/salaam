@@ -14,9 +14,14 @@ approval of privacy and retention policies are still open.
 - The cookie is `HttpOnly; SameSite=Lax; Path=/` with `Max-Age`, plus `Secure` in
   production. Login issues a new token and removes the user's expired sessions; logout
   revokes the session. Tokens never go to `localStorage`.
-- Login allows 10 attempts per socket IP per 15 minutes and at most two concurrent password
-  checks. Behind a proxy every client shares one address, so configure per-client
-  throttling at the proxy; forwarded IP headers are not trusted.
+- Login allows 10 attempts per normalized email per 15 minutes, across source addresses,
+  and at most two concurrent password checks. Login and password changes share a coarse
+  budget of 300 requests per socket IP per 15 minutes; behind a proxy this budget is
+  shared by the school. Successful attempts count too. Forwarded IP headers are not
+  trusted. Password changes have a separate 10-attempt budget per authenticated user.
+  The source budget also counts malformed and busy requests; the login account budget
+  counts validated requests admitted to the password-verification path. External
+  per-client throttling may supplement this policy without replacing account protection.
 - An administrator with `admin.users.manage` recovers a locked-out account by setting a new
   password (`POST /api/admin/users/:id/password`, 12–128 characters). The new hash and the
   deletion of **every** session of that account happen in one transaction, so a stolen or

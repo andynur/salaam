@@ -50,3 +50,35 @@ test("login validates JSON and normalizes email", async () => {
   }
   await expect(loginInput(request("{}", "text/plain"))).rejects.toThrow("JSON");
 });
+
+const loginRequest = (email: string, forwarded = "203.0.113.1") => new Request(`${config.baseUrl}/api/auth/login`, {
+  method: "POST", headers: { origin: config.baseUrl, "content-type": "application/json", "x-forwarded-for": forwarded },
+  body: JSON.stringify({ email, password: "test-password" }),
+});
+test("125 students behind one proxy have independent login budgets", async () => {
+  const handle = createHttpHandler(config, auth, async () => {});
+  for (let i = 0; i < 125; i++) expect((await handle(loginRequest(`student${i}@example.com`), "127.0.0.1")).status).toBe(200);
+});
+test("account throttle follows normalized email across source addresses and spoofed headers", async () => {
+  const handle = createHttpHandler(config, auth, async () => {});
+  for (let i = 0; i < 10; i++) expect((await handle(loginRequest("STUDENT@example.com"), `203.0.113.${i}`)).status).toBe(200);
+  expect((await handle(loginRequest(" student@example.com ", "192.0.2.2"), "192.0.2.1")).status).toBe(429);
+  expect((await handle(loginRequest("other@example.com"), "192.0.2.1")).status).toBe(200);
+});
+test("source throttle bounds attempts across accounts and ignores forwarded headers", async () => {
+  const handle = createHttpHandler(config, auth, async () => {});
+  for (let i = 0; i < 300; i++) expect((await handle(loginRequest(`student${i}@example.com`, `192.0.2.${i % 250}`), "127.0.0.1")).status).toBe(200);
+  expect((await handle(loginRequest("another@example.com", "198.51.100.1"), "127.0.0.1")).status).toBe(429);
+});
+test("password verification remains limited to two concurrent logins", async () => {
+  let release!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const handle = createHttpHandler(config, { ...auth, login: async () => { await blocked; return Response.json({ ok: true }); } }, async () => {});
+  const first = handle(loginRequest("one@example.com"));
+  const second = handle(loginRequest("two@example.com"));
+  try {
+    expect((await handle(loginRequest("three@example.com"))).status).toBe(429);
+  } finally { release(); }
+  expect((await first).status).toBe(200);
+  expect((await second).status).toBe(200);
+});
