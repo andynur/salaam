@@ -46,15 +46,23 @@ function EventDetail({ id, actor, onExpired }: { id: string; actor: Actor; onExp
   const [snapshot, setSnapshot] = useState<CalendarEntry | null>(null);
   return <><PageHeader title="Acara akademik" breadcrumbs={[{ label: "Kalender", href: "/calendar" }]} description="Waktu ditampilkan dalam WIB." />
     {view.error ? <ErrorState message={view.error} retry={view.retry} /> : !view.data ? <LoadingState /> : <>
-      {edit && snapshot ? <EventEditor actor={actor} entry={snapshot} onExpired={onExpired} cancel={() => setEdit(false)} saved={() => { setEdit(false); setRevision(r => r + 1); }} /> : <Card className="lesson-card">
-        <div className="card-heading"><h2>{view.data.title}</h2><span className="badge">{view.data.courseName ?? "Seluruh sekolah"}</span></div>
-        <p>{display(view.data.startsAt)} – {display(view.data.endsAt)}</p><p className="calendar-description">{view.data.description || "Tidak ada keterangan tambahan."}</p>
-        {view.data.canManage && <div className="form-actions"><Button aria-expanded={edit} aria-controls="event-editor" onClick={() => { setSnapshot(view.data); setEdit(true); setArchive(false); }}>Ubah acara</Button>
-          <Button className="button-secondary" aria-expanded={archive} aria-controls="archive-event" onClick={() => { setSnapshot(view.data); setArchive(true); }}>Arsipkan acara</Button></div>}
+      {edit && snapshot ? <EventEditor actor={actor} entry={snapshot} onExpired={onExpired} cancel={() => setEdit(false)} saved={() => { setEdit(false); setRevision(r => r + 1); }} /> : <Card className="lesson-card calendar-event-card">
+        <div className="card-heading"><div className="calendar-event-heading"><span className="calendar-event-icon" aria-hidden="true"><Icon name="calendar" size={18} /></span><h2>{view.data.title}</h2></div><span className="badge">{view.data.courseName ?? "Seluruh sekolah"}</span></div>
+        <div className="calendar-event-content">
+          <p className="calendar-event-meta"><Icon name="timer" size={16} /><span>{display(view.data.startsAt)} – {display(view.data.endsAt)}</span></p>
+          <div className="calendar-event-body"><h3 className="calendar-event-label"><Icon name="info" size={14} />Keterangan</h3>
+            <p className="calendar-description">{view.data.description || "Tidak ada keterangan tambahan."}</p>
+          </div>
+          {view.data.canManage && <div className="form-actions"><Button aria-expanded={edit} aria-controls="event-editor" onClick={() => { setSnapshot(view.data); setEdit(true); setArchive(false); }}><Icon name="edit" size={16} />Ubah acara</Button>
+            <Button className="button-secondary" aria-expanded={archive} aria-controls="archive-event" onClick={() => { setSnapshot(view.data); setArchive(true); }}><Icon name="archive" size={16} />Arsipkan acara</Button></div>}
+        </div>
       </Card>}
-      {archive && snapshot && <Card className="lesson-card" ><div id="archive-event"><h2>Arsipkan acara ini?</h2><p>Acara tidak lagi tampil di kalender atau notifikasi.</p>
+      {archive && snapshot && <Card className="lesson-card calendar-event-card"><div id="archive-event" className="calendar-event-content">
+        <div className="calendar-event-heading"><span className="calendar-event-icon calendar-event-icon-danger" aria-hidden="true"><Icon name="archive" size={18} /></span><h2>Arsipkan acara ini?</h2></div>
+        <p className="calendar-description">Acara tidak lagi tampil di kalender atau notifikasi.</p>
         <MutationForm path={`/api/calendar/events/${id}`} method="PATCH" label="Ya, arsipkan" body={() => ({ action: "archive", version: snapshot.version })} saved={() => location.assign("/calendar")} onExpired={onExpired} />
-        <Button className="button-secondary" onClick={() => setArchive(false)}>Batal</Button></div></Card>}
+        <Button className="button-secondary" onClick={() => setArchive(false)}><Icon name="close" size={16} />Batal</Button>
+      </div></Card>}
     </>}
   </>;
 }

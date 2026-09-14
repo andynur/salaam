@@ -199,6 +199,10 @@ document as one standalone, script-free HTML page under `/share/lessons/:slug`; 
 - Pages live in `pages/`. UI primitives are in `components/ui.tsx`, the data and form kit in
   `components/learning.tsx`, project widgets in `components/projects.tsx`, and icons in
   `components/icons.tsx`.
+- `pages/Dashboard.tsx` selects an admin, teacher, Asisten Mentor, or student experience by
+  role precedence, then filters every quick action by capability. The role only changes the
+  presentation; the existing scoped dashboard queries and server authorization remain
+  authoritative.
 - `lib/api.ts` wraps `fetch` with same-origin credentials and surfaces the server's
   Indonesian error message. Exam answers made offline are queued in `localStorage` under
   `salaam:attempt:<id>`.

@@ -37,7 +37,7 @@ export function Search({ change }: { change: (q: string) => void }) {
 }
 export function Status({ published }: { published: boolean }) { return <span className={`badge ${published ? "badge-success" : "badge-draft"}`}>{published ? "Terbit" : "Draft"}</span>; }
 
-export function MutationForm({ path, label, body, saved, onExpired, children, method = "POST", disabled = false }: { path: string; label: string; body: (form: FormData) => unknown; saved: () => void; onExpired: () => void; children?: ReactNode; method?: string; disabled?: boolean }) {
+export function MutationForm({ path, label, body, saved, onExpired, children, method = "POST", disabled = false, cancel }: { path: string; label: string; body: (form: FormData) => unknown; saved: () => void; onExpired: () => void; children?: ReactNode; method?: string; disabled?: boolean; cancel?: () => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const saving = useRef(false);
@@ -55,7 +55,7 @@ export function MutationForm({ path, label, body, saved, onExpired, children, me
     } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setError(errorMessage(cause)); }
     finally { saving.current = false; setPending(false); }
   }
-  return <form className="learning-form" onSubmit={event => void submit(event)}><fieldset className="admin-fields" disabled={pending || disabled}>{children}<div className="form-actions"><Button type="submit" disabled={pending || disabled}>{pending ? "Menyimpan…" : label}</Button></div></fieldset>{error && <ErrorState message={error} />}</form>;
+  return <form className="learning-form" onSubmit={event => void submit(event)}><fieldset className="admin-fields" disabled={pending || disabled}>{children}<div className="form-actions"><Button type="submit" disabled={pending || disabled}>{pending ? "Menyimpan…" : label}</Button>{cancel && <Button type="button" className="button-secondary" disabled={pending} onClick={cancel}>Batal</Button>}</div></fieldset>{error && <ErrorState message={error} />}</form>;
 }
 export function Field({ label, name, value = "", area = false, type = "text", required = true, max = 150, min, step }: { label: string; name: string; value?: string | number | undefined; area?: boolean; type?: string; required?: boolean; max?: number; min?: number; step?: string }) {
   return <label className={`learning-field ${area ? "field-wide" : ""}`}><span>{label}</span>{area ? <textarea className="input" name={name} required={required} maxLength={max} defaultValue={value} rows={5} /> : <input className="input" name={name} required={required} maxLength={type === "text" ? max : undefined} type={type} defaultValue={value} min={min} max={type === "number" ? max : undefined} step={step} />}</label>;

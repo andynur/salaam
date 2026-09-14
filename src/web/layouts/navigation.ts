@@ -18,15 +18,15 @@ export function navigationFor(actor: Actor) {
   const isStudent = actor.roles.includes("student") && !actor.roles.some(role => role === "admin" || role === "teacher");
   const main = [
     item("/dashboard", "Dashboard", "dashboard", exact("/dashboard")),
+    ...(can("learning.view") ? [
+      item("/learning", "Pembelajaran", "book"),
+      item("/attendance", "Kehadiran", "attendance"),
+      item("/projects", "Projects", "board"),
+      item("/curriculum", "Kurikulum", "route", exact("/curriculum")),
+    ] : []),
     ...(can("dashboard:view") ? [item("/calendar", "Kalender", "calendar", exact("/calendar"))] : []),
     ...(can("reports.view") ? [item("/reports", "Laporan", "chart")] : []),
   ];
-  const learning = can("learning.view") ? [
-    item("/learning", "Pembelajaran", "book"),
-    item("/curriculum", "Kurikulum", "route", exact("/curriculum")),
-    item("/attendance", "Kehadiran", "attendance"),
-    item("/projects", "Projects", "board"),
-  ] : [];
   const growth = [
     ...(can("learning.view") ? [item("/gamification", "Pertumbuhan", "star")] : []),
     ...(can("links.view") ? [item("/links", "Tautan", "link")] : []),
@@ -39,7 +39,6 @@ export function navigationFor(actor: Actor) {
   ];
   const groups: NavGroup[] = [
     { id: "main", items: main },
-    { id: "learning", label: "Belajar", items: learning },
     { id: "growth", label: "Pembinaan", items: growth },
     { id: "admin", label: "Administrasi", items: admin },
   ].filter(group => group.items.length > 0);

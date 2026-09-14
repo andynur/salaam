@@ -63,6 +63,17 @@ export function Shell({ actor, timezone, onLogout, onExpired, pending, children 
     addEventListener("keydown", escape);
     return () => removeEventListener("keydown", escape);
   }, [drawerOpen]);
+  useEffect(() => {
+    const body = document.body;
+    const cls = "is-sidebar-open";
+    if (drawerOpen && mobile) {
+      body.classList.add(cls);
+      return () => body.classList.remove(cls);
+    } else {
+      body.classList.remove(cls);
+    }
+  }, [drawerOpen, mobile]);
+  useEffect(() => () => document.body.classList.remove("is-sidebar-open"), []);
 
   function toggleSidebar() {
     if (mobile) { setDrawerOpen(!drawerOpen); return; }
@@ -109,7 +120,13 @@ export function Shell({ actor, timezone, onLogout, onExpired, pending, children 
           <ul id="nav-future" hidden={!futureOpen}>{future.map(item => <li key={item.label}><span className="nav-item nav-item-disabled" aria-disabled="true"><Icon name={item.icon} size={20} /><span>{item.label}</span><span className="nav-soon">Segera</span></span></li>)}</ul>
         </div>}
       </nav>
-      <p className="sidebar-footer"><span className="gold-dot" aria-hidden="true" />{BRAND.tagline}</p>
+      <footer className="sidebar-footer" aria-label="Footer sidebar">
+        <div className="sidebar-footer-tagline" role="note">
+          <span className="gold-dot" aria-hidden="true" />
+          <span>{BRAND.tagline}</span>
+        </div>
+        <p className="sidebar-footer-copy">&copy; {new Date().getFullYear()} {BRAND.name}</p>
+      </footer>
     </aside>
     {drawerOpen && <div className="sidebar-backdrop" aria-hidden="true" onClick={() => setDrawerOpen(false)} />}
     <main id="main" className="main-content" tabIndex={-1}>{children}</main>

@@ -44,6 +44,7 @@ Coding agents follow skill `deliver-phase`.
 | 34 | Curriculum map | Delivered — [record](phases/34-curriculum-map.md) |
 | 36 | Navigation, account page, and administration layout | Delivered — [record](phases/36-navigation-account.md) |
 | 37 | Attendance agenda | Delivered — [record](phases/37-attendance-agenda.md) |
+| 38 | Role-specific dashboard | Delivered — [record](phases/38-role-specific-dashboard.md) |
 
 ## Delivered
 
@@ -149,6 +150,12 @@ append-only corrections.
 
 Written assessment questions can carry bounded criteria. Teachers grade each criterion and the
 system stores the breakdown with the append-only manual grade history.
+
+### Phase 38 — Role-specific dashboard
+
+The shared dashboard becomes a focused workspace for administrators, teachers, Asisten
+Mentor, and students. Each role gets relevant KPIs, priority language, empty states, and
+capability-filtered quick actions while reusing the existing scoped dashboard data.
 
 ## Planned
 

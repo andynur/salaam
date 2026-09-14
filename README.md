@@ -64,6 +64,7 @@ environment-specific validation.
 | 30 — QR check-in import | Verified offline scan import with issued-code validation and idempotent batches | [Phase 30](docs/phases/30-qr-checkin-import.md) |
 | 31 — Student-visible leaderboard | Current-class student ranking with server-enforced scope | [Phase 31](docs/phases/31-student-leaderboard.md) |
 | 32 — Club management | Club directory and workspace (Coders, Builders, Multimedia) orchestrating existing learning, project, attendance and growth surfaces, with administrator CRUD and archive | [Phase 32](docs/phases/32-club-management.md) |
+| 38 — Role-specific dashboard | Focused KPIs, priority queues, empty states, and capability-filtered quick actions for administrators, teachers, Asisten Mentor, and students | [Phase 38](docs/phases/38-role-specific-dashboard.md) |
 
 Each record describes the user workflow, API, verified behavior, and out-of-scope items.
 The next milestone is **local-server migration planning**, subject to measured operational

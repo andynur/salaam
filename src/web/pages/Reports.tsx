@@ -73,8 +73,8 @@ function Overview({ scope, onExpired }: { scope: ReportScope; onExpired: () => v
       <span className={`stat-icon ${stat.tone}`} aria-hidden="true"><Icon name={stat.icon} size={20} /></span>
       <div><span className="summary-label">{stat.label}</span><strong className="summary-value">{stat.value}</strong><p>{stat.hint}</p></div>
     </Card>)}</div>
-    <Card><div className="card-heading"><h2>Angka operasional</h2></div>
-      <p className="card-hint">Dihitung dari data pembelajaran, penilaian, kehadiran, dan proyek dalam cakupan filter.</p>
+    <Card className="report-operational-card"><div className="card-heading"><h2>Angka operasional</h2></div>
+      <p className="card-hint report-hint">Dihitung dari data pembelajaran, penilaian, kehadiran, dan proyek dalam cakupan filter.</p>
       <ul className="report-metrics">{rates.map(rate => <li key={rate.label}><span className="summary-label">{rate.label}</span><strong>{rate.value}</strong></li>)}</ul>
     </Card>
     <TrendChart scope={scope} onExpired={onExpired} />
@@ -88,7 +88,7 @@ function TrendChart({ scope, onExpired }: { scope: ReportScope; onExpired: () =>
   const maxCount = Math.max(1, ...data.map(point => Math.max(point.lessonCompletions, point.submissions)));
   return <Card className="report-trend-card">
     <div className="card-heading"><h2>Tren 12 minggu</h2></div>
-    <p className="card-hint">Aktivitas yang tercatat per minggu dalam cakupan filter. Minggu tanpa aktivitas tetap ditampilkan.</p>
+    <p className="card-hint report-hint">Aktivitas yang tercatat per minggu dalam cakupan filter. Minggu tanpa aktivitas tetap ditampilkan.</p>
     <div className="trend-legend" aria-hidden="true"><span><i className="trend-key trend-key-attendance" />Kehadiran</span><span><i className="trend-key trend-key-completion" />Lesson selesai</span><span><i className="trend-key trend-key-submission" />Tugas dikumpulkan</span></div>
     <ol className="trend-chart" aria-label="Tren kehadiran, penyelesaian lesson, dan pengumpulan tugas selama 12 minggu">
       {data.map(point => <li className="trend-week" key={point.week}>

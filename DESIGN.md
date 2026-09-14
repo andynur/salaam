@@ -256,6 +256,15 @@ adding a near-duplicate.
   `.page-header-text`, `.page-actions`), `.date-label`.
 - **Dashboard**: `.summary-grid` of `.stat-card`s (`.stat-icon` + `.stat-blue` /
   `.stat-purple` / `.stat-gold`, `.summary-label`, `.summary-value`), `.dashboard-grid`.
+  The role-specific header combines the role lozenge and date in
+  `.dashboard-header-actions`. `.quick-action-grid` holds capability-filtered
+  `.quick-action` links with `.quick-action-icon` and `.quick-action-copy` in a dedicated
+  `.dashboard-shortcuts` section: four columns on desktop, two on tablets, and horizontal
+  single-column rows on phones. Each full card is a keyboard-focusable link.
+  `.dashboard-task-filters` uses pressed-state buttons to filter loaded activity types;
+  `.dashboard-list-control` expands the initial five rows. Counts refer to activities,
+  while summary pending-work counts include grouped answers and projects.
+  `.dashboard-focus` highlights the first server-ordered task with a direct action.
 - **Empty/loading/error/messages**: `.empty-state`/`.empty-symbol`/`.empty-action`,
   `.loading-state`/`.spinner`, `.error-state`, `.success-state` (green), `.info-state`
   (blue, neutral notices such as "settings are locked").

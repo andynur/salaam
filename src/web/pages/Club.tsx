@@ -163,17 +163,19 @@ function Workspace({ clubs, club, timezone, onExpired, select, refresh }: Omit<C
       </div>} />
     <nav className="tabs" aria-label="Halaman klub">{(Object.keys(tabLabels) as Tab[]).map(key =>
       <button key={key} className={tab === key ? "tab-active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => go(key)}>{tabLabels[key]}</button>)}</nav>
-    {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState />
-      : tab === "overview" ? <Overview club={data} onExpired={onExpired} saved={saved} />
-      : tab === "learning" ? <Learning club={data} onExpired={onExpired} />
-      : tab === "sessions" ? <Sessions club={data} timezone={timezone} onExpired={onExpired} />
-      : tab === "challenges" ? <Challenges club={data} timezone={timezone} onExpired={onExpired} />
-      : tab === "projects" ? <Projects club={data} timezone={timezone} onExpired={onExpired} />
-      : tab === "members" ? <Members club={data} timezone={timezone} onExpired={onExpired} saved={saved} />
-      : tab === "groups" ? <Groups club={data} onExpired={onExpired} />
-      : <Progress club={data} onExpired={onExpired} />}
-    {data?.archived && <p className="club-note">Klub diarsipkan: isinya hanya dapat dibaca sampai administrator memulihkannya.</p>}
-    {data && !data.published && !data.archived && <p className="club-note">Klub masih draft: hanya mentor yang dapat membukanya.</p>}
+    <div className="club-tab-content">
+      {error ? <ErrorState message={error} retry={retry} /> : !data ? <LoadingState />
+        : tab === "overview" ? <Overview club={data} onExpired={onExpired} saved={saved} />
+        : tab === "learning" ? <Learning club={data} onExpired={onExpired} />
+        : tab === "sessions" ? <Sessions club={data} timezone={timezone} onExpired={onExpired} />
+        : tab === "challenges" ? <Challenges club={data} timezone={timezone} onExpired={onExpired} />
+        : tab === "projects" ? <Projects club={data} timezone={timezone} onExpired={onExpired} />
+        : tab === "members" ? <Members club={data} timezone={timezone} onExpired={onExpired} saved={saved} />
+        : tab === "groups" ? <Groups club={data} onExpired={onExpired} />
+        : <Progress club={data} onExpired={onExpired} />}
+      {data?.archived && <p className="club-note">Klub diarsipkan: isinya hanya dapat dibaca sampai administrator memulihkannya.</p>}
+      {data && !data.published && !data.archived && <p className="club-note">Klub masih draft: hanya mentor yang dapat membukanya.</p>}
+    </div>
   </>;
 }
 

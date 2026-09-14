@@ -1,11 +1,12 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { Actor } from "../../core/permissions";
 import type { Badge, GrowthSummary, LeaderboardRow, RewardRule, RewardRuleKey } from "../../shared/gamification";
 import { badgeCriteria, badgeIcons } from "../../shared/gamification";
 import type { Page } from "../../shared/learning";
 import type { ReportFilterOptions } from "../../shared/reporting";
+import { api, ApiError } from "../lib/api";
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PersonName, gradeOf, initials, personTone } from "../components/ui";
-import { Field, MutationForm, Pager, Search, formatDateTime, useData } from "../components/learning";
+import { Field, MutationForm, Pager, Search, errorMessage, formatDateTime, useData } from "../components/learning";
 import { Icon, type IconName } from "../components/icons";
 
 const ruleLabels: Record<RewardRuleKey, string> = {
@@ -173,20 +174,44 @@ function Leaderboard({ actor, onExpired }: { actor: Actor; onExpired: () => void
 
 function RewardRules({ onExpired }: { onExpired: () => void }) {
   const [revision, setRevision] = useState(0);
-  const { data, error, retry } = useData<RewardRule[]>("/api/gamification/rules", onExpired, revision);
-  if (error) return <ErrorState message={error} retry={retry} />;
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const saving = useRef(false);
+  const { data, error: loadError, retry } = useData<RewardRule[]>("/api/gamification/rules", onExpired, revision);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving.current || !data) return;
+    const form = new FormData(event.currentTarget);
+    // Only rules whose XP actually changed need a request.
+    const changed = data.filter(rule => Number(form.get(rule.key)) !== rule.points);
+    if (!changed.length) return;
+    saving.current = true; setPending(true); setError("");
+    try {
+      await Promise.all(changed.map(rule => api(`/api/gamification/rules/${rule.key}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ points: Number(form.get(rule.key)) }),
+      })));
+      setRevision(value => value + 1);
+    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) onExpired(); else setError(errorMessage(cause)); }
+    finally { saving.current = false; setPending(false); }
+  }
+  if (loadError) return <ErrorState message={loadError} retry={retry} />;
   if (!data) return <LoadingState />;
   return <Card>
     <div className="card-heading"><h2>Aturan XP</h2></div>
     <p className="card-hint">XP yang sudah tercatat tidak berubah saat aturan diubah; aturan baru berlaku untuk perolehan berikutnya.</p>
-    <ul className="task-list">{data.map(rule => <li key={rule.key}><div className="rule-row">
-      <span className="xp-row-main"><span className="xp-icon" aria-hidden="true"><Icon name={ruleIcons[rule.key]} /></span>
-        <span className="task-body"><strong>{ruleLabels[rule.key]}</strong><span className="task-meta">{rule.description}</span></span></span>
-      <MutationForm path={`/api/gamification/rules/${rule.key}`} method="PATCH" label="Simpan" onExpired={onExpired}
-        body={form => ({ points: Number(form.get("points")) })} saved={() => setRevision(value => value + 1)}>
-        <Field label="XP" name="points" type="number" value={rule.points} min={0} max={1000} step="1" />
-      </MutationForm>
-    </div></li>)}</ul>
+    <form onSubmit={event => void submit(event)}>
+      <fieldset className="rule-list" disabled={pending}>{data.map(rule => <label key={rule.key} className="rule-row">
+        <span className="rule-row-main">
+          <span className="xp-icon" aria-hidden="true"><Icon name={ruleIcons[rule.key]} /></span>
+          <span className="rule-row-text"><strong>{ruleLabels[rule.key]}</strong><span className="task-meta">{rule.description}</span></span>
+        </span>
+        <span className="rule-tile-input-group">
+          <input className="input rule-tile-input" type="number" name={rule.key} defaultValue={rule.points} min={0} max={1000} step="1" aria-label={`XP untuk ${ruleLabels[rule.key]}`} />
+          <span className="rule-tile-suffix" aria-hidden="true">XP</span>
+        </span>
+      </label>)}</fieldset>
+      <div className="form-actions rule-actions">{error && <ErrorState message={error} />}<Button type="submit" disabled={pending}>{pending ? "Menyimpan…" : "Simpan aturan XP"}</Button></div>
+    </form>
   </Card>;
 }
 
@@ -244,7 +269,7 @@ export function Growth({ actor, timezone, onExpired }: { actor: Actor; timezone:
   const tabs: { id: string; label: string; icon: IconName }[] = [
     ...(can("learning.participate") ? [{ id: "me", label: "Pertumbuhan saya", icon: "star" as const }] : []),
     ...(can("learning.manage") || can("learning.assist") || can("learning.participate") ? [{ id: "leaderboard", label: "Peringkat kelas", icon: "trophy" as const }] : []),
-    ...(can("academic.manage") ? [{ id: "rules", label: "Aturan & lencana", icon: "shield" as const }] : []),
+    ...(can("academic.manage") ? [{ id: "rules", label: "Aturan XP", icon: "shield" as const }, { id: "badges", label: "Katalog lencana", icon: "star" as const }] : []),
   ];
   const [tab, setTab] = useState(tabs[0]?.id ?? "me");
   const active = tabs.some(item => item.id === tab) ? tab : tabs[0]?.id ?? "me";
@@ -256,6 +281,7 @@ export function Growth({ actor, timezone, onExpired }: { actor: Actor; timezone:
       ? <GrowthView path="/api/gamification/me" timezone={timezone} onExpired={onExpired} />
       : <EmptyState icon="star" title="Belum ada XP" description="XP dan lencana dikumpulkan oleh santri melalui pembelajaran dan proyek." />)
       : active === "leaderboard" ? <Leaderboard actor={actor} onExpired={onExpired} />
-      : <div className="dashboard-side"><RewardRules onExpired={onExpired} /><BadgeCatalogue onExpired={onExpired} /></div>}
+      : active === "rules" ? <RewardRules onExpired={onExpired} />
+      : <BadgeCatalogue onExpired={onExpired} />}
   </>;
 }

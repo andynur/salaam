@@ -58,6 +58,7 @@ workflow.
 | 34 — Curriculum map | [phases/34-curriculum-map.md](phases/34-curriculum-map.md) |
 | 36 — Navigation, account page, and administration layout | [phases/36-navigation-account.md](phases/36-navigation-account.md) |
 | 37 — Attendance agenda | [phases/37-attendance-agenda.md](phases/37-attendance-agenda.md) |
+| 38 — Role-specific dashboard | [phases/38-role-specific-dashboard.md](phases/38-role-specific-dashboard.md) |
 
 New records follow
 [`.agents/skills/deliver-phase/phase-record-template.md`](../.agents/skills/deliver-phase/phase-record-template.md).
