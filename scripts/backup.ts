@@ -1,5 +1,7 @@
 import { mkdir, readdir, rm, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, basename, resolve, join, relative } from "node:path";
+import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 
 const databaseUrl = Bun.env.DATABASE_URL;
 const storageRoot = Bun.env.STORAGE_ROOT;
@@ -20,15 +22,16 @@ const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const staging = join(backupRoot, `.staging-${timestamp}-${crypto.randomUUID()}`);
 const destination = join(backupRoot, timestamp);
 
-async function run(command: string[], label: string): Promise<void> {
-  const process = Bun.spawn(command, { stdout: "inherit", stderr: "inherit" });
-  const exitCode = await process.exited;
+async function run(command: string[], label: string, env = Bun.env): Promise<void> {
+  const child = Bun.spawn(command, { stdout: "inherit", stderr: "inherit", env });
+  const exitCode = await child.exited;
   if (exitCode !== 0) throw new Error(`${label} failed with exit code ${exitCode}`);
 }
 
 async function sha256(path: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", await Bun.file(path).arrayBuffer());
-  return Buffer.from(digest).toString("hex");
+  const digest = createHash("sha256");
+  for await (const chunk of createReadStream(path)) digest.update(chunk);
+  return digest.digest("hex");
 }
 
 try {
@@ -36,7 +39,13 @@ try {
   if (!storageInfo.isDirectory()) throw new Error("STORAGE_ROOT must be a directory");
   await mkdir(staging, { recursive: true });
 
-  await run(["pg_dump", "--format=custom", `--file=${join(staging, "database.dump")}`, databaseUrl], "pg_dump");
+  // libpq does not expand a connection URI supplied through PGDATABASE. Keep the
+  // password in the child environment, and pass the remaining URI explicitly.
+  const dumpUrl = new URL(databaseUrl);
+  const password = decodeURIComponent(dumpUrl.password) || dumpUrl.searchParams.get("password");
+  dumpUrl.password = "";
+  dumpUrl.searchParams.delete("password");
+  await run(["pg_dump", "--format=custom", `--file=${join(staging, "database.dump")}`, `--dbname=${dumpUrl}`], "pg_dump", { ...Bun.env, ...(password ? { PGPASSWORD: password } : {}) });
   await run(["tar", "-czf", join(staging, "storage.tgz"), "-C", dirname(sourceStorage), basename(sourceStorage)], "storage archive");
   await writeFile(join(staging, "SHA256SUMS"), `${await sha256(join(staging, "database.dump"))}  database.dump\n${await sha256(join(staging, "storage.tgz"))}  storage.tgz\n`);
 
