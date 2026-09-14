@@ -68,6 +68,53 @@ the existing environment file.
   recovery to the operator. Inspect schema compatibility before switching `current`
   back to the previous release. Never automatically roll back database migrations.
 
+## GitHub Actions deployment
+
+`.github/workflows/deploy.yml` runs typecheck, the full PostgreSQL-backed suite against a
+disposable `postgres:17` service container, `bun run build`, and `deploy/package.sh` on
+every push and pull request. Nothing is deployed automatically: the `deploy` job only runs
+from a manual `workflow_dispatch` run (Actions tab → "Test, build, and deploy" → Run
+workflow), gated by the `production` GitHub Environment, and only after the `test` job
+passes on the chosen ref. Re-enable a push-triggered `deploy` job only after several manual
+runs and at least one verified rollback.
+
+One-time VPS setup, run once as root:
+
+1. Create a deployment identity separate from the `salaam` runtime user, with no shell
+   login beyond SSH key auth:
+   `adduser --disabled-password --gecos "" salaam-deploy`.
+2. Generate an ed25519 key pair for CI (`ssh-keygen -t ed25519 -C github-actions -f
+   salaam-deploy-ci -N ""`); add the public half to
+   `/home/salaam-deploy/.ssh/authorized_keys` (mode 700/600, owned by `salaam-deploy`).
+   Keep the private half only in the GitHub secret below; do not leave a copy on disk.
+3. Install a fixed, root-owned copy of the release script the deploy user cannot edit:
+   `install -m 755 -o root -g root deploy/release.sh /usr/local/sbin/salaam-release.sh`.
+   Re-run this whenever `deploy/release.sh` changes; CI never updates it automatically.
+4. Grant exactly that command, nothing else, via
+   `/etc/sudoers.d/salaam-deploy` (`visudo -cf` before installing it):
+   ```
+   salaam-deploy ALL=(root) NOPASSWD: /usr/local/sbin/salaam-release.sh *
+   ```
+5. Record the host's SSH fingerprint for pinned verification:
+   `ssh-keyscan -t ed25519 <host> > known_hosts`.
+
+Add these repository secrets, and create a `production` GitHub Environment with required
+reviewers before granting deploy access:
+
+| Secret | Value |
+| --- | --- |
+| `DEPLOY_SSH_HOST` | The VPS address |
+| `DEPLOY_SSH_USER` | `salaam-deploy` |
+| `DEPLOY_SSH_KEY` | The CI private key from step 2 |
+| `DEPLOY_SSH_KNOWN_HOSTS` | The output of step 5 |
+
+The workflow uploads the packaged artifact to `/tmp` over SSH, runs
+`sudo /usr/local/sbin/salaam-release.sh <artifact> <sha256> <commit-sha>` (matching
+`deploy/release.sh`'s own checksum and serialization checks), removes the uploaded artifact,
+then checks public `/health/live` and `/health/ready`. It does not run migrations outside
+`release.sh`, does not touch Yahoot, and cannot deploy without a maintainer starting the
+run and the environment's reviewers approving it.
+
 ## Move to the school server
 
 Provision the school server using the same versions and scripts, with a new database

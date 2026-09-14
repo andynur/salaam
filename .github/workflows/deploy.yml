@@ -1,0 +1,104 @@
+name: Test, build, and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit or branch to release (defaults to main)"
+        required: false
+        default: main
+
+env:
+  BUN_VERSION: "1.4.2"
+
+jobs:
+  test:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: salaam
+          POSTGRES_PASSWORD: salaam
+          POSTGRES_DB: salaam_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U salaam"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run typecheck
+
+      - name: Test (unit + PostgreSQL integration)
+        env:
+          TEST_DATABASE_URL: postgres://salaam:salaam@127.0.0.1:5432/salaam_test
+        run: bun test
+
+      - run: bun run build
+
+      - name: Package release artifact
+        run: bash deploy/package.sh "$RUNNER_TEMP/release.tgz"
+
+      - name: Record checksum
+        run: shasum -a 256 "$RUNNER_TEMP/release.tgz" | cut -d ' ' -f 1 > "$RUNNER_TEMP/release.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            ${{ runner.temp }}/release.tgz
+            ${{ runner.temp }}/release.sha256
+          retention-days: 14
+
+  deploy:
+    name: Deploy to VPS
+    needs: test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}
+
+      - name: Configure SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Upload release artifact
+        run: |
+          scp -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${{ runner.temp }}/release.tgz" \
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:/tmp/salaam-release-${{ github.sha }}.tgz"
+
+      - name: Run release script on the VPS
+        run: |
+          checksum=$(cat "${{ runner.temp }}/release.sha256")
+          ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" \
+            "sudo /usr/local/sbin/salaam-release.sh /tmp/salaam-release-${{ github.sha }}.tgz $checksum ${{ github.sha }} && rm -f /tmp/salaam-release-${{ github.sha }}.tgz"
+
+      - name: Verify public health
+        run: |
+          curl -fsS --retry 5 --retry-delay 3 https://salaam.hsibs.my.id/health/live
+          curl -fsS --retry 5 --retry-delay 3 https://salaam.hsibs.my.id/health/ready
