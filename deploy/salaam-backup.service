@@ -1,0 +1,13 @@
+[Unit]
+Description=SALAAM consistent database and storage backup
+After=postgresql@17-main.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/salaam/salaam.env
+ExecStart=/bin/bash /srv/salaam/current/deploy/backup.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min
+MemoryMax=384M

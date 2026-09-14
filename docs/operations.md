@@ -1,5 +1,9 @@
 # Deployment and operations
 
+For the 2 GB RAM / 2 vCPU pilot VPS shared with Yahoot, targeting `salaam.hsibs.my.id`, see the
+[deployment strategy](deployment-vps.md), including resource budgets, release artifacts,
+and login/backup prerequisites before pilot use.
+
 ## Runtime
 
 - Build with Bun 1.4.2 (`bun run build`), apply migrations (`bun run db:migrate`), then start
@@ -47,7 +51,9 @@ and keep a backup from before the release.
 - Terminate HTTPS and forward to the loopback port.
 - Accept request bodies of at least 10.25 MB on `/api/learning/` (a 10 MB file plus form
   fields).
-- Throttle login per client; the application's limiter only sees the proxy's address.
+- The application limits login per account and applies a coarse 300-request/15-minute
+  source budget shared behind the proxy. Optional per-client proxy throttling supplements
+  this; forwarded IP headers remain untrusted. See [security](security.md#identity-and-sessions).
 - Keep private storage out of any static route.
 - Pass WebSocket `Upgrade`/`Connection`, the browser `Origin`, and session cookies through
   to `/api/attendance/live`, and keep the idle timeout above 60 seconds.

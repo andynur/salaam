@@ -10,6 +10,7 @@ Setup and commands are in the root [README](../README.md). Coding agents start f
 | [Architecture](architecture.md) | Request flow, authorization, domain model, lifecycle and locking rules, web client, build |
 | [Security](security.md) | Sessions, permissions, audit, request limits, headers, uploads, rules for planned features |
 | [Operations](operations.md) | Deployment, configuration, reverse proxy, backups, rollout checklist |
+| [Small VPS deployment](deployment-vps.md) | Shared 2 GB / 2 vCPU pilot, domain, release strategy, and school-server migration |
 | [DESIGN.md](../DESIGN.md) | UI tokens, components, CSS classes, interaction and accessibility rules |
 | [Brand](brand.md) | Name, tagline, logos, icons, social preview |
 | [Agent harness](agent-harness.md) | How `AGENTS.md`, `CLAUDE.md`, skills, and agent settings fit together |

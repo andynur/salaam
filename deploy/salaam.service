@@ -1,0 +1,28 @@
+[Unit]
+Description=SALAAM learning platform
+After=network-online.target postgresql@17-main.service
+Wants=network-online.target
+Requires=postgresql@17-main.service
+
+[Service]
+Type=simple
+User=salaam
+Group=salaam
+WorkingDirectory=/srv/salaam/current
+EnvironmentFile=/etc/salaam/salaam.env
+ExecStart=/usr/local/bin/bun dist/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/salaam/storage
+MemoryHigh=512M
+MemoryMax=768M
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

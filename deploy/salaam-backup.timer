@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly SALAAM backup (Asia/Jakarta)
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Asia/Jakarta
+Persistent=true
+Unit=salaam-backup.service
+
+[Install]
+WantedBy=timers.target
