@@ -36,7 +36,7 @@ export async function listCourses(db: SQL, actor: Actor, pattern: string, offset
 // Activities of every kind count. An assignment is done when submitted and graded when a
 // grade exists; a quiz or exam is both once any attempt is submitted (scores are automatic);
 // a challenge is done once the student's project was submitted and graded once approved.
-export async function progressRows(db: SQL, courseId: string, studentId: string | null, pattern = "%", offset = 0) {
+export async function progressRows(db: SQL, courseId: string, studentId: string | null, pattern = "%", offset = 0, certification = false) {
   return db<Progress[]>`WITH visible_lessons AS (
       SELECT l.id FROM lessons l JOIN course_modules m ON m.id = l.module_id JOIN courses c ON c.id = l.course_id
       WHERE l.course_id = ${courseId} AND c.published AND l.published AND m.published AND l.archived_at IS NULL AND m.archived_at IS NULL
@@ -46,10 +46,10 @@ export async function progressRows(db: SQL, courseId: string, studentId: string 
       (SELECT count(*)::int FROM visible_lessons) AS lessons,
       (SELECT count(*)::int FROM lesson_completions lc JOIN visible_lessons l ON l.id = lc.lesson_id WHERE lc.student_id = u.id) AS completed,
       (SELECT count(*)::int FROM visible_activities) AS activities,
-      (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id)
+      (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id AND (NOT ${certification} OR s.status = 'submitted'))
         OR EXISTS (SELECT 1 FROM attempts t WHERE t.activity_id = a.id AND t.student_id = u.id AND t.submitted_at IS NOT NULL)
       OR EXISTS (SELECT 1 FROM project_members pm JOIN projects p ON p.id = pm.project_id
-          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.first_submitted_at IS NOT NULL)
+          WHERE p.activity_id = a.id AND pm.student_id = u.id AND p.first_submitted_at IS NOT NULL AND (NOT ${certification} OR p.status IN ('submitted', 'approved')))
         OR EXISTS (SELECT 1 FROM survey_responses sr WHERE sr.activity_id = a.id AND sr.student_id = u.id)) AS submitted,
       (SELECT count(*)::int FROM visible_activities a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.activity_id = a.id AND s.student_id = u.id
           AND EXISTS (SELECT 1 FROM submission_grades g WHERE g.submission_id = s.id))

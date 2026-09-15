@@ -293,3 +293,10 @@ suppresses expired or inaccessible sources. It generates reminders only for sour
 upcoming within 24 hours, so expired agenda items are not backfilled. Backlogs can require
 multiple ticks; measure queue age and latency on school hardware. The whole application
 still uses the existing single-instance deployment model.
+
+## Course certification
+
+No migration, new environment variable, or PDF rendering service is needed. The existing
+white HSI logo is bundled into the SPA. Verify an incomplete and complete student's
+Sertifikasi tab after deployment, including an actual PDF download. The date is the
+generation date in WIB, and course/name changes apply to subsequent downloads.

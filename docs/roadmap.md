@@ -10,6 +10,7 @@ Coding agents follow skill `deliver-phase`.
 | 0 | Repository and identity foundation | Delivered — [record](phases/00-foundation.md) |
 | 1 | Core identity and academic foundation | Delivered — [record](phases/01-identity-academic.md) |
 | 2 | Learning core | Delivered — [record](phases/02-learning-core.md) |
+| 2 extension | Course certification | Delivered — [record](phases/course-certification.md) |
 | 3 | Assessment engine | Delivered for choice questions — [record](phases/03-assessment-engine.md) |
 | 4 | Project learning | Delivered — [record](phases/04-project-learning.md) |
 | 5 | Gamification | Delivered — [record](phases/05-gamification.md) |

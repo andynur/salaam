@@ -259,3 +259,11 @@ information or exception payloads. No external provider receives school data.
   audited; the underlying modules audit their own writes.
 - Club routes add no public surface: every endpoint requires a session, and non-GET
   requests require the same origin.
+
+## Certification downloads
+
+Certification endpoints require course scope; students can address only themselves,
+while managers and assigned assistants can address currently enrolled students. Generation
+rechecks completion and active publication, and requires a successful audit write.
+Certificates are image PDFs generated in the authenticated browser, with no public
+verification route, digital signature, persistent award record, or revocation mechanism.

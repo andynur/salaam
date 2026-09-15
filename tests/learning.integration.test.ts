@@ -107,6 +107,42 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
     await rm(storage, { recursive: true, force: true });
   });
 
+  test("certification scopes students and staff, locks incomplete work, and rechecks revisions on generation", async () => {
+    const { courseId, lessonId, activityId } = await fixture();
+    await academic("teaching-assignments", { courseId, teacherId: assistantId });
+    const detail = path(courseId, `certifications/${studentId}`);
+    const generate = `${detail}/generate`;
+    expect((await request(detail, outsider)).status).toBe(404);
+    expect((await request(detail, otherTeacher)).status).toBe(404);
+    expect((await request(path(courseId, `certifications/${peerId}`), student)).status).toBe(404);
+    expect((await request(path(courseId, "certifications/no-id"), teacher)).status).toBe(400);
+    const list = await (await request(path(courseId, "certifications"), student)).json() as Page<Progress>;
+    expect(list.items.map(row => row.studentId)).toEqual([studentId]);
+    expect((await request(generate, student, {})).status).toBe(409);
+    expect((await post(courseId, `lessons/${lessonId}/complete`, {}, student)).status).toBe(200);
+    expect((await (await request(detail, student)).json() as { percent: number }).percent).toBe(50);
+    expect((await post(courseId, `activities/${activityId}/submit`, { content: "Completed" }, student)).status).toBe(200);
+    for (const cookie of [student, admin, teacher, assistant]) {
+      const result = await request(generate, cookie, {});
+      expect(result.status).toBe(200);
+      expect(await result.json()).toMatchObject({ eligible: true, percent: 100, teachers: ["teacher"] });
+    }
+    const [{ count }] = await db`SELECT count(*)::int AS count FROM audit_logs WHERE event = 'learning.certification.generated' AND resource_id = ${studentId}`;
+    expect(count).toBe(4);
+    await db.unsafe("CREATE FUNCTION reject_certificate_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event = 'learning.certification.generated' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END $$");
+    await db.unsafe("CREATE TRIGGER reject_certificate_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_certificate_audit()");
+    try { expect((await request(generate, student, {})).status).toBe(500); }
+    finally { await db.unsafe("DROP TRIGGER reject_certificate_audit ON audit_logs"); await db.unsafe("DROP FUNCTION reject_certificate_audit()"); }
+    const [submission] = await db`SELECT id FROM submissions WHERE activity_id = ${activityId} AND student_id = ${studentId}`;
+    expect((await post(courseId, `submissions/${submission.id}/return`, { reason: "Please revise" })).status).toBe(200);
+    expect((await request(generate, assistant, {})).status).toBe(409);
+    expect((await (await request(detail, student)).json() as { percent: number }).percent).toBe(50);
+    expect((await publish(courseId, "", false)).status).toBe(200);
+    expect((await request(generate, teacher, {})).status).toBe(409);
+    expect((await request(generate, student, {})).status).toBe(404);
+    expect((await request(detail, "")).status).toBe(401);
+  });
+
   test("draft visibility cascades from course through module, lesson, materials and activities", async () => {
     const f = await fixture(false);
     const detail = () => request(path(f.courseId), student);

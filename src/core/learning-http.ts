@@ -1,3 +1,4 @@
+import { courseCertification, listCertifications } from "../modules/learning/certifications";
 import type { SQL } from "bun";
 import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
@@ -35,6 +36,8 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
       if (parts.length === 1 && request.method === "GET") return Response.json(page(await listCourses(db, actor, pattern, offset), offset));
       const courseId = idField({ courseId: course }, "courseId");
       if (request.method === "GET") {
+        if (parts.length === 3 && resource === "certifications") return Response.json(page(await listCertifications(db, actor, courseId, pattern, offset), offset));
+        if (parts.length === 4 && resource === "certifications") return Response.json(await courseCertification(db, actor, courseId, idField({ id: item }, "id")));
         if (parts.length === 2) return Response.json(await courseDetail(db, actor, courseId));
         if (parts.length === 3 && resource === "progress") return Response.json(page(await courseProgress(db, actor, courseId, pattern, offset), offset));
         if (parts.length === 3 && resource === "questions") return Response.json(page(await listQuestions(db, actor, courseId, pattern, offset, url.searchParams.get("archived") === "1"), offset));
@@ -69,7 +72,9 @@ export function createLearningHandler(db: SQL, storageRoot: string) {
           : { body: await jsonObject(request, jsonLimit), file: null };
         let result: unknown;
         let created = false;
-        if (method === "POST" && parts.length === 3 && resource === "publish") {
+        if (itemAction && resource === "certifications" && action === "generate") {
+          result = await courseCertification(db, actor, courseId, id, requestId);
+        } else if (method === "POST" && parts.length === 3 && resource === "publish") {
           result = await publishContent(db, actor, courseId, "courses", courseId, body, requestId);
         } else if (itemAction && action === "publish" && (resource === "modules" || resource === "lessons" || resource === "activities")) {
           result = await publishContent(db, actor, courseId, resource, id, body, requestId);

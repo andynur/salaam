@@ -354,3 +354,13 @@ roster rule, and progress from `xp_entries` and `badge_awards`. A member who is 
 in a linked course therefore sees an empty workspace. Linking a course calls
 `courseAccess(…, "manage")`, so a club can never reach a course its mentor does not teach.
 See [Phase 32](phases/32-club-management.md).
+
+## Course certification
+
+Certification derives current eligibility from lesson and activity progress, with no new
+tables. Scoped list/detail reads and audited generation use the learning router,
+`courseAccess`, and repeatable-read snapshots; generation takes a shared course lock.
+Only enrolled students are recipients, and assigned assistants have read/generation
+access without authoring or grading capabilities. The SPA embeds a locally rendered
+JPEG into a single-page PDF after a fresh server eligibility check. See the
+[feature record](phases/course-certification.md) for completion semantics and limits.

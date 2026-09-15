@@ -573,3 +573,11 @@ those panels. An administrator additionally finds the archive or restore control
 bottom of the manage panel; on an archived club the panel offers nothing but `Pulihkan klub`,
 and `.club-note` under the tabs explains that the club is read-only. Copy stays Indonesian,
 and the page never scrolls sideways at 390 px — wide data sits in `.table-scroll`.
+
+## Course certification
+
+The course **Sertifikasi** tab reuses the progress bar, card, search/pager, and labeled
+student select. `.certification-body` spaces the hint, preview, and PDF action;
+`.certification-preview` fits the landscape image within the card, and `.is-locked`
+uses grayscale with an opaque lock notice. The image and downloaded PDF share one canvas
+renderer, HSI color tokens and the existing white logo. The signature area remains blank.
