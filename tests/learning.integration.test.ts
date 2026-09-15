@@ -8,6 +8,7 @@ import { createAuthService } from "../src/core/auth/service";
 import { createHttpHandler } from "../src/core/http";
 import { createFoundationHandler } from "../src/core/foundation-http";
 import { createLearningHandler } from "../src/core/learning-http";
+import { createShareHandler } from "../src/core/share-http";
 import { storedFilePath } from "../src/core/storage/files";
 import { bootstrapAdmin, createUser } from "../src/modules/users/service";
 import { createAcademic } from "../src/modules/academic/service";
@@ -88,7 +89,7 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
     db = new SQL(url, { max: 4, connection: { search_path: schema } });
     await migrate(db);
     adminId = (await bootstrapAdmin(db, { email: "admin@example.test", name: "Admin", identifier: "ADMIN", password })).id;
-    handle = createHttpHandler(config, createAuthService(db, config), async () => {}, { foundation: createFoundationHandler(db), learning: createLearningHandler(db, storage), dashboard: async () => ({}) });
+    handle = createHttpHandler(config, createAuthService(db, config), async () => {}, { foundation: createFoundationHandler(db), learning: createLearningHandler(db, storage), share: createShareHandler(db, storage, config.timezone), dashboard: async () => ({}) });
     admin = (await request("/api/auth/login", "", { email: "admin@example.test", password })).headers.get("set-cookie")!.split(";")[0]!;
     ({ id: teacherId, cookie: teacher } = await user("teacher", "teacher"));
     ({ id: assistantId, cookie: assistant } = await user("assistant", "asmen"));
@@ -118,17 +119,35 @@ describe.skipIf(!url)("Phase 2 learning core (isolated PostgreSQL schema)", () =
     expect((await request(path(courseId, "certifications/no-id"), teacher)).status).toBe(400);
     const list = await (await request(path(courseId, "certifications"), student)).json() as Page<Progress>;
     expect(list.items.map(row => row.studentId)).toEqual([studentId]);
+    expect(await (await request(detail, student)).json()).toMatchObject({ issuedAt: null, verificationPath: null });
     expect((await request(generate, student, {})).status).toBe(409);
     expect((await post(courseId, `lessons/${lessonId}/complete`, {}, student)).status).toBe(200);
     expect((await (await request(detail, student)).json() as { percent: number }).percent).toBe(50);
     expect((await post(courseId, `activities/${activityId}/submit`, { content: "Completed" }, student)).status).toBe(200);
-    for (const cookie of [student, admin, teacher, assistant]) {
-      const result = await request(generate, cookie, {});
+    let verificationPath = "";
+    const generated = await Promise.all([student, admin, teacher, assistant].map(cookie => request(generate, cookie, {})));
+    for (const result of generated) {
       expect(result.status).toBe(200);
-      expect(await result.json()).toMatchObject({ eligible: true, percent: 100, teachers: ["teacher"] });
+      const certificate = await result.json() as { eligible: boolean; percent: number; teachers: string[]; issuedAt: string; verificationPath: string };
+      expect(certificate).toMatchObject({ eligible: true, percent: 100, teachers: ["teacher"] });
+      expect(certificate.issuedAt).toBeString();
+      verificationPath ||= certificate.verificationPath;
+      expect(certificate.verificationPath).toBe(verificationPath);
     }
+    expect((await db`SELECT * FROM course_certificates WHERE course_id = ${courseId} AND student_id = ${studentId}`).length).toBe(1);
+    expect((await db`SELECT 1 FROM audit_logs a JOIN course_certificates c ON c.id = a.resource_id
+      WHERE a.event = 'learning.certification.issued' AND c.course_id = ${courseId} AND c.student_id = ${studentId}`).length).toBe(1);
     const [{ count }] = await db`SELECT count(*)::int AS count FROM audit_logs WHERE event = 'learning.certification.generated' AND resource_id = ${studentId}`;
     expect(count).toBe(4);
+    const publicPage = await handle(new Request(`${config.baseUrl}${verificationPath}`), "1.2.3.4");
+    expect(publicPage.status).toBe(200);
+    expect(publicPage.headers.get("content-security-policy")).toContain("default-src 'none'");
+    const publicHtml = await publicPage.text();
+    expect(publicHtml).toContain("Sertifikat terverifikasi");
+    expect(publicHtml).toContain("student");
+    expect(publicHtml).toContain("teacher");
+    expect((await handle(new Request(`${config.baseUrl}${verificationPath}`, { method: "POST" }), "1.2.3.4")).status).toBe(405);
+    expect((await handle(new Request(`${config.baseUrl}/share/certificates/AAAAAAAAAAAAAAAAAAAAAA`), "1.2.3.4")).status).toBe(404);
     await db.unsafe("CREATE FUNCTION reject_certificate_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event = 'learning.certification.generated' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END $$");
     await db.unsafe("CREATE TRIGGER reject_certificate_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_certificate_audit()");
     try { expect((await request(generate, student, {})).status).toBe(500); }

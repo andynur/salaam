@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 import { certificationProgress } from "../src/shared/certification";
 import { imagePdf } from "../src/shared/image-pdf";
+import { certificateQrCodewords, certificateQrSize, encodeCertificateQr } from "../src/web/lib/certificate-qr";
+import { divisor, remainder } from "../src/web/lib/qr";
 const base = { studentId: "id", studentName: "Santri", lessons: 4, completed: 4, activities: 2, submitted: 1, graded: 0 };
 test("certification weighs lessons and activities equally and never rounds incomplete work to 100", () => {
   expect(certificationProgress(base)).toMatchObject({ percent: 83, eligible: false });
@@ -20,4 +22,14 @@ test("image PDF byte offsets resolve every object across binary image bytes", ()
   }
   expect(text).toContain("/Filter /DCTDecode");
   expect(text).toContain("/Count 1");
+});
+test("certificate verification URLs produce a version 5 QR with valid error correction", () => {
+  const url = "https://salaam.hsibs.my.id/share/certificates/AbCdEfGhIjKlMnOpQrStUv";
+  const words = certificateQrCodewords(url);
+  expect(words).toHaveLength(134);
+  expect([...remainder(words, divisor(26))].every(byte => byte === 0)).toBe(true);
+  const modules = encodeCertificateQr(url);
+  expect(modules).toHaveLength(certificateQrSize);
+  expect(modules.every(row => row.length === certificateQrSize)).toBe(true);
+  expect(() => certificateQrCodewords(`https://example.test/${"a".repeat(90)}`)).toThrow();
 });

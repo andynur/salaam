@@ -28,18 +28,22 @@ function CertificateDetail({ courseId, studentId, onExpired }: { courseId: strin
   const [renderRevision, setRenderRevision] = useState(0);
   const [downloadError, setDownloadError] = useState("");
   const [pending, setPending] = useState(false);
+  const [issued, setIssued] = useState<Certification | null>(null);
+  const [copied, setCopied] = useState(false);
   const busy = useRef(false);
+  const display = issued ?? data;
   useEffect(() => {
     let active = true;
     setPreview(""); setRenderError("");
-    if (data) void certificateImage(data).then(canvas => { if (active) setPreview(canvas.toDataURL("image/png")); }).catch(cause => { if (active) setRenderError(errorMessage(cause)); });
+    if (display) void certificateImage(display).then(canvas => { if (active) setPreview(canvas.toDataURL("image/png")); }).catch(cause => { if (active) setRenderError(errorMessage(cause)); });
     return () => { active = false; };
-  }, [data, renderRevision]);
+  }, [display, renderRevision]);
   async function download() {
     if (busy.current) return;
     busy.current = true; setPending(true); setDownloadError("");
     try {
       const fresh = await api<Certification>(`${path}/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      setIssued(fresh);
       await downloadCertificate(fresh);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) onExpired();
@@ -47,14 +51,16 @@ function CertificateDetail({ courseId, studentId, onExpired }: { courseId: strin
     } finally { busy.current = false; setPending(false); }
   }
   if (error) return <ErrorState message={error} retry={retry} />;
-  if (!data) return <LoadingState />;
+  if (!display) return <LoadingState />;
+  const publicUrl = display.verificationPath ? new URL(display.verificationPath, location.origin).href : "";
   return <>
-    <div className="learning-progress"><div><strong>Progres sertifikasi · {data.percent}%</strong><progress aria-label="Progres sertifikasi" max={100} value={data.percent} /></div><span>{data.completed} / {data.lessons} materi selesai</span><span>{data.submitted} / {data.activities} aktivitas selesai</span></div>
-    <Card className="certification-card"><div className="card-heading"><h2>Sertifikat penyelesaian</h2><span className={`badge ${data.eligible ? "badge-success" : ""}`}>{data.eligible ? "Terbuka" : "Terkunci"}</span></div>
-      <div className="certification-body"><p className="learning-muted">{data.eligible ? "Seluruh pembelajaran selesai. Sertifikat siap diunduh dalam PDF." : "Data sertifikat ditampilkan lengkap sebagai gambaran. Pratinjau tetap abu-abu dan unduhan terkunci sampai progres mencapai 100% pada course aktif. Tugas atau proyek yang perlu revisi belum dihitung selesai."}</p>
-        {renderError ? <ErrorState message={renderError} retry={() => setRenderRevision(value => value + 1)} /> : !preview ? <LoadingState /> : <img className={`certification-preview${data.eligible ? "" : " is-locked"}`} src={preview} alt={`Sertifikat ${data.studentName} untuk ${data.courseName}, guru ${data.teachers.join(", ") || "belum ditetapkan"}${data.eligible ? "" : ", pratinjau abu-abu dan unduhan terkunci"}`} />}
+    <div className="learning-progress"><div><strong>Progres sertifikasi · {display.percent}%</strong><progress aria-label="Progres sertifikasi" max={100} value={display.percent} /></div><span>{display.completed} / {display.lessons} materi selesai</span><span>{display.submitted} / {display.activities} aktivitas selesai</span></div>
+    <Card className="certification-card"><div className="card-heading"><h2>Sertifikat penyelesaian</h2><span className={`badge ${display.eligible ? "badge-success" : ""}`}>{display.eligible ? "Terbuka" : "Terkunci"}</span></div>
+      <div className="certification-body"><p className="learning-muted">{display.eligible ? publicUrl ? "Sertifikat telah diterbitkan. QR dan tautan publik dapat digunakan untuk verifikasi." : "Seluruh pembelajaran selesai. Terbitkan sertifikat untuk membuat QR dan tautan verifikasi publik." : "Data sertifikat ditampilkan lengkap sebagai gambaran. Pratinjau tetap abu-abu dan unduhan terkunci sampai progres mencapai 100% pada course aktif. Tugas atau proyek yang perlu revisi belum dihitung selesai."}</p>
+        {renderError ? <ErrorState message={renderError} retry={() => setRenderRevision(value => value + 1)} /> : !preview ? <LoadingState /> : <img className={`certification-preview${display.eligible ? "" : " is-locked"}`} src={preview} alt={`Sertifikat ${display.studentName} untuk ${display.courseName}, guru ${display.teachers.join(", ") || "belum ditetapkan"}${display.eligible ? "" : ", pratinjau abu-abu dan unduhan terkunci"}`} />}
+        {publicUrl && <div className="doc-share-link"><label className="visually-hidden" htmlFor={`certificate-${studentId}`}>Tautan verifikasi publik</label><input id={`certificate-${studentId}`} className="input" readOnly value={publicUrl} onFocus={event => event.target.select()} /><a className="button button-secondary button-small" href={publicUrl} target="_blank" rel="noopener noreferrer">Buka</a><Button className="button-secondary button-small" onClick={() => { void navigator.clipboard?.writeText(publicUrl).then(() => setCopied(true)).catch(() => setCopied(false)); }}>Salin</Button>{copied && <span className="success-state" role="status">Tautan disalin.</span>}</div>}
         {downloadError && <ErrorState message={downloadError} />}
-        <Button disabled={!data.eligible || pending || !preview} onClick={() => void download()}>{pending ? "Membuat PDF…" : "Unduh sertifikat PDF"}</Button>
+        <Button disabled={!display.eligible || pending || !preview} onClick={() => void download()}>{pending ? "Membuat PDF…" : publicUrl ? "Unduh sertifikat PDF" : "Terbitkan & unduh PDF"}</Button>
       </div>
     </Card>
   </>;

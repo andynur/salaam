@@ -296,7 +296,10 @@ still uses the existing single-instance deployment model.
 
 ## Course certification
 
-No migration, new environment variable, or PDF rendering service is needed. The existing
-white HSI logo is bundled into the SPA. Verify an incomplete and complete student's
+Migration `0037_course_certificates.sql` must be applied before rollout; no new environment
+variable or PDF rendering service is needed. `APP_BASE_URL` becomes the origin encoded in
+certificate QR links and must match the public HTTPS origin. The complete URL is limited to
+106 UTF-8 bytes by the dependency-free QR encoder. The existing white HSI logo is bundled
+into the SPA. Verify an incomplete and complete student's
 Sertifikasi tab after deployment, including an actual PDF download. The date is the
-generation date in WIB, and course/name changes apply to subsequent downloads.
+issue date in WIB. Issued names and course details remain stable on later downloads.

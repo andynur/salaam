@@ -130,8 +130,8 @@ export function createHttpHandler(config: Config, auth: AuthService, ready: () =
         if (method !== "GET") requireSameOrigin(request, config);
         response = await services.calendar(request, await auth.actor(request), requestId);
       } else if (path.startsWith("/share/") && services?.share) {
-        // Public lesson pages: the slug is the only credential, so no session is read and
-        // nothing but GET is accepted.
+        // Public lesson and certificate pages use opaque slugs, read no session, and
+        // accept nothing but GET.
         if (method !== "GET") throw new HttpError(405, "METHOD_NOT_ALLOWED", "Operasi tidak tersedia.");
         response = await services.share(request);
       } else if (path.startsWith("/api/admin/") && services) {

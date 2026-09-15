@@ -96,6 +96,7 @@ measured operational requirement exists.
 | `0028_club_management` | `clubs`, `club_goals`, `club_members`, `club_courses`, the `club.view`/`club.manage` capabilities, and the seeded Coders Club |
 | `0030_club_directory` | No table: seeds Builders Club and Multimedia Club with their goals |
 | `0032_curriculum` | `curriculum_grades`, `curriculum_semesters`, `curriculum_weeks`; grades X/XI seeded published and XII unpublished. Weeks arrive by CSV import and are revised in place (`learning.view` reads, `academic.manage` writes) |
+| `0037_course_certificates` | Immutable issued certificate snapshots with opaque public verification slugs |
 | `0004_assessment_engine` | `questions`, `assessment_settings`, `assessment_questions`, `attempts`, `attempt_questions`, `attempt_answers`, `attempt_score_adjustments` |
 | `0005_project_learning` | `challenge_settings`, `projects`, `project_members`, `project_tasks`, `project_reviews`, `portfolio_entries` |
 | `0006_gamification` | `reward_rules`, `xp_entries`, `badges`, `badge_awards` |
@@ -357,10 +358,15 @@ See [Phase 32](phases/32-club-management.md).
 
 ## Course certification
 
-Certification derives current eligibility from lesson and activity progress, with no new
-tables. Scoped list/detail reads and audited generation use the learning router,
-`courseAccess`, and repeatable-read snapshots; generation takes a shared course lock.
-Only enrolled students are recipients, and assigned assistants have read/generation
-access without authoring or grading capabilities. The SPA embeds a locally rendered
-JPEG into a single-page PDF after a fresh server eligibility check. See the
+Certification derives current eligibility from lesson and activity progress. Migration
+`0037_course_certificates` adds one immutable issuance snapshot per course/student with an
+opaque 22-character public slug. Scoped list/detail reads use repeatable-read snapshots;
+audited generation uses the learning router, `courseAccess`, a shared course lock, and a
+transaction advisory lock per course/student. Only enrolled students are recipients, and
+assigned assistants have read and generation access without authoring or grading
+capabilities. First generation audits
+`learning.certification.issued`; every PDF generation audits
+`learning.certification.generated`. `GET /share/certificates/:slug` reads only the snapshot,
+uses no session, and returns a script-free verification page. The SPA embeds its locally
+rendered JPEG into a single-page PDF; no stored PDF is introduced. See the
 [feature record](phases/course-certification.md) for completion semantics and limits.

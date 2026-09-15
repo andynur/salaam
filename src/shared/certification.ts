@@ -8,7 +8,10 @@ export interface Certification extends CertificationProgress {
   year: string;
   teachers: string[];
   generatedAt: string;
+  issuedAt: string | null;
+  verificationPath: string | null;
 }
+export type PublicCertification = Pick<Certification, "studentName" | "courseName" | "className" | "term" | "year" | "teachers"> & { issuedAt: string };
 export function certificationProgress(progress: Progress): CertificationProgress {
   const total = progress.lessons + progress.activities;
   const completed = progress.completed + progress.submitted;

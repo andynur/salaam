@@ -580,5 +580,7 @@ The course **Sertifikasi** tab reuses the progress bar, card, search/pager, and 
 student select. `.certification-body` spaces the hint, preview, and PDF action;
 `.certification-preview` fits the landscape image within the card, and `.is-locked`
 keeps the complete certificate visible in grayscale while its download stays disabled.
-The image and downloaded PDF share one canvas renderer, HSI color tokens and the existing
-white logo. The signature area remains blank.
+The centered canvas follows the reference's monospace typography, navy header, geometric
+background, QR verification block, teacher signature line, and seal. Eligible previews
+show a clearly labeled sample signature; downloaded PDFs leave that signature line blank.
+After issuance, the existing public-link control exposes the stable verification URL.

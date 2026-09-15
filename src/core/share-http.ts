@@ -2,13 +2,14 @@ import type { SQL } from "bun";
 import { HttpError } from "./errors";
 import { fileResponse } from "./storage/files";
 import { sharedLesson, sharedLessonCover } from "../modules/learning/documents";
+import { publicCertification } from "../modules/learning/certifications";
 import { escapeHtml, markdownExcerpt, renderMarkdown } from "../shared/markdown";
 import { BRAND, brandTitle } from "../web/lib/brand";
 import type { SharedLesson } from "../shared/learning";
+import type { PublicCertification } from "../shared/certification";
 
-// A shared lesson is served as one standalone document: no session, no script, and no
-// SPA. Only the slug grants access, so nothing about the course or its students is
-// exposed beyond the document the teacher chose to publish.
+// Public resources are standalone documents with no session, script, or SPA. Only the
+// opaque slug grants access, and each response contains only the published snapshot.
 const styles = `
 :root { color-scheme: light; --ink: #172b4d; --muted: #626f86; --line: #dfe1e6; --blue: #1d5fd1; --navy: #0b1f3a; --surface: #ffffff; --sunken: #f7f8f9; }
 * { box-sizing: border-box; }
@@ -37,6 +38,13 @@ main { max-width: 820px; margin: 0 auto; padding: 0 20px 64px; }
 .share-doc th, .share-doc td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; font-size: 14px; }
 .share-doc th { background: var(--sunken); }
 .share-foot { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 0 0; }
+.certificate-paper { text-align: center; padding: 48px 32px; }
+.certificate-mark { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 24px; font-weight: 700; }
+.certificate-paper h1 { margin: 18px 0 8px; font-size: 28px; }
+.certificate-name { margin: 28px 0 6px; font: 700 34px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+.certificate-course { margin: 6px 0; font: 700 28px/1.25 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+.certificate-meta { color: var(--muted); margin: 10px 0; }
+.certificate-status { display: inline-block; margin-top: 24px; padding: 6px 10px; border-radius: 3px; background: #dcfff1; color: #216e4e; font-size: 13px; font-weight: 700; }
 @media (max-width: 600px) { .share-body { padding: 20px; } .share-body h1 { font-size: 24px; } }
 `;
 
@@ -73,12 +81,53 @@ function page(lesson: SharedLesson, slug: string, timezone: string) {
 </html>`;
 }
 
+function certificatePage(certificate: PublicCertification, timezone: string) {
+  const issued = new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: timezone }).format(new Date(certificate.issuedAt));
+  return `<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>${escapeHtml(brandTitle(`Sertifikat ${certificate.studentName}`))}</title>
+<meta name="description" content="Verifikasi sertifikat penyelesaian ${escapeHtml(certificate.courseName)}." />
+<style>${styles}</style>
+</head>
+<body>
+<header class="share-top">${escapeHtml(BRAND.name)} · Verifikasi sertifikat</header>
+<main>
+  <article class="share-paper certificate-paper">
+    <span class="certificate-mark" aria-hidden="true">✓</span>
+    <h1>Sertifikat terverifikasi</h1>
+    <p>Sertifikat penyelesaian ini diterbitkan oleh ${escapeHtml(BRAND.organization)} untuk</p>
+    <p class="certificate-name">${escapeHtml(certificate.studentName)}</p>
+    <p>yang telah menyelesaikan</p>
+    <p class="certificate-course">${escapeHtml(certificate.courseName)}</p>
+    <p class="certificate-meta">${escapeHtml(certificate.className)} · ${escapeHtml(certificate.term)} · ${escapeHtml(certificate.year)}</p>
+    <p class="certificate-meta">Diterbitkan ${escapeHtml(issued)} · Guru: ${escapeHtml(certificate.teachers.join(", ") || "Belum ditetapkan")}</p>
+    <span class="certificate-status">Data cocok dengan catatan SALAAM</span>
+  </article>
+  <p class="share-foot">Tautan publik ini hanya memuat data yang tercetak pada sertifikat.</p>
+</main>
+</body>
+</html>`;
+}
+
 const slugPattern = /^[A-Za-z0-9_-]{22}$/;
 export function createShareHandler(db: SQL, storageRoot: string, timezone: string) {
   return async (request: Request): Promise<Response> => {
     const parts = new URL(request.url).pathname.split("/").filter(Boolean);
     const [, resource, slug, action] = parts;
-    if (resource !== "lessons" || !slug || !slugPattern.test(slug) || parts.length > 4 || (parts.length === 4 && action !== "cover")) {
+    if (!slug || !slugPattern.test(slug)) {
+      throw new HttpError(404, "NOT_FOUND", "Halaman publik tidak ditemukan.");
+    }
+    if (resource === "certificates" && parts.length === 3) {
+      return new Response(certificatePage(await publicCertification(db, slug), timezone), { headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      } });
+    }
+    if (resource !== "lessons" || parts.length > 4 || (parts.length === 4 && action !== "cover")) {
       throw new HttpError(404, "NOT_FOUND", "Halaman publik tidak ditemukan.");
     }
     if (action === "cover") return fileResponse(storageRoot, await sharedLessonCover(db, slug), "inline");

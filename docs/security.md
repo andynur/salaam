@@ -260,10 +260,13 @@ information or exception payloads. No external provider receives school data.
 - Club routes add no public surface: every endpoint requires a session, and non-GET
   requests require the same origin.
 
-## Certification downloads
+## Certification downloads and verification
 
 Certification endpoints require course scope; students can address only themselves,
 while managers and assigned assistants can address currently enrolled students. Generation
 rechecks completion and active publication, and requires a successful audit write.
-Certificates are image PDFs generated in the authenticated browser, with no public
-verification route, digital signature, persistent award record, or revocation mechanism.
+First generation stores one immutable certificate snapshot with an opaque 128-bit random
+slug. `GET /share/certificates/:slug` reads no session and reveals only the student, course,
+class/term/year, teacher names, and issue date printed on the certificate. It is GET-only,
+script-free, `noindex`, and protected by a restrictive CSP. The QR contains this URL.
+There is no digital signature, stored PDF, public directory, or revocation mechanism.
