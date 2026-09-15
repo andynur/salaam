@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { eventInput, preferencesInput, rangeInput, versionInput } from "../src/modules/calendar/input";
+import { academicCalendarEventInput, eventInput, preferencesInput, rangeInput, versionInput } from "../src/modules/calendar/input";
 import { calendarHref, maxNotifiableLevel } from "../src/shared/calendar";
 import { levelFor, levelThresholds, maxLevel } from "../src/shared/gamification";
 const valid = { title: " Acara ", description: " Catatan ", startsAt: "2026-09-12T01:00:00Z", endsAt: "2026-09-12T02:00:00Z" };
@@ -18,6 +18,14 @@ test("preferences accept booleans only and versions cannot overflow", () => {
   expect(preferencesInput({ reminders: false, levelUp: true, checkin: false })).toEqual({ reminders: false, levelUp: true, checkin: false });
   expect(() => preferencesInput({ reminders: "false", levelUp: true, checkin: true })).toThrow();
   for (const version of [0, -1, "1", 1.5, 2147483647]) expect(() => versionInput({ version })).toThrow();
+});
+test("annual academic calendar input validates dates, category and scope", () => {
+  const academicYearId = crypto.randomUUID();
+  expect(academicCalendarEventInput({ academicYearId, classId: "", title: "MPLS", description: "", category: "student", startsOn: "2026-07-13", endsOn: "2026-07-19" })).toEqual({
+    academicYearId, classId: null, title: "MPLS", description: "", category: "student", startsOn: "2026-07-13", endsOn: "2026-07-19",
+  });
+  expect(() => academicCalendarEventInput({ academicYearId, title: "MPLS", description: "", category: "unknown", startsOn: "2026-07-13", endsOn: "2026-07-19" })).toThrow();
+  expect(() => academicCalendarEventInput({ academicYearId, title: "MPLS", description: "", category: "student", startsOn: "2026-07-20", endsOn: "2026-07-19" })).toThrow();
 });
 test("source links resolve to existing learning, attendance and calendar pages", () => {
   expect(calendarHref({ kind: "event", id: "event", courseId: null, lessonId: null })).toBe("/calendar?event=event");

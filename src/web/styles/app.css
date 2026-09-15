@@ -818,7 +818,7 @@
 }
 /* Lesson documents: cover, in-place editor, rendered Markdown, and the share link. */
 @layer components {
-  .lesson-document { padding: 0; overflow: hidden; }
+  .lesson-document { padding: 20px 0; overflow: hidden; }
   .lesson-document > *:not(.doc-cover) { padding-left: 20px; padding-right: 20px; }
   .lesson-document > .learning-row { padding-top: 20px; }
   .doc-cover { position: relative; }
@@ -1221,10 +1221,14 @@
   .academic-calendar-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 20px 20px 4px; }
   .academic-calendar-heading h2 { font-size: 18px; font-weight: 650; }
   .academic-calendar-heading .card-hint { padding: 4px 0 0; }
+  .academic-calendar-heading-actions { display: flex; align-items: center; gap: 16px; }
   .academic-calendar-stats { display: grid; justify-items: end; color: var(--color-muted); font-size: 12px; }
   .academic-calendar-stats strong { color: var(--color-text); font-size: 22px; line-height: 1.1; }
   .academic-calendar-filters { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-background); }
   .academic-calendar-filters .learning-field { width: min(220px, 100%); }
+  .academic-category-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 20px 4px; color: var(--color-subtle); font-size: 12px; }
+  .academic-category-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .academic-category-legend .academic-summary-dot { margin: 0; }
   .academic-calendar-months { padding: 8px 20px 24px; }
   .academic-semester + .academic-semester { margin-top: 24px; }
   .academic-semester > h3 { margin: 0 0 12px; color: var(--color-text); font-size: 17px; text-align: center; }
@@ -1244,11 +1248,15 @@
   .academic-day-tooltip strong, .academic-day-tooltip small { display: block; white-space: pre-line; }
   .academic-day-tooltip strong { font-size: 12px; }
   .academic-day-tooltip small { margin-top: 3px; color: var(--color-muted); font-size: 11px; }
-  .academic-day:hover .academic-day-tooltip, .academic-day:focus .academic-day-tooltip { display: block; }
+  .academic-day:hover .academic-day-tooltip, .academic-day:focus .academic-day-tooltip, .academic-day.is-tooltip-open .academic-day-tooltip { display: block; }
   .academic-day:nth-child(-n + 7) .academic-day-tooltip { bottom: auto; top: calc(100% + 8px); }
   .academic-month-summary { display: grid; gap: 8px; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--color-border); list-style: none; color: var(--color-subtle); font-size: 12px; line-height: 1.35; }
-  .academic-month-summary li { display: grid; grid-template-columns: 8px minmax(0, 1fr); column-gap: 7px; align-items: start; min-width: 0; }
+  .academic-month-summary li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 7px; align-items: start; min-width: 0; }
   .academic-summary-content { min-width: 0; overflow-wrap: anywhere; }
+  .academic-summary-content small { display: block; margin-top: 2px; color: var(--color-muted); font-size: 11px; }
+  .academic-summary-actions { display: flex; gap: 2px; margin-top: -5px; }
+  .academic-summary-actions .icon-button-small { color: var(--color-muted); }
+  .academic-summary-actions .icon-button-small:hover { color: var(--color-blue); }
   .academic-month-summary li strong { font-weight: 650; }
   .academic-summary-dot { width: 8px; height: 8px; margin-top: 3px; border-radius: 50%; }
   .academic-summary-academic { background: var(--color-success); }
@@ -1284,7 +1292,10 @@
   .calendar-page-actions { margin-top: -8px; }
   .calendar-filter-actions { flex-wrap: wrap; }
   .calendar-search { padding-left: 16px; padding-right: 16px; }
-  .academic-calendar-heading, .academic-calendar-filters, .academic-calendar-months { padding-left: 16px; padding-right: 16px; }
+  .academic-calendar-heading, .academic-calendar-filters, .academic-category-legend, .academic-calendar-months { padding-left: 16px; padding-right: 16px; }
+  .academic-calendar-heading { align-items: stretch; flex-direction: column; }
+  .academic-calendar-heading-actions { justify-content: space-between; }
+  .academic-calendar-stats { justify-items: start; }
   .academic-month-grid { grid-template-columns: 1fr; }
   .notification-row { grid-template-columns: 32px minmax(0, 1fr); align-items: start; padding: 14px 16px; }
   .notification-actions { grid-column: 2; justify-content: flex-start; }

@@ -17,7 +17,7 @@ export interface AcademicCalendarYear { id: string; name: string; startsOn: stri
 export interface AcademicCalendarClass { id: string; name: string }
 export interface AcademicCalendarEvent {
   id: string; academicYearId: string; classId: string | null; className: string | null;
-  title: string; description: string; category: AcademicCalendarCategory; startsOn: string; endsOn: string;
+  title: string; description: string; category: AcademicCalendarCategory; startsOn: string; endsOn: string; version: number;
 }
 export interface AcademicCalendarData {
   year: AcademicCalendarYear; years: AcademicCalendarYear[]; classes: AcademicCalendarClass[];

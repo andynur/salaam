@@ -65,6 +65,14 @@ approved the [scope proposal](08-calendar-notifications-proposal.md) before impl
   events for one academic year. The Calendar screen now separates the live learning agenda
   from a 12-month academic view with semester grouping, event tooltips, and administrator
   filters for academic year and class. Demo seeding includes the 2026/2027 sample schedule.
+- **Editable annual calendar:** migration `0038_editable_academic_calendar.sql` with a
+  matching down script adds idempotent creation, optimistic versions, archive history, and
+  operation metadata to annual events. Administrators can add, edit, or remove a school- or
+  class-scoped activity directly from its monthly recap. The migration safely reconciles
+  matching legacy demo rows with the approved 2026/2027 reference; fresh demo seeds use the
+  same 31-event schedule. Data migration `0039_academic_calendar_reference.sql` fills that
+  reference only when an existing 2026/2027 annual calendar is empty, so custom calendars
+  are never overwritten.
 
 ## API additions
 
@@ -74,6 +82,8 @@ Mutations require the application Origin. Out-of-scope sources return 404.
 | --- | --- | --- |
 | GET | `/api/calendar?from=…&to=…&q=…&offset=…` | Scoped live agenda; exclusive upper date bound |
 | GET | `/api/calendar/academic?yearId=…&classId=…` | Scoped annual academic calendar and admin filter options |
+| POST | `/api/calendar/academic/events` | Create an annual event with `requestKey` (`academic.manage`) |
+| PATCH | `/api/calendar/academic/events/:id` | Versioned annual-event edit, or `action: "archive"` |
 | GET | `/api/calendar/events/:id` | Current academic event detail |
 | POST | `/api/calendar/events` | Create event with `requestKey` |
 | PATCH | `/api/calendar/events/:id` | Versioned edit, or `action: "archive"` |

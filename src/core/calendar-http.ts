@@ -3,7 +3,7 @@ import type { Actor } from "./permissions";
 import { requirePermission } from "./permissions";
 import { HttpError } from "./errors";
 import { databaseInputError, idField, jsonObject, listInput } from "./validation";
-import { academicCalendar, calendarEntries, createEvent, eventDetail, updateEvent } from "../modules/calendar/service";
+import { academicCalendar, calendarEntries, createAcademicCalendarEvent, createEvent, eventDetail, updateAcademicCalendarEvent, updateEvent } from "../modules/calendar/service";
 import { inbox, markRead, preferences, savePreferences } from "../modules/calendar/notifications";
 export function createCalendarHandler(db: SQL) {
   return async (request: Request, actor: Actor | null, requestId: string): Promise<Response> => {
@@ -20,10 +20,13 @@ export function createCalendarHandler(db: SQL) {
       }
       if (method === "POST" || method === "PATCH") {
         const body = await jsonObject(request, 16384);
+        if (path === "/api/calendar/academic/events" && method === "POST") return Response.json(await createAcademicCalendarEvent(db, actor, body, requestId), { status: 201 });
         if (path === "/api/calendar/events" && method === "POST") return Response.json(await createEvent(db, actor, body, requestId), { status: 201 });
         if (path === "/api/notifications/preferences" && method === "PATCH") return Response.json(await savePreferences(db, actor, body, requestId));
         const event = path.match(/^\/api\/calendar\/events\/([^/]+)$/);
         if (event && method === "PATCH") return Response.json(await updateEvent(db, actor, idField({ id: event[1] }, "id"), body, requestId));
+        const academicEvent = path.match(/^\/api\/calendar\/academic\/events\/([^/]+)$/);
+        if (academicEvent && method === "PATCH") return Response.json(await updateAcademicCalendarEvent(db, actor, idField({ id: academicEvent[1] }, "id"), body, requestId));
         const read = path.match(/^\/api\/notifications\/([^/]+)\/read$/);
         if (read && method === "POST") return Response.json(await markRead(db, actor, idField({ id: read[1] }, "id")));
       }

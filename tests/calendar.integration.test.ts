@@ -25,6 +25,7 @@ describe.skipIf(!url)("Phase 8 calendar and notifications (isolated PostgreSQL s
   let handle: ReturnType<typeof createHttpHandler>;
   let adminId: string;
   let teacherId: string;
+  let yearId: string;
   let termId: string;
   let classId: string;
   const people: Record<"teacher" | "otherTeacher" | "student" | "peer" | "outsider", { id: string; cookie: string }> = {} as never;
@@ -77,7 +78,7 @@ describe.skipIf(!url)("Phase 8 calendar and notifications (isolated PostgreSQL s
     teacherId = people.teacher.id;
     people.otherTeacher = await user("otherteacher", "teacher");
     for (const name of ["student", "peer", "outsider"] as const) people[name] = await user(name, "student");
-    const yearId = await academic("years", { name: "2026/2027", startsOn: "2026-07-01", endsOn: "2027-06-30" });
+    yearId = await academic("years", { name: "2026/2027", startsOn: "2026-07-01", endsOn: "2027-06-30" });
     termId = await academic("terms", { yearId, name: "Ganjil", startsOn: "2026-07-01", endsOn: "2026-12-31" });
     classId = await academic("classes", { yearId, name: "X A" });
     const otherClass = await academic("classes", { yearId, name: "X B" });
@@ -90,8 +91,37 @@ describe.skipIf(!url)("Phase 8 calendar and notifications (isolated PostgreSQL s
     startsAt: new Date(Date.now() + 2 * 3600000).toISOString(), endsAt: new Date(Date.now() + 3 * 3600000).toISOString(), requestKey: crypto.randomUUID() });
   const agenda = (cookie = people.student.cookie) => json<any>(request(`/api/calendar?${new URLSearchParams({ from: new Date(Date.now() - 86400000).toISOString(), to: new Date(Date.now() + 2 * 86400000).toISOString() })}`, cookie));
   const events = "/api/calendar/events";
+  const academicEvents = "/api/calendar/academic/events";
   const notifications = (cookie = people.student.cookie) => json<any>(request("/api/notifications", cookie));
   const prefs = (cookie: string, reminders: boolean, levelUp = true, checkin = true) => json(request("/api/notifications/preferences", cookie, { reminders, levelUp, checkin }, "PATCH"));
+  const academicEventBody = () => ({ academicYearId: yearId, classId: "", title: "Kegiatan tahunan", description: "Keterangan", category: "academic",
+    startsOn: "2026-10-10", endsOn: "2026-10-11", requestKey: crypto.randomUUID() });
+  test("annual academic events are idempotent, versioned, scoped and archivable", async () => {
+    const body = academicEventBody();
+    expect((await request(academicEvents, people.teacher.cookie, body)).status).toBe(403);
+    expect((await request(academicEvents, adminCookie, { ...body, endsOn: "2027-07-01" })).status).toBe(400);
+    const copies = await Promise.all(Array.from({ length: 4 }, () => json<any>(request(academicEvents, adminCookie, body), 201)));
+    expect(new Set(copies.map(row => row.id)).size).toBe(1);
+    expect((await db`SELECT * FROM audit_logs WHERE event = 'calendar.academic_event.created' AND resource_id = ${copies[0].id}`).length).toBe(1);
+    expect((await request(academicEvents, adminCookie, { ...body, title: "Kegiatan lain" })).status).toBe(409);
+    const studentView = await json<any>(request(`/api/calendar/academic?yearId=${yearId}`, people.student.cookie));
+    expect(studentView.canManage).toBe(false);
+    expect(studentView.events.find((event: any) => event.id === copies[0].id).version).toBe(1);
+    const update = { ...body, title: "Kegiatan diperbarui", version: 1 };
+    const outcomes = await Promise.all([
+      request(`${academicEvents}/${copies[0].id}`, adminCookie, update, "PATCH"),
+      request(`${academicEvents}/${copies[0].id}`, adminCookie, { ...update, title: "Perubahan bersaing" }, "PATCH"),
+    ]);
+    expect(outcomes.map(response => response.status).sort()).toEqual([200, 409]);
+    const current = await json<any>(request(`/api/calendar/academic?yearId=${yearId}`, adminCookie));
+    const updated = current.events.find((event: any) => event.id === copies[0].id);
+    expect(updated.title).toBe("Kegiatan diperbarui");
+    expect(updated.version).toBe(2);
+    const archive = { action: "archive", version: 2 };
+    expect((await request(`${academicEvents}/${copies[0].id}`, adminCookie, archive, "PATCH")).status).toBe(200);
+    expect((await request(`${academicEvents}/${copies[0].id}`, adminCookie, archive, "PATCH")).status).toBe(200);
+    expect((await json<any>(request(`/api/calendar/academic?yearId=${yearId}`, adminCookie))).events.some((event: any) => event.id === copies[0].id)).toBe(false);
+  });
   test("event creation validates capabilities, course scope, Origin and retry keys", async () => {
     const { courseId } = await workspace();
     const body = eventBody(courseId);

@@ -68,6 +68,102 @@ the existing environment file.
   recovery to the operator. Inspect schema compatibility before switching `current`
   back to the previous release. Never automatically roll back database migrations.
 
+## Demo dataset on the VPS (temporary, pilot only)
+
+[Deployment strategy](../docs/deployment-vps.md) says not to run demo seeds against the
+production database, because `database/seed/demo.ts` adds ~121 synthetic accounts and a
+full academic term alongside real data. Use this only for a deliberate staff walkthrough
+on the shared pilot VPS, sharing the same database as the real bootstrap administrator.
+There is no "un-seed" script; going live with real school data on this same deployment
+afterward means resetting the database first (`bun run db:migrate:reset` from a release,
+or a fresh restore).
+
+Release artifacts never include `database/seed/*.ts` sources or `node_modules`
+(`deploy/package.sh` only bundles `dist/`, migrations, and `ops/*.js`), so seeding needs a
+separate upload of the TypeScript source, run with `NODE_ENV` overridden to
+`development` — the only environment `demo.ts` allows — while every other variable
+(`DATABASE_URL`, `APP_BASE_URL`, `STORAGE_ROOT`, …) stays the real production value from
+`/etc/salaam/salaam.env`.
+
+1. **Upload source to a scratch directory the `salaam` user can reach.** Don't use a
+   directory under `/home/ubuntu`: its default `750` permissions block `salaam` from even
+   `chdir`-ing in, which fails silently under `systemd-run`/`runuser` (see step 3).
+
+   ```sh
+   cd /path/to/salaam
+   tar --exclude=node_modules --exclude=dist --exclude=.git -czf /tmp/salaam-src.tgz .
+   scp /tmp/salaam-src.tgz <deploy-user>@<host>:/tmp/salaam-src.tgz
+   ```
+
+2. **On the VPS, extract under `/opt` and install dependencies:**
+
+   ```sh
+   sudo mkdir -p /opt/salaam-seed-src
+   sudo tar -xzf /tmp/salaam-src.tgz -C /opt/salaam-seed-src
+   rm /tmp/salaam-src.tgz
+   cd /opt/salaam-seed-src
+   sudo bun install --frozen-lockfile
+   sudo chown -R salaam:salaam /opt/salaam-seed-src
+   ```
+
+3. **Verify the environment override actually takes effect before seeding.**
+   `systemd-run --property=EnvironmentFile=... --setenv=NODE_ENV=development` does not
+   reliably let `--setenv` win over a `NODE_ENV` already set in the environment file —
+   don't rely on flag order. Instead, source the protected env file as root (`salaam.env`
+   is root-readable only) and drop to `salaam` with `runuser -p`, which preserves the
+   shell's resolved environment exactly:
+
+   ```sh
+   sudo bash -c '
+     set -a
+     source /etc/salaam/salaam.env
+     set +a
+     export NODE_ENV=development
+     runuser -p -u salaam -- env | grep -E "^NODE_ENV=|^DATABASE_URL=|^APP_BASE_URL="
+   '
+   ```
+
+   Confirm the printed `NODE_ENV` is `development` and the other two are the real
+   production values before proceeding.
+
+4. **Run curriculum seed, then demo seed, in that order** (`demo.ts` reads the curriculum
+   the same way the app does; running it first keeps both idempotent-safe if repeated):
+
+   ```sh
+   sudo bash -c '
+     set -a
+     source /etc/salaam/salaam.env
+     set +a
+     export NODE_ENV=development
+     cd /opt/salaam-seed-src
+     runuser -p -u salaam -- /usr/local/bin/bun database/seed/curriculum.ts
+     echo "curriculum exit: $?"
+     runuser -p -u salaam -- /usr/local/bin/bun database/seed/demo.ts
+     echo "demo exit: $?"
+   '
+   ```
+
+   A real failure from `demo.ts` itself (the `NODE_ENV` guard, or "demo data already
+   present") prints an error and stack trace and exits `1`. An exit code of `200` with no
+   output and near-zero runtime means `systemd` never executed `bun` at all — almost
+   always `EXIT_CHDIR` from `WorkingDirectory` being unreachable by `salaam`; fix
+   directory permissions, don't change `NODE_ENV` handling.
+
+   `demo.ts` refuses to run a second time once its data exists (checks for the demo
+   academic year), so a successful run prints an account summary to stdout — capture that
+   output for distribution. All demo accounts under `@hsibs.my.id` share the password
+   `SalaamDemo2026!`, hardcoded in `database/seed/demo.ts`.
+
+5. **Verify and clean up:**
+
+   ```sh
+   curl -fsS https://salaam.hsibs.my.id/health/ready
+   sudo rm -rf /opt/salaam-seed-src
+   ```
+
+   Don't leave the seed source tree (and its `node_modules`) on the VPS — it isn't part
+   of the deployed release under `/srv/salaam/current` and only adds attack surface.
+
 ## GitHub Actions deployment
 
 `.github/workflows/deploy.yml` runs typecheck, the full PostgreSQL-backed suite against a

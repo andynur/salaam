@@ -328,6 +328,11 @@ and level, and QR notices on the specific window update. Read receipts preserve 
 timestamp. No broker, provider, copied content snapshot, or runtime dependency is introduced.
 See [Phase 8](phases/08-calendar-notifications.md) for limits and API behavior.
 
+The separate date-only annual calendar uses `academic_calendar_events`. Migration
+`0038_editable_academic_calendar.sql` adds optimistic versions and idempotency metadata;
+administrators manage these rows through `/api/calendar/academic/events`. Annual events
+remain distinct from live agenda deadlines and notification sources.
+
 ## Clubs
 
 A club is an orchestration layer over delivered modules, not a parallel domain. `clubs`

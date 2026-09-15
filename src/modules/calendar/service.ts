@@ -5,7 +5,7 @@ import { recordAudit } from "../../core/audit/repository";
 import { HttpError } from "../../core/errors";
 import { idField } from "../../core/validation";
 import { courseAccess, notFound } from "../learning/access";
-import { eventInput, rangeInput, versionInput } from "./input";
+import { academicCalendarEventInput, eventInput, rangeInput, versionInput } from "./input";
 import type { AcademicCalendarData, CalendarEntry } from "../../shared/calendar";
 const changed = () => new HttpError(409, "EVENT_CHANGED", "Acara sudah berubah. Muat ulang sebelum menyimpan.");
 export async function academicCalendar(db: SQL, actor: Actor, url: URL): Promise<AcademicCalendarData> {
@@ -25,7 +25,7 @@ export async function academicCalendar(db: SQL, actor: Actor, url: URL): Promise
     WHERE academic_year_id = ${selected.id} AND archived_at IS NULL ORDER BY name`;
   const classFilter = canManage ? requestedClassId : null;
   const events = await db<AcademicCalendarData["events"]>`SELECT e.id, e.academic_year_id AS "academicYearId", e.class_id AS "classId",
-    c.name AS "className", e.title, e.description, e.category, e.starts_on::text AS "startsOn", e.ends_on::text AS "endsOn"
+    c.name AS "className", e.title, e.description, e.category, e.starts_on::text AS "startsOn", e.ends_on::text AS "endsOn", e.version
     FROM academic_calendar_events e LEFT JOIN classes c ON c.id = e.class_id
     WHERE e.academic_year_id = ${selected.id} AND e.archived_at IS NULL
       AND (${classFilter}::uuid IS NULL OR e.class_id IS NULL OR e.class_id = ${classFilter}::uuid)
@@ -33,6 +33,51 @@ export async function academicCalendar(db: SQL, actor: Actor, url: URL): Promise
         OR EXISTS (SELECT 1 FROM teaching_assignments ta JOIN courses course ON course.id = ta.course_id WHERE ta.teacher_id = ${actor.id} AND course.class_id = e.class_id))
     ORDER BY e.starts_on, e.ends_on, e.id`;
   return { year: selected, years, classes, events, canManage };
+}
+async function academicYearDates(tx: SQL, yearId: string, startsOn: string, endsOn: string) {
+  const [year] = await tx<{ startsOn: string; endsOn: string }[]>`SELECT starts_on::text AS "startsOn", ends_on::text AS "endsOn"
+    FROM academic_years WHERE id = ${yearId} AND archived_at IS NULL FOR SHARE`;
+  if (!year) notFound();
+  if (startsOn < year.startsOn || endsOn > year.endsOn) throw new HttpError(400, "INVALID_INPUT", "Tanggal kegiatan harus berada dalam tahun ajaran yang dipilih.");
+}
+export async function createAcademicCalendarEvent(db: SQL, actor: Actor, body: Record<string, unknown>, requestId: string) {
+  requirePermission(actor, "academic.manage");
+  const input = academicCalendarEventInput(body), key = idField(body, "requestKey"), operation = JSON.stringify(input);
+  return db.begin(async tx => {
+    await academicYearDates(tx, input.academicYearId, input.startsOn, input.endsOn);
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${actor.id + key}, 0))`;
+    const [existing] = await tx<{ id: string; version: number; same: boolean }[]>`SELECT id, version, last_operation = ${operation}::text::jsonb AS same
+      FROM academic_calendar_events WHERE created_by = ${actor.id} AND request_key = ${key}`;
+    if (existing) { if (!existing.same) throw changed(); return { id: existing.id, version: existing.version }; }
+    const [row] = await tx<{ id: string; version: number }[]>`INSERT INTO academic_calendar_events
+      (academic_year_id, class_id, title, description, category, starts_on, ends_on, created_by, request_key, last_operation)
+      VALUES (${input.academicYearId}, ${input.classId}, ${input.title}, ${input.description}, ${input.category}, ${input.startsOn}, ${input.endsOn},
+        ${actor.id}, ${key}, ${operation}::text::jsonb) RETURNING id, version`;
+    await recordAudit(tx, actor.id, "calendar.academic_event.created", "academic_calendar_events", row!.id, requestId);
+    return row!;
+  });
+}
+export async function updateAcademicCalendarEvent(db: SQL, actor: Actor, id: string, body: Record<string, unknown>, requestId: string) {
+  requirePermission(actor, "academic.manage");
+  const version = versionInput(body), archive = body.action === "archive";
+  const input = archive ? null : academicCalendarEventInput(body);
+  const operation = JSON.stringify({ version, archive, input });
+  return db.begin(async tx => {
+    const [row] = await tx<{ academicYearId: string; version: number; same: boolean; archived: boolean }[]>`SELECT academic_year_id AS "academicYearId", version,
+      last_operation = ${operation}::text::jsonb AS same, archived_at IS NOT NULL AS archived FROM academic_calendar_events WHERE id = ${id} FOR UPDATE`;
+    if (!row) notFound();
+    if (row.same) return { id, version: row.version };
+    if (row.version !== version || row.archived) throw changed();
+    if (input) {
+      if (input.academicYearId !== row.academicYearId) throw new HttpError(400, "INVALID_INPUT", "Tahun ajaran kegiatan tidak dapat dipindahkan.");
+      await academicYearDates(tx, input.academicYearId, input.startsOn, input.endsOn);
+      await tx`UPDATE academic_calendar_events SET class_id = ${input.classId}, title = ${input.title}, description = ${input.description}, category = ${input.category},
+        starts_on = ${input.startsOn}, ends_on = ${input.endsOn}, version = version + 1, updated_at = clock_timestamp(), last_operation = ${operation}::text::jsonb WHERE id = ${id}`;
+    } else await tx`UPDATE academic_calendar_events SET archived_at = clock_timestamp(), version = version + 1, updated_at = clock_timestamp(),
+      last_operation = ${operation}::text::jsonb WHERE id = ${id}`;
+    await recordAudit(tx, actor.id, archive ? "calendar.academic_event.archived" : "calendar.academic_event.updated", "academic_calendar_events", id, requestId);
+    return { id, version: version + 1 };
+  });
 }
 export async function calendarEntries(db: SQL, actor: Actor, url: URL) {
   requirePermission(actor, "dashboard:view");

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Actor } from "../../core/permissions";
 import type { LearningCourse } from "../../shared/learning";
 import { calendarHref, calendarLabels, type AcademicCalendarData, type AcademicCalendarEvent, type CalendarEntry, type NotificationItem, type NotificationPreferences } from "../../shared/calendar";
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, PanelHeading } from "../components/ui";
 import { Icon } from "../components/icons";
 import { Field, MutationForm, Pager, Search, formatDateTime, useData } from "../components/learning";
 import { brandTitle } from "../lib/brand";
@@ -108,28 +108,62 @@ export const notificationIcons = { reminder: "book", level_up: "star", checkin: 
 // Dispatched on window after a read receipt so the topbar badge and the inbox page stay in step.
 export const notificationsChanged = "salaam:notifications-changed";
 export const notificationCategoryClass =(kind: NotificationItem["kind"]) => `notification-category-${kind.replace("_", "-")}`;
+function AcademicCalendarEventEditor({ data, entry, saved, cancel, onExpired }: { data: AcademicCalendarData; entry?: AcademicCalendarEvent; saved: () => void; cancel: () => void; onExpired: () => void }) {
+  const [key] = useState(() => crypto.randomUUID());
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => { panel.current?.querySelector<HTMLInputElement>('input[name="title"]')?.focus(); }, []);
+  return <Card className="admin-form-card"><div ref={panel} id="academic-event-editor">
+    <PanelHeading title={entry ? "Ubah kegiatan" : "Tambah kegiatan"} description="Tanggal menggunakan zona waktu sekolah dan harus berada dalam tahun ajaran ini." close={cancel} />
+    <MutationForm path={entry ? `/api/calendar/academic/events/${entry.id}` : "/api/calendar/academic/events"} method={entry ? "PATCH" : "POST"} label={entry ? "Simpan perubahan" : "Tambah kegiatan"} onExpired={onExpired} saved={saved} cancel={cancel}
+      body={form => ({ academicYearId: data.year.id, classId: form.get("classId"), title: form.get("title"), description: form.get("description"), category: form.get("category"),
+        startsOn: form.get("startsOn"), endsOn: form.get("endsOn"), requestKey: key, ...(entry ? { version: entry.version } : {}) })}>
+      <Field label="Nama kegiatan" name="title" value={entry?.title} />
+      <label className="learning-field"><span>Kategori</span><select className="input" name="category" defaultValue={entry?.category ?? "academic"}>
+        {Object.entries(categoryLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+      </select></label>
+      <Field label="Tanggal mulai" name="startsOn" type="date" value={entry?.startsOn} />
+      <Field label="Tanggal selesai" name="endsOn" type="date" value={entry?.endsOn} />
+      <label className="learning-field field-wide"><span>Lingkup kelas</span><select className="input" name="classId" defaultValue={entry?.classId ?? ""}>
+        <option value="">Seluruh sekolah</option>{data.classes.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
+      </select><small className="field-hint">Pilih kelas jika kegiatan hanya berlaku untuk satu kelas.</small></label>
+      <Field label="Keterangan" name="description" area max={2000} required={false} value={entry?.description} />
+    </MutationForm>
+  </div></Card>;
+}
+function AcademicCalendarArchive({ entry, saved, cancel, onExpired }: { entry: AcademicCalendarEvent; saved: () => void; cancel: () => void; onExpired: () => void }) {
+  return <Card className="admin-form-card"><div id="academic-event-archive">
+    <PanelHeading title="Hapus kegiatan dari kalender?" description={<><strong>{entry.title}</strong> tidak lagi terlihat oleh pengguna. Riwayat perubahan tetap tersimpan untuk audit.</>} close={cancel} />
+    <MutationForm path={`/api/calendar/academic/events/${entry.id}`} method="PATCH" label="Ya, hapus kegiatan" body={() => ({ action: "archive", version: entry.version })} saved={saved} onExpired={onExpired} cancel={cancel} />
+  </div></Card>;
+}
 function AcademicCalendar({ onExpired }: { onExpired: () => void }) {
-  const [yearId, setYearId] = useState(""), [classId, setClassId] = useState("");
+  const [yearId, setYearId] = useState(""), [classId, setClassId] = useState(""), [revision, setRevision] = useState(0);
+  const [editing, setEditing] = useState<AcademicCalendarEvent | "new" | null>(null), [archiving, setArchiving] = useState<AcademicCalendarEvent | null>(null), [saved, setSaved] = useState("");
   const query = new URLSearchParams(); if (yearId) query.set("yearId", yearId); if (classId) query.set("classId", classId);
-  const view = useData<AcademicCalendarData>(`/api/calendar/academic?${query}`, onExpired);
+  const view = useData<AcademicCalendarData>(`/api/calendar/academic?${query}`, onExpired, revision);
   useEffect(() => { if (view.data && !yearId) setYearId(view.data.year.id); }, [view.data, yearId]);
   if (view.error) return <ErrorState message={view.error} retry={view.retry} />;
   if (!view.data) return <LoadingState />;
   const data = view.data;
-  return <Card className="academic-calendar-card">
-    <div className="academic-calendar-heading"><div><h2>{data.year.name}</h2><p className="card-hint">Kalender kegiatan akademik satu tahun ajaran.</p></div><div className="academic-calendar-stats"><strong>{data.events.length}</strong><span>kegiatan</span></div></div>
+  const complete = (message: string) => { setEditing(null); setArchiving(null); setSaved(message); setRevision(value => value + 1); };
+  return <>{editing && <AcademicCalendarEventEditor key={editing === "new" ? "new" : editing.id} data={data} {...(editing === "new" ? {} : { entry: editing })} saved={() => complete(editing === "new" ? "Kegiatan ditambahkan." : "Perubahan kegiatan disimpan.")} cancel={() => setEditing(null)} onExpired={onExpired} />}
+    {archiving && <AcademicCalendarArchive entry={archiving} saved={() => complete("Kegiatan dihapus dari kalender.")} cancel={() => setArchiving(null)} onExpired={onExpired} />}
+    {saved && <p className="success-state" role="status">{saved}</p>}
+    <Card className="academic-calendar-card">
+    <div className="academic-calendar-heading"><div><h2>{data.year.name}</h2><p className="card-hint">Kalender kegiatan akademik satu tahun ajaran.</p></div><div className="academic-calendar-heading-actions"><div className="academic-calendar-stats"><strong>{data.events.length}</strong><span>kegiatan</span></div>{data.canManage && <Button aria-expanded={editing === "new"} aria-controls="academic-event-editor" onClick={() => { setSaved(""); setArchiving(null); setEditing("new"); }}><Icon name="plus" size={16} />Tambah kegiatan</Button>}</div></div>
     {data.canManage && <div className="academic-calendar-filters"><label className="learning-field"><span>Tahun ajaran</span><select className="input" value={data.year.id} onChange={event => { setYearId(event.target.value); setClassId(""); }}>
       {data.years.map(year => <option value={year.id} key={year.id}>{year.name}</option>)}
     </select></label><label className="learning-field"><span>Kelas</span><select className="input" value={classId} onChange={event => setClassId(event.target.value)}><option value="">Semua kelas</option>{data.classes.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div>}
-    <AcademicMonths year={data.year} events={data.events} />
-  </Card>;
+    <div className="academic-category-legend" aria-label="Kategori kegiatan">{Object.entries(categoryLabels).map(([category, label]) => <span key={category}><span className={`academic-summary-dot academic-summary-${category}`} />{label}</span>)}</div>
+    <AcademicMonths year={data.year} events={data.events} canManage={data.canManage} edit={event => { setSaved(""); setArchiving(null); setEditing(event); }} archive={event => { setSaved(""); setEditing(null); setArchiving(event); }} />
+  </Card></>;
 }
-function AcademicMonths({ year, events }: { year: AcademicCalendarData["year"]; events: AcademicCalendarEvent[] }) {
+function AcademicMonths({ year, events, canManage, edit, archive }: { year: AcademicCalendarData["year"]; events: AcademicCalendarEvent[]; canManage: boolean; edit: (event: AcademicCalendarEvent) => void; archive: (event: AcademicCalendarEvent) => void }) {
   const start = new Date(`${year.startsOn}T00:00:00Z`);
   const months = Array.from({ length: 12 }, (_, index) => new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + index, 1)));
-  return <div className="academic-calendar-months">{[0, 1].map(semester => <section className="academic-semester" key={semester}><h3>Semester {semester + 1}</h3><div className="academic-month-grid">{months.slice(semester * 6, semester * 6 + 6).map(month => <AcademicMonth key={month.toISOString()} month={month} events={events} />)}</div></section>)}</div>;
+  return <div className="academic-calendar-months">{[0, 1].map(semester => <section className="academic-semester" key={semester}><h3>Semester {semester + 1}</h3><div className="academic-month-grid">{months.slice(semester * 6, semester * 6 + 6).map(month => <AcademicMonth key={month.toISOString()} month={month} events={events} canManage={canManage} edit={edit} archive={archive} />)}</div></section>)}</div>;
 }
-function AcademicMonth({ month, events }: { month: Date; events: AcademicCalendarEvent[] }) {
+function AcademicMonth({ month, events, canManage, edit, archive }: { month: Date; events: AcademicCalendarEvent[]; canManage: boolean; edit: (event: AcademicCalendarEvent) => void; archive: (event: AcademicCalendarEvent) => void }) {
   const year = month.getUTCFullYear(), monthIndex = month.getUTCMonth(), firstDay = (month.getUTCDay() + 6) % 7;
   const days = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
   const cells = Array.from({ length: Math.ceil((firstDay + days) / 7) * 7 }, (_, index) => index < firstDay || index >= firstDay + days ? null : index - firstDay + 1);
@@ -144,12 +178,14 @@ function AcademicMonth({ month, events }: { month: Date; events: AcademicCalenda
     return startDay === endDay ? String(startDay) : `${startDay}-${endDay}`;
   };
   return <article className="academic-month"><h4>{new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric", timeZone: "UTC" }).format(month)}</h4><div className="academic-weekdays">{["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map(day => <span key={day}>{day}</span>)}</div><div className="academic-days">{cells.map((day, index) => day === null ? <span className="academic-day academic-day-empty" key={index} /> : <AcademicDay day={day} date={dateKey(day)} events={dayEvents(day)} key={index} />)}</div>
-    {monthEvents.length > 0 && <ul className="academic-month-summary">{monthEvents.map(event => <li key={event.id}><span className={`academic-summary-dot academic-summary-${event.category}`} /><span className="academic-summary-content"><strong>{eventRange(event)}:</strong> {event.title}</span></li>)}</ul>}
+    {monthEvents.length > 0 && <ul className="academic-month-summary">{monthEvents.map(event => <li key={event.id}><span className={`academic-summary-dot academic-summary-${event.category}`} /><span className="academic-summary-content"><strong>{eventRange(event)}:</strong> {event.title}{event.className && <small>{event.className}</small>}</span>{canManage && <span className="academic-summary-actions"><button className="icon-button-small" type="button" aria-label={`Ubah ${event.title}`} onClick={() => edit(event)}><Icon name="edit" size={14} /></button><button className="icon-button-small" type="button" aria-label={`Hapus ${event.title}`} onClick={() => archive(event)}><Icon name="archive" size={14} /></button></span>}</li>)}</ul>}
   </article>;
 }
 function AcademicDay({ day, date, events }: { day: number; date: string; events: AcademicCalendarEvent[] }) {
   const event = events[0];
-  return <span className={`academic-day ${event ? categoryClass(event.category) : ""}`} tabIndex={event ? 0 : undefined} aria-label={event ? `${date}: ${events.map(item => item.title).join(", ")}` : date}>
+  return <span className={`academic-day ${event ? categoryClass(event.category) : ""}`} tabIndex={event ? 0 : undefined}
+    onFocus={event ? focus => focus.currentTarget.classList.add("is-tooltip-open") : undefined} onBlur={event ? focus => focus.currentTarget.classList.remove("is-tooltip-open") : undefined}
+    aria-label={event ? `${date}: ${events.map(item => item.title).join(", ")}` : date}>
     {day}{event && <span className="academic-day-tooltip" role="tooltip"><strong>{events.map(item => item.title).join(" · ")}</strong><small>{events.map(item => `${categoryLabels[item.category]}${item.className ? ` · ${item.className}` : ""}`).join("\n")}</small></span>}
   </span>;
 }
