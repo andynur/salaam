@@ -40,7 +40,8 @@ snapshot. Generation takes a shared course lock and writes
 actor, and request ID. Audit failure prevents a successful generation response.
 
 The browser renders a 1684 × 1190 canvas using local brand assets and colors. The locked
-preview is grayscale with an opaque lock message; the download button is disabled.
+preview keeps the complete student, course, date, and teacher data visible in grayscale;
+the download button remains disabled.
 An eligible download fetches fresh authorized data, rasterizes it to JPEG, then embeds
 that image in a single landscape A4 PDF. PDF object offsets count bytes; no HTML-to-PDF
 runtime is needed. Generation is guarded against double clicks and supports error retry.
@@ -57,6 +58,8 @@ runtime is needed. Generation is guarded against double clicks and supports erro
 - Disposable QA database migration passed; no application database schema change required.
 - Headless Chrome: **26/26 checks passed**, including locked 50%, unlocked 100%, four
   roles, student-picker visibility, and no horizontal overflow or alerts at 1440/820/390.
+- Follow-up UI smoke: **12/12 checks passed** for tab-first ordering, complete grayscale
+  locked data, disabled download, and responsive overflow/alert checks at 1440/820/390.
 - Actual browser download inspected with `pdfinfo` and rendered with Poppler: one A4
   landscape page, readable white logo, names and blank signature area. Desktop, phone,
   locked preview, and PDF render were visually inspected.

@@ -80,8 +80,8 @@ function CourseWorkspace({ courseId, initialLesson, initialReview, timezone, onE
   return <>
     <PageHeader breadcrumbs={crumbs} title={course.name} description={`${course.className} · ${course.term} · ${course.year}`} actions={<><Status published={course.published} />{course.canManage && publishButton("", course.published, "course")}</>} />
     {success && <p className="success-state" role="status">{success}</p>}{saveError && <ErrorState message={saveError} />}
-    {tab !== "certification" && data.progress && <ProgressSummary value={data.progress} />}
     <nav className="tabs" aria-label="Halaman course">{tabButton("content", "Materi & tugas")}{tabButton("certification", "Sertifikasi")}{course.canManage && tabButton("questions", "Bank soal")}{course.canManage && tabButton("progress", "Progres santri")}</nav>
+    {tab === "content" && data.progress && <ProgressSummary value={data.progress} />}
     {tab === "certification" ? <CertificationPanel courseId={courseId} staff={Boolean(course.canManage || course.canAssist)} onExpired={onExpired} /> : tab === "progress" && course.canManage ? <ProgressTable courseId={courseId} classroom={course.className} onExpired={onExpired} /> : tab === "questions" && course.canManage ? <QuestionBank courseId={courseId} onExpired={onExpired} /> : <>
       {course.canManage && <div className="learning-toolbar"><Button onClick={() => setEditor({ resource: "modules" })}>Tambah modul</Button><p>Publikasikan setiap tingkat agar konten terlihat oleh santri.</p></div>}
       {editor && <ContentEditor key={`${editor.resource}-${editor.value?.id ?? ("parentId" in editor ? editor.parentId : "new")}`} editor={editor} modules={modules} courseId={courseId} onExpired={onExpired} close={() => setEditor(null)} saved={() => { setEditor(null); setSuccess("Konten berhasil disimpan."); changed(); }} />}

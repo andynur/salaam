@@ -37,11 +37,6 @@ export async function certificateImage(data: Certification): Promise<HTMLCanvasE
   line(data.teachers.join(" · ") || "Guru pengajar belum ditetapkan", 968, 25, true);
   line("Guru Pengajar", 1008, 22);
   line(`${BRAND.organization} · Seluruh pembelajaran selesai (100%)`, 1090, 19);
-  if (!data.eligible) {
-    ctx.fillStyle = color("neutral"); ctx.globalAlpha = 1; ctx.fillRect(58, 268, 1568, 864); ctx.globalAlpha = 1;
-    ctx.fillStyle = color("muted"); line("PRATINJAU TERKUNCI", 610, 44, true);
-    line("Selesaikan seluruh materi dan aktivitas untuk membuka sertifikat", 674, 24);
-  }
   return canvas;
 }
 
