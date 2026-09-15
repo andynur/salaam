@@ -189,7 +189,9 @@ describe.skipIf(!url)("Phase 4 project learning (isolated PostgreSQL schema)", (
     const edit = (taskId: string, version: number, title: string) => request(project(`${projectId}/tasks/${taskId}`), peer.cookie, { title, assigneeId: student.id, dueAt: "2026-10-01T10:00:00Z", labels: ["UI", "Backend"], version }, "PATCH");
     expect((await edit(one.id, 5, "Riset pengguna")).status).toBe(409);
     expect(await json<unknown>(edit(one.id, 1, "Riset pengguna"))).toEqual({ id: one.id, version: 2 });
-    expect((await detail(projectId)).tasks.find(task => task.id === one.id)).toMatchObject({ title: "Riset pengguna", assigneeName: "student", dueAt: "2026-10-01 17:00:00+07", labels: ["UI", "Backend"], version: 2 });
+    const edited = (await detail(projectId)).tasks.find(task => task.id === one.id)!;
+    expect(edited).toMatchObject({ title: "Riset pengguna", assigneeName: "student", labels: ["UI", "Backend"], version: 2 });
+    expect(new Date(edited.dueAt!).toISOString()).toBe("2026-10-01T10:00:00.000Z");
     await json(request(project(`${projectId}/tasks/${three.id}/archive`), student.cookie, { archived: true, version: 2 }));
     const afterArchive = await detail(projectId);
     expect(afterArchive.tasks.filter(task => task.status === "todo").map(task => [task.title, task.position])).toEqual([["Riset pengguna", 0]]);
